@@ -10,16 +10,16 @@ from adflow import ADFLOW
 #         Input Information -- Modify accordingly!
 # ======================================================================
 outputDirectory = './'
-gridFile = './grid_struct_35x25_vol_mod.cgns'
+gridFile = './warped.cgns'
 alpha = 0.0
 mach = 0.2
 Re = 5000000
 Re_L = 1.0
 temp = 540
-arearef = 1.0
+arearef = 2.0
 chordref = 1.0
 altitude = 10000
-name = 'fc'
+name = '273_193_bump'
 
 aeroOptions = {
 # Common Parameters
@@ -36,13 +36,15 @@ aeroOptions = {
 
 # Common Parameters
 'MGCycle':'sg',
-'nCycles':10000,
+'nCycles':100000,
 'monitorvariables':['resrho','resmom','cl','cd','resturb'],
 'useNKSolver':True,
-'NKSwitchTol':1e-05,
+'NKSwitchTol':1e-07,
 'NKSubspaceSize':200,
 'useANKSolver':True,
-'ANKCoupledSwitchTol':1.0,
+'ANKCoupledSwitchTol':1e-16,
+'ANKConstCFLStep':0.4,
+'ANKCFLLimit':1000000000.0,
 
 # Output
 'volumeVariables':['eddy','eddyratio','dist']
