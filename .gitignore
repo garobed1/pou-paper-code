@@ -1,0 +1,18 @@
+# mesh files
+*.cgns
+*.vtk
+*.plt
+*.xyz
+*.q
+*.fmt
+*.dat
+
+# misc
+*.bak
+*.bak1
+*.bak2
+*Zone.Identifier
+
+# other files
+ffd_def.py
+ffd_def_ex.py

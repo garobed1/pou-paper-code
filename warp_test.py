@@ -3,7 +3,7 @@ from idwarp import USMesh
 from numpy import cos, arctan as atan
 
 options = {
-  'gridFile':'grid_struct_273x193_vol_mod2.cgns',
+  'gridFile':'grid_struct_69x49_vol_mod2.cgns',
   'fileType':'CGNS',
   'specifiedSurfaces':None,
   'symmetrySurfaces':None,
@@ -29,9 +29,9 @@ coords0 = mesh.getSurfaceCoordinates()
 new_coords = coords0.copy()
 
 #form bump arc according to parameters
-l = 1.0
-l0 = 0.5 
-b = 0.05
+l = 0.3
+l0 = 0.05 
+b = 0.02
 
 l1 = l+l0
 lc = (l/2.0) + l0
@@ -41,7 +41,8 @@ rmb = r - b
 for i in range(len(coords0)):
      x = new_coords[i, 0]
      y = new_coords[i, 1]
-     if x > l0 and x < l1:
+     z = new_coords[i, 2]
+     if x > l0 and x < l1 and z < 0.5:
          th = atan(abs(x - lc)/rmb)
          new_coords[i, 2] += r*cos(th) - rmb
 #    new_coords[i, :] *= 1.1
@@ -54,4 +55,4 @@ mesh.setSurfaceCoordinates(new_coords)
 mesh.warpMesh()
 
 # Write the new grid file.
-mesh.writeGrid('warped.cgns')
+mesh.writeGrid(f'bump_69x49_{l}_{l0}_{b}.cgns')
