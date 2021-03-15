@@ -20,9 +20,8 @@ class PlateComponent(om.ExplicitComponent):
         self.DVGeo = pf.createFFD()
 
         # starting flat mesh
-        meshname = 'bump_69x49_0.1_0.05_0.02'
-        gridFile = f'./{meshname}.cgns'
-        self.aoptions['gridFile'] = gridFile
+        meshname = self.aoptions['gridFile']
+        gridFile = meshname
         
         # flow characteristics
         alpha = 0.0
@@ -44,59 +43,81 @@ class PlateComponent(om.ExplicitComponent):
         evalFuncs=['cd'])
 
         # Create solver
-        self.CFDSolver = ADFLOW(options=aeroOptions, comm=MPI.COMM_WORLD)
+        self.CFDSolver = ADFLOW(options=self.aoptions, comm=MPI.COMM_WORLD)
         self.CFDSolver.setDVGeo(self.DVGeo)
 
         # Set up mesh warping
         self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_WORLD)
         self.CFDSolver.setMesh(self.mesh)
 
+        self.CFDSolver.DVGeo.getFlattenedChildren()[1].writePlot3d("ffdp_opt_def.xyz")
+
+
         # Set constraints
-        self.DVCon = DVConstraints()
-        self.DVCon.setDVGeo(self.DVGeo)
+        # self.DVCon = DVConstraints()
+        # self.DVCon.setDVGeo(self.CFDSolver.DVGeo)
 
-        self.DVCon.setSurface(self.CFDSolver.getTriangulatedMeshSurface())
+        # self.DVCon.setSurface(self.CFDSolver.getTriangulatedMeshSurface())
 
-        # DV should be same along spanwise
-        lIndex = self.DVGeo.getLocalIndex(0)
-        indSetA = []
-        indSetB = []
-        for i in range(lIndex.shape[0]):
-            indSetA.append(lIndex[i, 0, 0])
-            indSetB.append(lIndex[i, 0, 1])
-        for i in range(lIndex.shape[0]):
-            indSetA.append(lIndex[i, 1, 0])
-            indSetB.append(lIndex[i, 1, 1])
-        self.DVCon.addLinearConstraintsShape(indSetA, indSetB, factorA=1.0, factorB=-1.0, lower=0, upper=0)
+        # # DV should be same along spanwise
+        # lIndex = self.CFDSolver.DVGeo.getLocalIndex(0)
+        # indSetA = []
+        # indSetB = []
+        # for i in range(lIndex.shape[0]):
+        #     indSetA.append(lIndex[i, 0, 0])
+        #     indSetB.append(lIndex[i, 0, 1])
+        # for i in range(lIndex.shape[0]):
+        #     indSetA.append(lIndex[i, 1, 0])
+        #     indSetB.append(lIndex[i, 1, 1])
+        # self.DVCon.addLinearConstraintsShape(indSetA, indSetB, factorA=1.0, factorB=-1.0, lower=0, upper=0)
 
     def setup(self):
         #initialize shape and set deformation points as inputs
-        a_init = self.DVGeo.getValues()
-        a_init['pnts'][:] = self.ooptions['DVUpperBound']
+        a_init = self.CFDSolver.DVGeo.getValues()
+        a_init['pnts'][:] = 0.5*self.ooptions['DVUpperBound']
         self.add_input('a', a_init['pnts'], desc="Bump Shape Control Points")
+        #self.add_input('a', 0.2, desc="Bump Shape Control Points")
 
         self.add_output('Cd', 0.0, desc="Drag Coefficient")
+
     
     def setup_partials(self):
-        self.declare_partials('Cd','a')
+        self.declare_partials('Cd','a', method='exact')
     
     def compute(self, inputs, outputs):
         # run the bump shape model
 
+        # move the mesh
+        self.CFDSolver.DVGeo.setDesignVars(inputs['a'])
+
+
+        #self.CFDSolver.DVGeo.update("coords")
+
         # Solve and evaluate functions
         funcs = {}
         self.CFDSolver(self.ap)
+
         self.CFDSolver.evalFunctions(self.ap, funcs)
 
         str = self.gridSol + '_cd'
         outputs['Cd'] = funcs[str]
 
+        #outputs['Cd'] = inputs['a']*inputs['a']
+
     def compute_partials(self, inputs, J):
 
+        # move the mesh
+        self.CFDSolver.DVGeo.setDesignVars(inputs['a'])
+        #self.CFDSolver.DVGeo.update("coords")
+
+
         funcSens = {}
+        self.CFDSolver(self.ap)
         self.CFDSolver.evalFunctionsSens(self.ap, funcSens, ['cd'])
 
         str = self.gridSol + '_cd'
-        J['Cd','a'] = funcSens[str]
+        J['Cd','a'] = funcSens[str]['pnts']
+
+        #J['Cd','a'][0] = 2*inputs['a']
 
 
