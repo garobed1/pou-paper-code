@@ -1,8 +1,14 @@
 optOptions = { #general optimization parameters
+    'prob_name':'constrained_69x49_eq',
     'NX':20, #number of x FFD points, not necessarily the number of design vars
     'bumpBounds':[0.05, 0.45], #ends of the bump
     'DVFraction':0.1, #fraction of NX on either side of bump control points not used as DVs
-    'DVUpperBound':0.3  #upper bound for control point movement
+    'DVUpperBound':0.3,  #upper bound for control point movement
+    'DVLowerBound':0.08,  #lower bound for control point movement (set to 0 when thickness constraints work)
+    'DVInit':0.1,  #uniform initial design state
+    'DCMinThick':0.01,  #uniform minimum thickness
+    'constrain_opt':False,
+    'check_partials':False  #check partial derivatives
 }
 
 aeroOptions = { #ADflow aero solver options
