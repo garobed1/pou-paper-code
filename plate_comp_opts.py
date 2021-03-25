@@ -1,20 +1,21 @@
 optOptions = { #general optimization parameters
-    'prob_name':'constrained_69x49_eq',
-    'NX':20, #number of x FFD points, not necessarily the number of design vars
-    'bumpBounds':[0.05, 0.45], #ends of the bump
+    'prob_name':'constrained_grid_c_2_10',
+    'NX':10, #number of x FFD points, not necessarily the number of design vars
+    'bumpBounds':[1.35, 1.55], #ends of the bump
     'DVFraction':0.1, #fraction of NX on either side of bump control points not used as DVs
     'DVUpperBound':0.3,  #upper bound for control point movement
     'DVLowerBound':0.08,  #lower bound for control point movement (set to 0 when thickness constraints work)
     'DVInit':0.1,  #uniform initial design state
     'DCMinThick':0.01,  #uniform minimum thickness
-    'constrain_opt':False,
+    'DCThickFrac':0.75, #percentage of bump area to constrain
+    'constrain_opt':True,
     'check_partials':False  #check partial derivatives
 }
 
 aeroOptions = { #ADflow aero solver options
     # Common Parameters
-    'gridFile':f'grid_struct_69x49_vol_mod2.cgns',
-    'outputDirectory':'./',
+    'gridFile':f'grid_c.cgns',
+    'outputDirectory':'./results/',
     'writeTecplotSurfaceSolution':True,
     
     # Physics Parameters
@@ -51,7 +52,7 @@ aeroOptions = { #ADflow aero solver options
     }
 
 warpOptions = { #IDwarp mesh movement options
-  'gridFile':'grid_struct_69x49_vol_mod2.cgns',
+  'gridFile':'grid_c.cgns',
   'fileType':'CGNS',
   'specifiedSurfaces':None,
   'symmetrySurfaces':None,

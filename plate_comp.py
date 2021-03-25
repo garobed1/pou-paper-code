@@ -83,14 +83,15 @@ class PlateComponent(om.ExplicitComponent):
 
         # Maximum thickness of the domain, translates to minimum thickness of bump
         ub = 1.0 - self.ooptions['DCMinThick']
+        tcf = self.ooptions['DCThickFrac']
         ra = optOptions['bumpBounds']
         span = numpy.linspace(0, 1, nXc)
         xc = span * (ra[1] - ra[0]) + ra[0]
         #ind = range(int(nXc/2) - int(self.NC/2), int(nXc/2) + int(self.NC/2)))
-        ind = [int(nXc/2) - int(self.NC/2), int(nXc/2) + int(self.NC/2)]
+        ind = [int(nXc/2) - int(tcf*self.NC/2), int(nXc/2) + int(tcf*self.NC/2)]
         ptList = numpy.zeros([2, 3])
         ptList[:,0] = xc[ind]
-        ptList[:,1] = -0.5
+        ptList[:,1] = 0.5
         ptList[:,2] = 0.5
 
         self.DVCon.addThicknessConstraints1D(ptList, self.NC, [0,0,1], lower=0.5, upper=ub, name='tcs')

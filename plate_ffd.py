@@ -7,8 +7,8 @@ from plate_comp_opts import warpOptions, optOptions
 def createFFD():
 
     # Bounding box for bump
-    x_root_range = [-0.4, 2.1]
-    y_root_range = [-1.1, 0.1]
+    x_root_range = [-0.1, 3.1]
+    y_root_range = [-0.1, 1.1]
     z_root_range = [-0.1, 1.1]
 
     # Number of FFD control points per dimension
@@ -48,7 +48,7 @@ def createFFD():
 
     # Bounding box for bump
     x_root_range_c = optOptions['bumpBounds']
-    y_root_range_c = [-1.05, 0.05]
+    y_root_range_c = [-0.05, 1.05]
     z_root_range_c = [-0.05, 0.95]
 
     # Number of FFD control points per dimension

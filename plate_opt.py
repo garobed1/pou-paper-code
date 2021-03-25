@@ -13,19 +13,19 @@ prob.model.add_subsystem('bump_plate', pc.PlateComponent(), promotes_inputs=['a'
 # setup the optimization
 prob.driver = om.ScipyOptimizeDriver()
 prob.driver.options['optimizer'] = 'SLSQP'
-prob.driver.options['debug_print'] = ['desvars','objs','totals']
+prob.driver.options['debug_print'] = ['desvars','objs','totals','nl_cons']
 prob.driver.options['tol'] = 1e-6
 
 
 # design vars and objectives
 NV = 2*math.trunc(((1.0 - optOptions['DVFraction'])*optOptions['NX']))
 ub = optOptions['DVUpperBound']*np.ones(NV)
-lb = optOptions['DVLowerBound']*np.ones(NV)
+lb = optOptions['DVLowerBound']*np.zeros(NV)
 prob.model.add_design_var('a', lower=lb, upper=ub)
 prob.model.add_objective('bump_plate.Cd', scaler=1)
-ub = 1.0 - ooptions['DCMinThick']
+lbc = ooptions['DCMinThick']
 if ooptions['constrain_opt']:
-    prob.model.add_constraint('bump_plate.TC', upper = ub, scaler=1)
+    prob.model.add_constraint('bump_plate.TC', lower = lbc, scaler=1)
 
 prob.model.add_constraint('bump_plate.EQ', equals = 0.0, scaler=1)
 
