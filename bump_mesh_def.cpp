@@ -11,6 +11,7 @@ gcc bump_mesh_def.c -L $CGNS_HOME/lib -I $CGNS_HOME/include -o bump_mesh_def
 library libcgns.a is located)
 */
 
+#include <sstream>
 #include <iostream>
 #include <cmath>
 //#include <stdlib>
@@ -31,7 +32,7 @@ double xDistFunc(int ind, int imax, double lX, double xs[][2], double *B, double
 
 double zDistFunc(int ind, int imax, double lX, double *xs, double B, double del);
 
-int main()
+int main(int argc, char *argv[])
 {
 /*
    dimension statements (note that tri-dimensional arrays
@@ -42,7 +43,18 @@ int main()
    subroutine and dimension exactly there):
 */
 
-   
+   // parse options
+   if(argc != 4)
+   {
+      printf("Incorrect number of arguments: Need -nx, -nz, name \n");
+      return 1;
+   }
+   std::stringstream cx{argv[1]};   
+   std::stringstream cz{argv[2]};
+   std::stringstream name{argv[3]};
+   const std::string names = name.str() + "_" + cx.str() + "_" + cz.str() + ".cgns";
+   const char* cstr = names.c_str();
+
    cgsize_t isize[3][3];
    cgsize_t ipnts[3][3];
    int ni,nj,nk,i,j,k;
@@ -54,9 +66,12 @@ int main()
    double lX = 3.0;
    double lY = 1.0;
    double lZ = 1.0;
-   ni=96;
+   // ni=96;
    nj=2;
-   nk=49;
+   // nk=49;
+   cx >> ni;
+   cz >> nk;
+
    double x[nk*nj*ni],y[nk*nj*ni],z[nk*nj*ni];
 
 /* off-wall spacings */
@@ -80,19 +95,23 @@ int main()
 
 //x direction, 7 sections, middle section even
    double fr[6] = {
-      1./8.,
+      1./10.,
       1./6.,
       1./4.,
       3./4.,
       5./6.,
-      7./8.};
+      9./10.};
+   double off1 = 30.*lX/(3.*ni); 
+   double off2 = lX/(12.*(fr[1]-fr[0])*ni);  
+   double off3 = 20.*lX/(3.*ni);     
+   double offm = lX/(3.*(fr[3]-fr[2])*ni);
    double xs[6][2] = {
-   {0.1,1e-2},
-   {1e-2,0.1},
-   {0.1,1e-4},
-   {1e-4,0.1},
-   {0.1,1e-2},
-   {1e-2,0.1}};
+   {off1,off2},
+   {off2,off3},
+   {off3,offm}, 
+   {offm,off3},
+   {off3,off2},
+   {off2,off1}};
    double Bx[6] = {
    1./((fr[0]-0.)*(ni-1)*sqrt(xs[0][1]*xs[0][0])),
    1./((fr[1]-fr[0])*(ni-1)*sqrt(xs[1][1]*xs[1][0])),
@@ -138,7 +157,7 @@ int main()
 
 /* WRITE X, Y, Z GRID POINTS TO CGNS FILE */
 /* open CGNS file for write */
-   if (cg_open("grid_c_dx_dz.cgns",CG_MODE_WRITE,&index_file)) cg_error_exit();
+   if (cg_open(cstr,CG_MODE_WRITE,&index_file)) cg_error_exit();
 /* create base (user can give any name) */
    strcpy(basename,"Base");
    icelldim=3;
@@ -172,7 +191,7 @@ int main()
    printf("\nSuccessfully wrote grid to file grid_c.cgns\n");
    
    //boundary conditions
-   if (cg_open("grid_c_dx_dz.cgns",CG_MODE_MODIFY,&index_file)) cg_error_exit();
+   if (cg_open(cstr,CG_MODE_MODIFY,&index_file)) cg_error_exit();
    index_base=1;
    index_zone=1;
    cg_zone_read(index_file,index_base,index_zone,zonename,*isize);
@@ -184,8 +203,8 @@ int main()
    jhi=isize[0][1];
    klo=1;
    khi=isize[0][2];
-   double fr1 = 1./8.;
-   double fr5 = 7./8.;
+   double fr1 = fr[0];
+   double fr5 = fr[5];
    ihi1 = (int)(fr1*ihi);
    ihi2 = (int)(fr5*ihi);
    //inlet face
@@ -342,9 +361,9 @@ double xDistFunc(int ind, int imax, double lX, double xs[][2], double *B, double
       X = lXpre*(u/(A+(1.-A)*u)) + lXbum + 4*lXsec + lXpre;
    }
 
-   printf("f = %f\n", frac);
-   printf("u = %f\n", u);
-   printf("x = %f\n", X);
+   // printf("f = %f\n", frac);
+   // printf("u = %f\n", u);
+   // printf("x = %f\n", X);
 
    return X;
 }

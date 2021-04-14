@@ -2,20 +2,22 @@ import numpy
 import openmdao.api as om
 import plate_ffd as pf
 import math
+import plate_sa_lhs
 from mpi4py import MPI
 from idwarp import USMesh
 from baseclasses import *
 from adflow import ADFLOW
 from pygeo import DVGeometry, DVConstraints
-from plate_comp_opts import aeroOptions, warpOptions, optOptions
+from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
 
-class PlateComponent(om.ExplicitComponent):
+class PlateComponentLHS(om.ExplicitComponent):
     """Deterministic Bump Flow Problem"""
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
+        self.uoptions = uqOptions
 
         # Generate FFD and DVs
         self.DVGeo = pf.createFFD()
@@ -26,16 +28,17 @@ class PlateComponent(om.ExplicitComponent):
         
         # flow characteristics
         alpha = 0.0
-        mach = 0.8
+        mach = 0.85
         Re = 50000
         Re_L = 1.0
         temp = 540
         arearef = 2.0
         chordref = 1.0
 
-        # Spalart Allmaras model constants, to be changed in UQ
-        saconstsm = [0.41, 0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0]
-        self.saconsts = saconstsm + [1.0, 2.0, 1.2, 0.5, 2.0]
+        # Spalart Allmaras model constants, to be changed in UQ (4 for now)
+        saconstsm = [0.41, 0.1355, 0.622, 0.66666666667]
+        self.saconstsb = [7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
+        self.saconsts = saconstsm + self.saconstsb
         self.aoptions['SAConsts'] = self.saconsts
         #self.gridSol = f'{meshname}_{saconstsm}_sol'
         solname = self.ooptions['prob_name']
@@ -55,10 +58,15 @@ class PlateComponent(om.ExplicitComponent):
 
         self.CFDSolver.DVGeo.getFlattenedChildren()[1].writePlot3d("ffdp_opt_def.xyz")
 
+        # Get a set of UQ sample points (LHS)
+        if self.ooptions['run_once']:
+            self.sample = self.uoptions['dist']
+        else:
+            self.sample = plate_sa_lhs.genLHS(s=self.uoptions['NS'])
 
         # Set constraints
         self.DVCon = DVConstraints()
-        self.DVCon2 = DVConstraints()
+        self.DVCon2 = DVConstraints() 
         self.DVCon.setDVGeo(self.CFDSolver.DVGeo.getFlattenedChildren()[1])
         self.DVCon2.setDVGeo(self.CFDSolver.DVGeo)
 
@@ -110,7 +118,9 @@ class PlateComponent(om.ExplicitComponent):
         a_init['pnts'][:] = self.ooptions['DVInit']
         mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
         mult = numpy.concatenate((mult, mult))
-        a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
+        if self.ooptions['run_once']:
+            a_init['pnts'] = self.ooptions['ro_shape']
+        #a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
         self.add_input('a', a_init['pnts'], desc="Bump Shape Control Points")
         #self.add_input('a', 0.2, desc="Bump Shape Control Points")
 
@@ -118,13 +128,17 @@ class PlateComponent(om.ExplicitComponent):
             self.add_output('SA', 1.0, desc='Surface Area Constraint')
         else:
             self.add_output('TC', numpy.zeros(self.NC), desc='Thickness Constraints')
-        self.add_output('Cd', 0.0, desc="Drag Coefficient")
+        self.add_output('Cd_m', 0.0, desc="Mean Drag Coefficient")
+        self.add_output('Cd_v', 0.0, desc="Variance Drag Coefficient")
+        self.add_output('Cd_r', 0.0, desc="Robust Drag Objective")
         self.add_output('EQ', numpy.zeros(int(len(a_init['pnts'])/2)), desc="Control Point Symmetry")
 
 
     
     def setup_partials(self):
-        self.declare_partials('Cd','a', method='exact')
+        self.declare_partials('Cd_m','a', method='exact')
+        self.declare_partials('Cd_v','a', method='exact')
+        self.declare_partials('Cd_r','a', method='exact')
         if self.ooptions['use_area_con']:
             self.declare_partials('SA','a', method='exact')
         else:
@@ -144,13 +158,39 @@ class PlateComponent(om.ExplicitComponent):
 
         # Solve and evaluate functions
         funcs = {}
-        self.CFDSolver(self.ap)
+
+        # evaluate each sample point
+        ns = self.uoptions['NS']
+        sum = 0.
+        mus = numpy.zeros(ns)
+        for i in range(ns):
+            if not self.ooptions['run_once']:
+                saconstsm = self.sample[i].tolist()
+            else:
+                saconstsm = self.sample[i]
+            self.saconsts = saconstsm + self.saconstsb
+            self.CFDSolver.setOption('SAConsts', self.saconsts)
+
+            self.CFDSolver(self.ap)
+            self.CFDSolver.evalFunctions(self.ap, funcs)
+            str = self.gridSol + '_cd'
+            mus[i] = funcs[str]
+            sum += funcs[str]
+        
+        # compute mean and variance
+        E = sum/ns
+        sum2 = 0.
+        for i in range(ns):
+            sum2 += (mus[i]-E)**2
+        V = sum2/ns
+
         self.DVCon.evalFunctions(funcs, includeLinear=True)
         self.DVCon2.evalFunctions(funcs, includeLinear=True)
-        self.CFDSolver.evalFunctions(self.ap, funcs)
 
-        str = self.gridSol + '_cd'
-        outputs['Cd'] = funcs[str]
+        outputs['Cd_m'] = E
+        outputs['Cd_v'] = V
+        rho = self.uoptions['rho']
+        outputs['Cd_r'] = E + rho*math.sqrt(V)
         if self.ooptions['use_area_con']:
             outputs['SA'] = funcs['sas']
         else:
@@ -163,21 +203,57 @@ class PlateComponent(om.ExplicitComponent):
     def compute_partials(self, inputs, J):
 
         # move the mesh
-        #import pdb; pdb.set_trace()
         dvdict = {'pnts':inputs['a']}
         self.CFDSolver.DVGeo.setDesignVars(dvdict)
         self.ap.setDesignVars(dvdict)
         #self.CFDSolver.DVGeo.update("coords")
  
- 
+        funcs = {}
         funcSens = {}
-        self.CFDSolver(self.ap)
+        # evaluate each sample point
+        ns = self.uoptions['NS']
+        sum = 0.
+        mus = numpy.zeros(ns)
+        pmu = []
+        psum = numpy.zeros(len(inputs['a']))
+        for i in range(ns):
+            saconstsm = self.sample[i].tolist()
+            self.saconsts = saconstsm + self.saconstsb
+            self.CFDSolver.setOption('SAConsts', self.saconsts)
+
+            self.CFDSolver(self.ap)
+            self.CFDSolver.evalFunctions(self.ap, funcs)
+            self.CFDSolver.evalFunctionsSens(self.ap, funcSens, ['cd'])
+            
+            str = self.gridSol + '_cd'
+            arr = [x*(1./ns) for x in funcSens[str]['pnts']]
+            sum += funcs[str]
+            mus[i] = funcs[str]
+            pmu.append(arr[0])
+            psum += arr[0]
+                
+        #import pdb; pdb.set_trace()
+
+        # compute variance sensitivity
+        E = sum/ns
+        sum2 = 0.
+        psum2 = numpy.zeros(len(inputs['a']))
+        for i in range(ns):
+            sum2 += (mus[i]-E)**2
+
+            temp = pmu[i] - psum
+            arr2 = [x*2*(mus[i]-E) for x in temp]
+            psum2 += arr2
+        V = sum2/ns
+
         self.DVCon.evalFunctionsSens(funcSens, includeLinear=True)
         self.DVCon2.evalFunctionsSens(funcSens, includeLinear=True)
-        self.CFDSolver.evalFunctionsSens(self.ap, funcSens, ['cd'])
  
         str = self.gridSol + '_cd'
-        J['Cd','a'] = funcSens[str]['pnts']
+        J['Cd_m','a'] = psum
+        J['Cd_v','a'] = psum2
+        rho = self.uoptions['rho']
+        J['Cd_r','a'] = psum + rho*(1./(2*math.sqrt(V)))*psum2
         if self.ooptions['use_area_con']:
             J['SA','a'] = funcSens['sas']['pnts']
         else:
