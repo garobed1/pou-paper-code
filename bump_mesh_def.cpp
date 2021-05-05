@@ -44,20 +44,22 @@ int main(int argc, char *argv[])
 */
 
    // parse options
-   if(argc != 4)
+   if(argc != 5)
    {
-      printf("Incorrect number of arguments: Need -nx, -nz, name \n");
+      printf("Incorrect number of arguments: Need -nx, -nz, -wall, name \n");
       return 1;
    }
    std::stringstream cx{argv[1]};   
    std::stringstream cz{argv[2]};
-   std::stringstream name{argv[3]};
-   const std::string names = name.str() + "_" + cx.str() + "_" + cz.str() + ".cgns";
+   std::stringstream walls{argv[3]};
+   std::stringstream name{argv[4]};
+   const std::string names = name.str() + "_" + cx.str() + "_" + cz.str() + "_" + walls.str() + ".cgns";
    const char* cstr = names.c_str();
 
    cgsize_t isize[3][3];
    cgsize_t ipnts[3][3];
    int ni,nj,nk,i,j,k;
+   int wall;
    int index_file,icelldim,iphysdim,index_base;
    int index_zone,index_coord;
    char basename[33],zonename[33];
@@ -71,6 +73,7 @@ int main(int argc, char *argv[])
    // nk=49;
    cx >> ni;
    cz >> nk;
+   walls >> wall;
 
    double x[nk*nj*ni],y[nk*nj*ni],z[nk*nj*ni];
 
@@ -112,20 +115,21 @@ int main(int argc, char *argv[])
    {offm,off3},
    {off3,off2},
    {off2,off1}};
-   double Bx[6] = {
+   double Bx[7] = {
    1./((fr[0]-0.)*(ni-1)*sqrt(xs[0][1]*xs[0][0])),
    1./((fr[1]-fr[0])*(ni-1)*sqrt(xs[1][1]*xs[1][0])),
    1./((fr[2]-fr[1])*(ni-1)*sqrt(xs[2][1]*xs[2][0])),
    1./((fr[4]-fr[3])*(ni-1)*sqrt(xs[3][1]*xs[3][0])),
    1./((fr[5]-fr[4])*(ni-1)*sqrt(xs[4][1]*xs[4][0])),
-   1./((1.-fr[5])*(ni-1)*sqrt(xs[5][1]*xs[5][0]))};
+   1./((1.-fr[5])*(ni-1)*sqrt(xs[5][1]*xs[5][0])),
+   1./((fr[3]-fr[2])*(ni-1)*sqrt(0.1*offm*offm))};
    
-   double delx[6];
+   double delx[7];
 
    double drx = 0.;
    double dx = 0.;
    double rx = 0.;
-   for(int nsec = 0; nsec < 6; nsec++)
+   for(int nsec = 0; nsec < 7; nsec++)
    {  
       count = 0;
       dx = 10.;
@@ -205,6 +209,11 @@ int main(int argc, char *argv[])
    khi=isize[0][2];
    double fr1 = fr[0];
    double fr5 = fr[5];
+   if (wall == 2)
+   {
+      fr1 = fr[2];
+      fr5 = fr[3];
+   }
    ihi1 = (int)(fr1*ihi);
    ihi2 = (int)(fr5*ihi);
    //inlet face
@@ -325,7 +334,10 @@ double xDistFunc(int ind, int imax, double lX, double xs[][2], double *B, double
    if((frac - fr[2]) > 0.0 && (frac - fr[3]) < 0.0)
    {
       double mid = fr[3]-fr[2];
-      X = lXbum*((frac-fr[2])/mid) + 2*lXsec + lXpre;
+      A = 1.0;
+      u = 0.5*(1+tanh(del[6]*((frac-fr[2])/mid-0.5))/tanh(del[6]/2.));
+      X = lXbum*(u/(A+(1.-A)*u)) + 2*lXsec + lXpre;
+      //X = lXbum*((frac-fr[2])/mid) + 2*lXsec + lXpre;
    }
    if((frac - fr[3]) == 0.0)
    {

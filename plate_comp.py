@@ -26,8 +26,8 @@ class PlateComponent(om.ExplicitComponent):
         
         # flow characteristics
         alpha = 0.0
-        mach = 0.8
-        Re = 50000
+        mach = self.ooptions['mach']#0.95
+        Re = self.ooptions['Re']#50000
         Re_L = 1.0
         temp = 540
         arearef = 2.0
@@ -53,6 +53,9 @@ class PlateComponent(om.ExplicitComponent):
         self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_WORLD)
         self.CFDSolver.setMesh(self.mesh)
 
+        # Try setting the DVGeo coordinates here
+        coords = self.CFDSolver.getSurfaceCoordinates(groupName=self.CFDSolver.allWallsGroup)
+        self.CFDSolver.DVGeo.addPointSet(coords, 'coords')
         self.CFDSolver.DVGeo.getFlattenedChildren()[1].writePlot3d("ffdp_opt_def.xyz")
 
 
@@ -108,9 +111,11 @@ class PlateComponent(om.ExplicitComponent):
         #initialize shape and set deformation points as inputs
         a_init = self.CFDSolver.DVGeo.getValues()
         a_init['pnts'][:] = self.ooptions['DVInit']
-        mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
-        mult = numpy.concatenate((mult, mult))
-        a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
+        # mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
+        # mult = numpy.concatenate((mult, mult))
+        # a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
+        if self.ooptions['run_once']:
+            a_init['pnts'] = self.ooptions['ro_shape']
         self.add_input('a', a_init['pnts'], desc="Bump Shape Control Points")
         #self.add_input('a', 0.2, desc="Bump Shape Control Points")
 
@@ -171,7 +176,7 @@ class PlateComponent(om.ExplicitComponent):
  
  
         funcSens = {}
-        self.CFDSolver(self.ap)
+        #self.CFDSolver(self.ap) #ASSUME WE ALREADY COMPUTED THE SOLUTION
         self.DVCon.evalFunctionsSens(funcSens, includeLinear=True)
         self.DVCon2.evalFunctionsSens(funcSens, includeLinear=True)
         self.CFDSolver.evalFunctionsSens(self.ap, funcSens, ['cd'])

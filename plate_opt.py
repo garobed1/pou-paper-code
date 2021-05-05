@@ -7,6 +7,10 @@ from plate_comp_opts import aeroOptions, warpOptions, optOptions
 # Script to run plate optimization
 ooptions = optOptions
 
+# Print options file
+log = open("./plate_comp_opts.py", "r").read()
+print(log)
+
 prob = om.Problem()
 prob.model.add_subsystem('bump_plate', pc.PlateComponent(), promotes_inputs=['a'])
 
@@ -37,6 +41,8 @@ prob.setup()
 
 if ooptions['check_partials']:
     prob.check_partials(method = 'fd')
+if ooptions['run_once']:
+    prob.run_model()
 else:
     prob.run_driver()
 

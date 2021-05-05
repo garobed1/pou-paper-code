@@ -3,6 +3,7 @@ import openmdao.api as om
 import plate_ffd as pf
 import math
 import plate_sa_lhs
+import subprocess
 from mpi4py import MPI
 from idwarp import USMesh
 from baseclasses import *
@@ -10,10 +11,15 @@ from adflow import ADFLOW
 from pygeo import DVGeometry, DVConstraints
 from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
 
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
+
 class PlateComponentLHS(om.ExplicitComponent):
     """Deterministic Bump Flow Problem"""
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
+        #import pdb; pdb.set_trace()
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
@@ -28,8 +34,8 @@ class PlateComponentLHS(om.ExplicitComponent):
         
         # flow characteristics
         alpha = 0.0
-        mach = 0.85
-        Re = 50000
+        mach = self.ooptions['mach']#0.95
+        Re = self.ooptions['Re']#50000
         Re_L = 1.0
         temp = 540
         arearef = 2.0
@@ -45,18 +51,8 @@ class PlateComponentLHS(om.ExplicitComponent):
         self.gridSol = f'{solname}_sol'
 
         # Aerodynamic problem description
-        self.ap = AeroProblem(name=self.gridSol, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, 
-        evalFuncs=['cd'])
-
-        # Create solver
-        self.CFDSolver = ADFLOW(options=self.aoptions, comm=MPI.COMM_WORLD)
-        self.CFDSolver.setDVGeo(self.DVGeo)
-
-        # Set up mesh warping
-        self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_WORLD)
-        self.CFDSolver.setMesh(self.mesh)
-
-        self.CFDSolver.DVGeo.getFlattenedChildren()[1].writePlot3d("ffdp_opt_def.xyz")
+        #self.ap = AeroProblem(name=self.gridSol, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, 
+        #evalFuncs=['cd'])
 
         # Get a set of UQ sample points (LHS)
         if self.ooptions['run_once']:
@@ -64,19 +60,82 @@ class PlateComponentLHS(om.ExplicitComponent):
         else:
             self.sample = plate_sa_lhs.genLHS(s=self.uoptions['NS'])
 
-        # Set constraints
+        # Set up mesh warping
+        #self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
+
+        # Scatter samples, multi-point parallelism
+        ns = self.uoptions['NS']
+        self.nsp = int(ns/size) # samples per processor
+
+        self.samplep = self.sample[(rank*self.nsp):(rank*self.nsp+(self.nsp))] #shouldn't really need to "scatter" per se
+        #import pdb; pdb.set_trace()
+        #self.CFDSolver.DVGeo.getFlattenedChildren()[1].writePlot3d("ffdp_opt_def.xyz")
+        #import pdb; pdb.set_trace()
+
+        # create copies of the original mesh (need this for idwarp?)
+        if rank == 0:
+            #basemesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
+            for i in range(ns):
+                meshname = self.ooptions['prob_name'] + "_" + str(i) + ".cgns"
+                # basemesh.writeGrid(fileName=meshname)
+                subprocess.run(["cp",self.woptions['gridFile'],meshname])
+            dummy = 1
+        else:
+            dummy = 2
+        
+        dummysum = comm.allgather(dummy)
+        
+        # Actually create solvers (and aeroproblems?) (and mesh?) now
+        self.aps = []
+        self.solvers = []
+        self.meshes = []
+        self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
+        for i in range(self.nsp):
+            namestr = self.gridSol + "_" + str(rank*self.nsp + i)
+            
+            #meshname = self.ooptions['prob_name'] + "_" + str(rank*self.nsp + i) + ".cgns"
+            #import pdb; pdb.set_trace()
+            #basemesh.writeGrid(fileName=meshname)
+            #self.woptions['gridFile'] = meshname
+            # create meshes (needed?)
+            #self.meshes.append(USMesh(options={'gridFile':meshname}, comm=MPI.COMM_SELF))
+            
+            # create aeroproblems (needed?)
+            self.aps.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
+            
+            # create solvers
+            self.solvers.append(ADFLOW(options=self.aoptions, comm=MPI.COMM_SELF))
+            if not self.ooptions['run_once']:
+                saconstsm = self.samplep[i].tolist()
+            else:
+                saconstsm = self.samplep[i]
+            self.saconsts = saconstsm + self.saconstsb
+            self.solvers[i].setOption('SAConsts', self.saconsts)
+            #self.solvers[i].setOption('gridFile', meshname)
+            self.solvers[i].setDVGeo(self.DVGeo)
+            self.solvers[i].setMesh(self.mesh)#es[i])
+            coords = self.solvers[i].getSurfaceCoordinates(groupName=self.solvers[i].allWallsGroup)
+            self.solvers[i].DVGeo.addPointSet(coords, 'coords')
+
+        # Original setup
+        # self.CFDSolver = ADFLOW(options=self.aoptions, comm=MPI.COMM_WORLD)
+        # self.CFDSolver.setDVGeo(self.DVGeo)
+
+        # self.CFDSolver.setMesh(self.mesh)
+
+        # Set constraints, should only need one of those solvers, the meshes are all the same
         self.DVCon = DVConstraints()
         self.DVCon2 = DVConstraints() 
-        self.DVCon.setDVGeo(self.CFDSolver.DVGeo.getFlattenedChildren()[1])
-        self.DVCon2.setDVGeo(self.CFDSolver.DVGeo)
+        self.DVCon.setDVGeo(self.solvers[0].DVGeo.getFlattenedChildren()[1])
+        self.DVCon2.setDVGeo(self.solvers[0].DVGeo)
 
-        self.DVCon.setSurface(self.CFDSolver.getTriangulatedMeshSurface(groupName='allSurfaces'))
+        self.DVCon.setSurface(self.solvers[0].getTriangulatedMeshSurface(groupName='allSurfaces'))
         # set extra group for surface area condition
-        self.DVCon2.setSurface(self.CFDSolver.getTriangulatedMeshSurface(), name='wall')
+        self.DVCon2.setSurface(self.solvers[0].getTriangulatedMeshSurface(), name='wall')
 
         # DV should be same into page (not doing anything right now)
         #import pdb; pdb.set_trace()
-        lIndex = self.CFDSolver.DVGeo.getFlattenedChildren()[1].getLocalIndex(0)
+        lIndex = self.solvers[0].DVGeo.getFlattenedChildren()[1].getLocalIndex(0)
         indSetA = []
         indSetB = []
         nXc = optOptions['NX']
@@ -112,12 +171,15 @@ class PlateComponentLHS(om.ExplicitComponent):
         else:
             self.DVCon2.addThicknessConstraints1D(ptList, self.NC, [0,0,1], lower=0.5, upper=ub, name='tcs')
 
+
+
+
     def setup(self):
         #initialize shape and set deformation points as inputs
-        a_init = self.CFDSolver.DVGeo.getValues()
+        a_init = self.solvers[0].DVGeo.getValues()
         a_init['pnts'][:] = self.ooptions['DVInit']
-        mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
-        mult = numpy.concatenate((mult, mult))
+        # mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
+        # mult = numpy.concatenate((mult, mult))
         if self.ooptions['run_once']:
             a_init['pnts'] = self.ooptions['ro_shape']
         #a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
@@ -148,40 +210,64 @@ class PlateComponentLHS(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         # run the bump shape model
 
-        # move the mesh
-        #import pdb; pdb.set_trace()
-        dvdict = {'pnts':inputs['a']}
-        self.CFDSolver.DVGeo.setDesignVars(dvdict)
-        self.ap.setDesignVars(dvdict)
-
-        #self.CFDSolver.DVGeo.update("coords")
-
-        # Solve and evaluate functions
-        funcs = {}
-
         # evaluate each sample point
+        print("hello")
+        dvdict = {'pnts':inputs['a']}
+        funcs = {}
         ns = self.uoptions['NS']
-        sum = 0.
-        mus = numpy.zeros(ns)
-        for i in range(ns):
-            if not self.ooptions['run_once']:
-                saconstsm = self.sample[i].tolist()
-            else:
-                saconstsm = self.sample[i]
-            self.saconsts = saconstsm + self.saconstsb
-            self.CFDSolver.setOption('SAConsts', self.saconsts)
+        sump = 0.
+        musp = numpy.zeros(self.nsp)
+        #self.aps[0].setDesignVars(dvdict)
+        for i in range(self.nsp):
+            self.solvers[i].DVGeo.setDesignVars(dvdict)
+            self.aps[i].setDesignVars(dvdict)
+            self.solvers[i](self.aps[i])
+            self.solvers[i].evalFunctions(self.aps[i], funcs)
+            astr = self.gridSol + "_" + str(rank*self.nsp + i) +"_cd"
+            #import pdb; pdb.set_trace()
+            musp[i] = funcs[astr]
+            sump += funcs[astr]
+        
+        # # move the mesh
+        # #import pdb; pdb.set_trace()
+        # dvdict = {'pnts':inputs['a']}
+        # self.CFDSolver.DVGeo.setDesignVars(dvdict)
+        # self.ap.setDesignVars(dvdict)
 
-            self.CFDSolver(self.ap)
-            self.CFDSolver.evalFunctions(self.ap, funcs)
-            str = self.gridSol + '_cd'
-            mus[i] = funcs[str]
-            sum += funcs[str]
+        # #self.CFDSolver.DVGeo.update("coords")
+
+        # # Solve and evaluate functions
+        # funcs = {}
+
+        # self.nsp
+
+        # # evaluate each sample point
+        # ns = self.uoptions['NS']
+        # sum = 0.
+        # mus = numpy.zeros(ns)
+        # for i in range(ns):
+        #     if not self.ooptions['run_once']:
+        #         saconstsm = self.sample[i].tolist()
+        #     else:
+        #         saconstsm = self.sample[i]
+        #     self.saconsts = saconstsm + self.saconstsb
+        #     self.CFDSolver.setOption('SAConsts', self.saconsts)
+
+        #     self.CFDSolver(self.ap)
+        #     self.CFDSolver.evalFunctions(self.ap, funcs)
+        #     str = self.gridSol + '_cd'
+        #     mus[i] = funcs[str]
+        #     sum += funcs[str]
         
         # compute mean and variance
+        sum = comm.allreduce(sump)
+        mus = comm.allgather(musp)
+        #import pdb; pdb.set_trace()
         E = sum/ns
         sum2 = 0.
-        for i in range(ns):
-            sum2 += (mus[i]-E)**2
+        for i in range(size):
+            for j in range(self.nsp):
+                sum2 += (mus[i][j]-E)**2
         V = sum2/ns
 
         self.DVCon.evalFunctions(funcs, includeLinear=True)
@@ -202,35 +288,62 @@ class PlateComponentLHS(om.ExplicitComponent):
 
     def compute_partials(self, inputs, J):
 
-        # move the mesh
         dvdict = {'pnts':inputs['a']}
-        self.CFDSolver.DVGeo.setDesignVars(dvdict)
-        self.ap.setDesignVars(dvdict)
-        #self.CFDSolver.DVGeo.update("coords")
- 
         funcs = {}
         funcSens = {}
-        # evaluate each sample point
         ns = self.uoptions['NS']
-        sum = 0.
-        mus = numpy.zeros(ns)
-        pmu = []
-        psum = numpy.zeros(len(inputs['a']))
-        for i in range(ns):
-            saconstsm = self.sample[i].tolist()
-            self.saconsts = saconstsm + self.saconstsb
-            self.CFDSolver.setOption('SAConsts', self.saconsts)
+        sump = 0.
+        musp = numpy.zeros(self.nsp)
+        pmup = []
+        psump = numpy.zeros(len(inputs['a']))
+        #self.aps[0].setDesignVars(dvdict)
+        for i in range(self.nsp):
+            self.solvers[i].DVGeo.setDesignVars(dvdict)
+            self.aps[i].setDesignVars(dvdict)
+            self.solvers[i].evalFunctions(self.aps[i], funcs)
+            self.solvers[i].evalFunctionsSens(self.aps[i], funcSens, ['cd'])
+            astr = self.gridSol + "_" + str(rank*self.nsp + i)+"_cd"
+            arr = [x*(1./ns) for x in funcSens[astr]['pnts']]
+            sump += funcs[astr]
+            musp[i] = funcs[astr]
+            pmup.append(arr[0])
+            psump += arr[0]
 
-            self.CFDSolver(self.ap)
-            self.CFDSolver.evalFunctions(self.ap, funcs)
-            self.CFDSolver.evalFunctionsSens(self.ap, funcSens, ['cd'])
+        sum = comm.allreduce(sump)
+        mus = comm.allgather(musp)
+        pmu = comm.allgather(pmup)
+        psum = comm.allreduce(psump)
+
+
+        # # move the mesh
+        # dvdict = {'pnts':inputs['a']}
+        # self.CFDSolver.DVGeo.setDesignVars(dvdict)
+        # self.ap.setDesignVars(dvdict)
+        # #self.CFDSolver.DVGeo.update("coords")
+ 
+        # funcs = {}
+        # funcSens = {}
+        # # evaluate each sample point
+        # ns = self.uoptions['NS']
+        # sum = 0.
+        # mus = numpy.zeros(ns)
+        # pmu = []
+        # psum = numpy.zeros(len(inputs['a']))
+        # for i in range(ns):
+        #     saconstsm = self.sample[i].tolist()
+        #     self.saconsts = saconstsm + self.saconstsb
+        #     self.CFDSolver.setOption('SAConsts', self.saconsts)
+
+        #     self.CFDSolver(self.ap)
+        #     self.CFDSolver.evalFunctions(self.ap, funcs)
+        #     self.CFDSolver.evalFunctionsSens(self.ap, funcSens, ['cd'])
             
-            str = self.gridSol + '_cd'
-            arr = [x*(1./ns) for x in funcSens[str]['pnts']]
-            sum += funcs[str]
-            mus[i] = funcs[str]
-            pmu.append(arr[0])
-            psum += arr[0]
+        #     str = self.gridSol + '_cd'
+        #     arr = [x*(1./ns) for x in funcSens[str]['pnts']]
+        #     sum += funcs[str]
+        #     mus[i] = funcs[str]
+        #     pmu.append(arr[0])
+        #     psum += arr[0]
                 
         #import pdb; pdb.set_trace()
 
@@ -238,18 +351,19 @@ class PlateComponentLHS(om.ExplicitComponent):
         E = sum/ns
         sum2 = 0.
         psum2 = numpy.zeros(len(inputs['a']))
-        for i in range(ns):
-            sum2 += (mus[i]-E)**2
+        for i in range(size):
+            for j in range(self.nsp):
+                sum2 += (mus[i][j]-E)**2
 
-            temp = pmu[i] - psum
-            arr2 = [x*2*(mus[i]-E) for x in temp]
-            psum2 += arr2
+                temp = pmu[i][j] - psum
+                arr2 = [x*2*(mus[i][j]-E) for x in temp]
+                psum2 += arr2[0]
         V = sum2/ns
+        #import pdb; pdb.set_trace()
 
         self.DVCon.evalFunctionsSens(funcSens, includeLinear=True)
         self.DVCon2.evalFunctionsSens(funcSens, includeLinear=True)
  
-        str = self.gridSol + '_cd'
         J['Cd_m','a'] = psum
         J['Cd_v','a'] = psum2
         rho = self.uoptions['rho']

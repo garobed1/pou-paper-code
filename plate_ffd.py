@@ -86,8 +86,15 @@ def createFFD():
     fc.close()
 
     # define the design variables
+    
+    #add point set here? no
+    # meshOptions = warpOptions
+    # mesh = USMesh(options=meshOptions)
+    # coords = mesh.getSurfaceCoordinates()
 
     DVGeo = DVGeometry(filename)
+    
+    #DVGeo.addPointSet(coords, "coords")
     DVGeoc = DVGeometry(filenamec, child=True)
     DVGeoc.addRefAxis('dummy_axis', xFraction=0.1, alignIndex='i')
     DVGeo.addChild(DVGeoc)

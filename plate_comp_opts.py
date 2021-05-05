@@ -1,5 +1,5 @@
-gridFile = f'grid_conv_193_49.cgns'
-probName = 'conv_uq_lhs_2_result'
+gridFile = f'grid_foil_97_49_2.cgns'
+probName = 'testmp7'
 
 # astar = [
 #     3.78162576e-01, 2.80605905e-01, 3.73461068e-01, 2.09207603e-01, 
@@ -31,12 +31,23 @@ dist = [
     [0.39414667, 0.1296875,  0.61875,    0.675     ],
     [0.49816055, 0.1364375,  0.69375,    0.975     ]]
 
+astar_m75_20 =    [2.57421793e-01, 2.68722732e-01, 2.97207716e-01, 3.05921523e-01,
+                    3.03159109e-01, 2.88756775e-01, 2.76741724e-01, 2.58832887e-01,
+                    2.31751213e-01, 2.04331455e-01, 1.48283968e-01, 1.85935479e-01,
+                    0.00000000e+00, 1.65986277e-01, 2.61946767e-18, 3.18325944e-02,
+                    2.57421793e-01, 2.68722732e-01, 2.97207716e-01, 3.05921523e-01,
+                    3.03159109e-01, 2.88756775e-01, 2.76741724e-01, 2.58832887e-01,
+                    2.31751213e-01, 2.04331455e-01, 1.48283968e-01, 1.85935479e-01,
+                    0.00000000e+00, 1.65986277e-01, 2.61946767e-18, 3.18325944e-02]
+
 optOptions = { #general optimization parameters
     'prob_name':probName,
     'NX':10, #number of x FFD points, not necessarily the number of design vars
     'bumpBounds':[1.00, 2.00], #ends of the bump
+    'mach':0.85, #inflow mach number
+    'Re':3000000, #inflow reynolds number
     'DVFraction':0.1, #fraction of NX on either side of bump control points not used as DVs
-    'DVUpperBound':0.5,  #upper bound for control point movement
+    'DVUpperBound':2.0,  #upper bound for control point movement
     'DVLowerBound':0.0,  #lower bound for control point movement (set to 0 when thickness constraints work)
     'DVInit':0.1,  #uniform initial design state
     'DCMinThick':0.01,  #uniform minimum thickness
@@ -45,12 +56,12 @@ optOptions = { #general optimization parameters
     'constrain_opt':True,
     'use_area_con':True,
     'check_partials':False,  #check partial derivatives
-    'run_once':True, # run a single iteration of the model with given settings
-    'ro_shape':astar # shape variables 
+    'run_once':False, # run a single iteration of the model with given settings
+    'ro_shape':astar_m75_20 # shape variables 
 }
 
 uqOptions = { #general UQ parameters
-    'NS':8, #number of sample points
+    'NS':4, #number of sample points
     'rho':2., #robust objective std dev ratio
     'dist':dist #distribution to use ONLY IF running the model once
 }
@@ -85,14 +96,14 @@ aeroOptions = { #ADflow aero solver options
     'ANKCoupledSwitchTol':1e-5,
     'ANKConstCFLStep':0.4,
     'ANKCFLLimit':1000000000.0,
-    'L2Convergence':1e-13,
+    'L2Convergence':1e-08,
     
     # Design options
     'meshSurfaceFamily':'allSurfaces',
     'designSurfaceFamily':'allSurfaces',
 
     # Output
-    'volumeVariables':['eddy','eddyratio','dist'],
+    'volumeVariables':['eddyratio'],
     'printIterations':False,
     'printTiming':True,
     'printWarnings':False
@@ -103,7 +114,7 @@ warpOptions = { #IDwarp mesh movement options
   'fileType':'CGNS',
   'specifiedSurfaces':None,
   'symmetrySurfaces':None,
-  'symmetryPlanes':[],
+  'symmetryPlanes':[[[0.0, 0.0, 0.0],[0.0, -1.0, 0.0]],[[0.0, 1.0, 0.0],[0.0, 1.0, 0.0]]],
   'aExp': 3.0,
   'bExp': 5.0,
   'LdefFact':1.0,

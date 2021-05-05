@@ -1,16 +1,21 @@
 import math
 import numpy as np
 import openmdao.api as om
+from mpi4py import MPI
 import plate_comp as pc
 import plate_comp_lhs as pcl
 from plate_comp_opts import aeroOptions, warpOptions, optOptions
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 # Script to run plate optimization
 ooptions = optOptions
 
 # Print options file
-log = open("./plate_comp_opts.py", "r").read()
-print(log)
+if rank == 0:
+    log = open("./plate_comp_opts.py", "r").read()
+    print(log)
 
 
 prob = om.Problem()
@@ -43,7 +48,7 @@ prob.setup()
 
 if ooptions['check_partials']:
     prob.check_partials(method = 'fd')
-if ooptions['run_once']:
+elif ooptions['run_once']:
     prob.run_model()
 else:
     prob.run_driver()
@@ -53,12 +58,13 @@ prob.model.list_inputs(values = False, hierarchical=False)
 prob.model.list_outputs(values = False, hierarchical=False)
 
 # minimum value
-print(prob['bump_plate.Cd_m'])
-print(prob['bump_plate.Cd_v'])
-print(prob['bump_plate.Cd_r'])
-if ooptions['constrain_opt']:
-    if ooptions['use_area_con']:
-        print(prob['bump_plate.SA'])
-    else:
-        print(prob['bump_plate.TC'])
-print(prob['a'])
+if rank == 0:
+    print(prob['bump_plate.Cd_m'])
+    print(prob['bump_plate.Cd_v'])
+    print(prob['bump_plate.Cd_r'])
+    if ooptions['constrain_opt']:
+        if ooptions['use_area_con']:
+            print(prob['bump_plate.SA'])
+        else:
+            print(prob['bump_plate.TC'])
+    print(prob['a'])
