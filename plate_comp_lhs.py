@@ -4,6 +4,7 @@ import plate_ffd as pf
 import math
 import plate_sa_lhs
 import subprocess
+import time
 from mpi4py import MPI
 from idwarp import USMesh
 from baseclasses import *
@@ -16,7 +17,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 class PlateComponentLHS(om.ExplicitComponent):
-    """Deterministic Bump Flow Problem"""
+    """Robust Bump Flow Problem"""
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
@@ -26,7 +27,11 @@ class PlateComponentLHS(om.ExplicitComponent):
         self.uoptions = uqOptions
 
         # Generate FFD and DVs
-        self.DVGeo = pf.createFFD()
+        if rank == 0:
+            rank0dvg = pf.createFFD()
+        else:
+            rank0dvg = None
+        self.DVGeo = comm.bcast(rank0dvg, root=0)
 
         # starting flat mesh
         meshname = self.aoptions['gridFile']
@@ -65,44 +70,45 @@ class PlateComponentLHS(om.ExplicitComponent):
 
         # Scatter samples, multi-point parallelism
         ns = self.uoptions['NS']
-        self.nsp = int(ns/size) # samples per processor
+        self.cases = divide_cases(ns, size)
+        self.nsp = len(self.cases[rank])#int(ns/size) # samples per processor
 
-        self.samplep = self.sample[(rank*self.nsp):(rank*self.nsp+(self.nsp))] #shouldn't really need to "scatter" per se
+        self.samplep = self.sample[self.cases[rank]]#self.sample[(rank*self.nsp):(rank*self.nsp+(self.nsp))] #shouldn't really need to "scatter" per se
+        #import pdb; pdb.set_trace()
+        assert len(self.samplep) == self.nsp
+
         #import pdb; pdb.set_trace()
         #self.CFDSolver.DVGeo.getFlattenedChildren()[1].writePlot3d("ffdp_opt_def.xyz")
         #import pdb; pdb.set_trace()
 
         # create copies of the original mesh (need this for idwarp?)
-        if rank == 0:
-            #basemesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
-            for i in range(ns):
-                meshname = self.ooptions['prob_name'] + "_" + str(i) + ".cgns"
-                # basemesh.writeGrid(fileName=meshname)
-                subprocess.run(["cp",self.woptions['gridFile'],meshname])
-            dummy = 1
-        else:
-            dummy = 2
+        # if rank == 0:
+        #     #basemesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
+        #     for i in range(ns):
+        #         meshname = self.ooptions['prob_name'] + "_" + str(i) + ".cgns"
+        #         # basemesh.writeGrid(fileName=meshname)
+        #         subprocess.run(["cp",self.woptions['gridFile'],meshname])
+        #     dummy = 1
+        # else:
+        #     dummy = 2
         
-        dummysum = comm.allgather(dummy)
+        # dummysum = comm.allgather(dummy)
         
         # Actually create solvers (and aeroproblems?) (and mesh?) now
         self.aps = []
         self.solvers = []
         self.meshes = []
-        self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
+
+        #self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
         for i in range(self.nsp):
-            namestr = self.gridSol + "_" + str(rank*self.nsp + i)
+            namestr = self.gridSol + "_" + str(self.cases[rank][i])
             
-            #meshname = self.ooptions['prob_name'] + "_" + str(rank*self.nsp + i) + ".cgns"
-            #import pdb; pdb.set_trace()
-            #basemesh.writeGrid(fileName=meshname)
-            #self.woptions['gridFile'] = meshname
-            # create meshes (needed?)
-            #self.meshes.append(USMesh(options={'gridFile':meshname}, comm=MPI.COMM_SELF))
+            # create meshes 
+            self.meshes.append(USMesh(options=self.woptions, comm=MPI.COMM_SELF))
             
-            # create aeroproblems (needed?)
+            # create aeroproblems 
             self.aps.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
-            
+            time.sleep(0.1) # this solves a few problems for some reason
             # create solvers
             self.solvers.append(ADFLOW(options=self.aoptions, comm=MPI.COMM_SELF))
             if not self.ooptions['run_once']:
@@ -111,17 +117,11 @@ class PlateComponentLHS(om.ExplicitComponent):
                 saconstsm = self.samplep[i]
             self.saconsts = saconstsm + self.saconstsb
             self.solvers[i].setOption('SAConsts', self.saconsts)
-            #self.solvers[i].setOption('gridFile', meshname)
             self.solvers[i].setDVGeo(self.DVGeo)
-            self.solvers[i].setMesh(self.mesh)#es[i])
+            self.solvers[i].setMesh(self.meshes[i])
+            print("what up %i", str(rank))
             coords = self.solvers[i].getSurfaceCoordinates(groupName=self.solvers[i].allWallsGroup)
             self.solvers[i].DVGeo.addPointSet(coords, 'coords')
-
-        # Original setup
-        # self.CFDSolver = ADFLOW(options=self.aoptions, comm=MPI.COMM_WORLD)
-        # self.CFDSolver.setDVGeo(self.DVGeo)
-
-        # self.CFDSolver.setMesh(self.mesh)
 
         # Set constraints, should only need one of those solvers, the meshes are all the same
         self.DVCon = DVConstraints()
@@ -171,7 +171,8 @@ class PlateComponentLHS(om.ExplicitComponent):
         else:
             self.DVCon2.addThicknessConstraints1D(ptList, self.NC, [0,0,1], lower=0.5, upper=ub, name='tcs')
 
-
+        dummy = rank
+        dsum = comm.allgather(dummy)
 
 
     def setup(self):
@@ -209,7 +210,7 @@ class PlateComponentLHS(om.ExplicitComponent):
     
     def compute(self, inputs, outputs):
         # run the bump shape model
-
+        #import pdb; pdb.set_trace()
         # evaluate each sample point
         print("hello")
         dvdict = {'pnts':inputs['a']}
@@ -223,41 +224,10 @@ class PlateComponentLHS(om.ExplicitComponent):
             self.aps[i].setDesignVars(dvdict)
             self.solvers[i](self.aps[i])
             self.solvers[i].evalFunctions(self.aps[i], funcs)
-            astr = self.gridSol + "_" + str(rank*self.nsp + i) +"_cd"
+            astr = self.gridSol + "_" + str(self.cases[rank][i]) +"_cd"
             #import pdb; pdb.set_trace()
             musp[i] = funcs[astr]
             sump += funcs[astr]
-        
-        # # move the mesh
-        # #import pdb; pdb.set_trace()
-        # dvdict = {'pnts':inputs['a']}
-        # self.CFDSolver.DVGeo.setDesignVars(dvdict)
-        # self.ap.setDesignVars(dvdict)
-
-        # #self.CFDSolver.DVGeo.update("coords")
-
-        # # Solve and evaluate functions
-        # funcs = {}
-
-        # self.nsp
-
-        # # evaluate each sample point
-        # ns = self.uoptions['NS']
-        # sum = 0.
-        # mus = numpy.zeros(ns)
-        # for i in range(ns):
-        #     if not self.ooptions['run_once']:
-        #         saconstsm = self.sample[i].tolist()
-        #     else:
-        #         saconstsm = self.sample[i]
-        #     self.saconsts = saconstsm + self.saconstsb
-        #     self.CFDSolver.setOption('SAConsts', self.saconsts)
-
-        #     self.CFDSolver(self.ap)
-        #     self.CFDSolver.evalFunctions(self.ap, funcs)
-        #     str = self.gridSol + '_cd'
-        #     mus[i] = funcs[str]
-        #     sum += funcs[str]
         
         # compute mean and variance
         sum = comm.allreduce(sump)
@@ -265,8 +235,8 @@ class PlateComponentLHS(om.ExplicitComponent):
         #import pdb; pdb.set_trace()
         E = sum/ns
         sum2 = 0.
-        for i in range(size):
-            for j in range(self.nsp):
+        for i in range(len(mus)): #range(size):
+            for j in range(len(mus[i])): #range(self.nsp):
                 sum2 += (mus[i][j]-E)**2
         V = sum2/ns
 
@@ -296,13 +266,14 @@ class PlateComponentLHS(om.ExplicitComponent):
         musp = numpy.zeros(self.nsp)
         pmup = []
         psump = numpy.zeros(len(inputs['a']))
-        #self.aps[0].setDesignVars(dvdict)
+        self.aps[0].setDesignVars(dvdict)
+        #import pdb; pdb.set_trace()
         for i in range(self.nsp):
             self.solvers[i].DVGeo.setDesignVars(dvdict)
             self.aps[i].setDesignVars(dvdict)
             self.solvers[i].evalFunctions(self.aps[i], funcs)
             self.solvers[i].evalFunctionsSens(self.aps[i], funcSens, ['cd'])
-            astr = self.gridSol + "_" + str(rank*self.nsp + i)+"_cd"
+            astr = self.gridSol + "_" + str(self.cases[rank][i])+"_cd"
             arr = [x*(1./ns) for x in funcSens[astr]['pnts']]
             sump += funcs[astr]
             musp[i] = funcs[astr]
@@ -314,50 +285,19 @@ class PlateComponentLHS(om.ExplicitComponent):
         pmu = comm.allgather(pmup)
         psum = comm.allreduce(psump)
 
-
-        # # move the mesh
-        # dvdict = {'pnts':inputs['a']}
-        # self.CFDSolver.DVGeo.setDesignVars(dvdict)
-        # self.ap.setDesignVars(dvdict)
-        # #self.CFDSolver.DVGeo.update("coords")
- 
-        # funcs = {}
-        # funcSens = {}
-        # # evaluate each sample point
-        # ns = self.uoptions['NS']
-        # sum = 0.
-        # mus = numpy.zeros(ns)
-        # pmu = []
-        # psum = numpy.zeros(len(inputs['a']))
-        # for i in range(ns):
-        #     saconstsm = self.sample[i].tolist()
-        #     self.saconsts = saconstsm + self.saconstsb
-        #     self.CFDSolver.setOption('SAConsts', self.saconsts)
-
-        #     self.CFDSolver(self.ap)
-        #     self.CFDSolver.evalFunctions(self.ap, funcs)
-        #     self.CFDSolver.evalFunctionsSens(self.ap, funcSens, ['cd'])
-            
-        #     str = self.gridSol + '_cd'
-        #     arr = [x*(1./ns) for x in funcSens[str]['pnts']]
-        #     sum += funcs[str]
-        #     mus[i] = funcs[str]
-        #     pmu.append(arr[0])
-        #     psum += arr[0]
-                
         #import pdb; pdb.set_trace()
 
         # compute variance sensitivity
         E = sum/ns
         sum2 = 0.
         psum2 = numpy.zeros(len(inputs['a']))
-        for i in range(size):
-            for j in range(self.nsp):
+        for i in range(len(mus)): #range(size):
+            for j in range(len(mus[i])): #range(self.nsp):
                 sum2 += (mus[i][j]-E)**2
 
                 temp = pmu[i][j] - psum
                 arr2 = [x*2*(mus[i][j]-E) for x in temp]
-                psum2 += arr2[0]
+                psum2 += arr2
         V = sum2/ns
         #import pdb; pdb.set_trace()
 
@@ -376,4 +316,35 @@ class PlateComponentLHS(om.ExplicitComponent):
 
        #J['Cd','a'][0] = 2*inputs['a']
 
+def divide_cases(ncases, nprocs):
+    """
+    From parallel OpenMDAO beam problem example
 
+    Divide up load cases among available procs.
+
+    Parameters
+    ----------
+    ncases : int
+        Number of load cases.
+    nprocs : int
+        Number of processors.
+
+    Returns
+    -------
+    list of list of int
+        Integer case numbers for each proc.
+    """
+    data = []
+    for j in range(nprocs):
+        data.append([])
+
+    wrap = 0
+    for j in range(ncases):
+        idx = j - wrap
+        if idx >= nprocs:
+            idx = 0
+            wrap = j
+
+        data[idx].append(j)
+
+    return data

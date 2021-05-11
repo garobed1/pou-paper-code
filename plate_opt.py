@@ -41,7 +41,7 @@ prob.setup()
 
 if ooptions['check_partials']:
     prob.check_partials(method = 'fd')
-if ooptions['run_once']:
+elif ooptions['run_once']:
     prob.run_model()
 else:
     prob.run_driver()
