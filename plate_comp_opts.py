@@ -1,5 +1,5 @@
-gridFile = f'grid_foil_193_49_2.cgns'
-probName = 'rob_opt_1'
+gridFile = f'grid_mlmc_test_97_25_1.cgns'
+probName = 'mlmc_test'
 
 astar = [0.28788225, 0.29621159, 0.34267779, 0.18972925, 0.19873263, 0.30842999,
     0.27963309, 0.23999633, 0.28788225, 0.29621159, 0.34267779, 0.18972925,
@@ -11,7 +11,11 @@ dist = [
     [0.38547884, 0.129125,   0.6125,     0.65      ],
     [0.45482143, 0.133625,   0.6625,     0.85      ]]
 
-
+gridFilesML = [
+f'grid_mlmc_test_49_25_1.cgns',
+f'grid_mlmc_test_97_25_1.cgns',
+f'grid_mlmc_test_193_25_1.cgns'
+]
 
 optOptions = { #general optimization parameters
     'prob_name':probName,
@@ -22,21 +26,26 @@ optOptions = { #general optimization parameters
     'DVFraction':0.1, #fraction of NX on either side of bump control points not used as DVs
     'DVUpperBound':2.0,  #upper bound for control point movement
     'DVLowerBound':0.0,  #lower bound for control point movement (set to 0 when thickness constraints work)
-    'DVInit':0.2,  #uniform initial design state
+    'DVInit':0.3,  #uniform initial design state
     'DCMinThick':0.01,  #uniform minimum thickness
-    'DCMinArea':1.005,  #minimum surface area, if used
+    'DCMinArea':1.0025,  #minimum surface area, if used
     'DCThickFrac':0.75, #percentage of bump area to constrain
     'constrain_opt':True,
     'use_area_con':True,
-    'check_partials':False,  #check partial derivatives
+    'check_partials':True,  #check partial derivatives
     'run_once':False, # run a single iteration of the model with given settings
     'ro_shape':astar # shape variables 
 }
 
 uqOptions = { #general UQ parameters
-    'NS':16, #number of sample points
+    'mode':'MLMC', # MC: Normal Monte Carlo with LHS points
+                 # MLMC: Multi-Level Monte Carlo with LHS points
+    'NS':4, #number of sample points
+    'NS0':4, #start up sample number for multi-level
     'rho':2., #robust objective std dev ratio
-    'dist':dist #distribution to use ONLY IF running the model once
+    'dist':dist, #distribution to use ONLY IF running the model once
+    'gridFileLevels':gridFilesML, #all available meshes for multi-level (need at least 3)
+    'vartol': 3e-5 #ML variance tolerance for convergence
 }
 
 aeroOptions = { #ADflow aero solver options
@@ -62,24 +71,29 @@ aeroOptions = { #ADflow aero solver options
     'nCycles':100000,
     'monitorvariables':['resrho','resmom','cl','cd','resturb'],
     'useNKSolver':True,
-    'NKSwitchTol':1e-16,
+    'NKSwitchTol':1e-6,
     'NKSubspaceSize':200,
     'NKLS':'none',
     'useANKSolver':True,
     'ANKCoupledSwitchTol':1e-5,
     'ANKConstCFLStep':0.4,
     'ANKCFLLimit':1000000000.0,
-    'L2Convergence':1e-08,
+    'L2Convergence':1e-12,
     
     # Design options
     'meshSurfaceFamily':'allSurfaces',
     'designSurfaceFamily':'allSurfaces',
 
+    # Adjoint options
+    'adjointL2Convergence': 1e-06,
+
     # Output
-    'volumeVariables':['eddyratio'],
+    'volumeVariables':['eddyratio','mach'],
+    'surfaceVariables':['yplus'],
     'printIterations':False,
-    'printTiming':True,
-    'printWarnings':False
+    'printTiming':False,
+    'printWarnings':False,
+    'setMonitor':False
     }
 
 warpOptions = { #IDwarp mesh movement options

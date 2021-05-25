@@ -4,13 +4,15 @@ import openmdao.api as om
 from mpi4py import MPI
 import plate_comp as pc
 import plate_comp_lhs as pcl
-from plate_comp_opts import aeroOptions, warpOptions, optOptions
+import plate_comp_mlmc as pcm
+from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 
 # Script to run plate optimization
 ooptions = optOptions
+uoptions = uqOptions
 
 # Print options file
 if rank == 0:
@@ -19,7 +21,10 @@ if rank == 0:
 
 
 prob = om.Problem()
-prob.model.add_subsystem('bump_plate', pcl.PlateComponentLHS(), promotes_inputs=['a'])
+if uqOptions['mode'] == 'MLMC':
+    prob.model.add_subsystem('bump_plate', pcm.PlateComponentMLMC(), promotes_inputs=['a'])
+else:
+    prob.model.add_subsystem('bump_plate', pcl.PlateComponentLHS(), promotes_inputs=['a'])
 
 # setup the optimization
 prob.driver = om.ScipyOptimizeDriver()
@@ -68,3 +73,6 @@ if rank == 0:
         else:
             print(prob['bump_plate.TC'])
     print(prob['a'])
+
+    # if uoptions['mode'] == 'MLMC':
+    #     print()

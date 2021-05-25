@@ -17,7 +17,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 class PlateComponentLHS(om.ExplicitComponent):
-    """Robust Bump Flow Problem"""
+    """Robust Bump Flow Problem, with LHS Monte Carlo Samples"""
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
@@ -55,18 +55,15 @@ class PlateComponentLHS(om.ExplicitComponent):
         solname = self.ooptions['prob_name']
         self.gridSol = f'{solname}_sol'
 
-        # Aerodynamic problem description
-        #self.ap = AeroProblem(name=self.gridSol, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, 
-        #evalFuncs=['cd'])
-
         # Get a set of UQ sample points (LHS)
         if self.ooptions['run_once']:
             self.sample = self.uoptions['dist']
         else:
-            self.sample = plate_sa_lhs.genLHS(s=self.uoptions['NS'])
-
-        # Set up mesh warping
-        #self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
+            if rank == 0:
+                rank0sam = plate_sa_lhs.genLHS(s=self.uoptions['NS'])
+            else:
+                rank0sam = None
+            self.sample = comm.bcast(rank0sam, root=0)
 
         # Scatter samples, multi-point parallelism
         ns = self.uoptions['NS']
@@ -77,23 +74,6 @@ class PlateComponentLHS(om.ExplicitComponent):
         #import pdb; pdb.set_trace()
         assert len(self.samplep) == self.nsp
 
-        #import pdb; pdb.set_trace()
-        #self.CFDSolver.DVGeo.getFlattenedChildren()[1].writePlot3d("ffdp_opt_def.xyz")
-        #import pdb; pdb.set_trace()
-
-        # create copies of the original mesh (need this for idwarp?)
-        # if rank == 0:
-        #     #basemesh = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
-        #     for i in range(ns):
-        #         meshname = self.ooptions['prob_name'] + "_" + str(i) + ".cgns"
-        #         # basemesh.writeGrid(fileName=meshname)
-        #         subprocess.run(["cp",self.woptions['gridFile'],meshname])
-        #     dummy = 1
-        # else:
-        #     dummy = 2
-        
-        # dummysum = comm.allgather(dummy)
-        
         # Actually create solvers (and aeroproblems?) (and mesh?) now
         self.aps = []
         self.solvers = []
@@ -171,6 +151,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         else:
             self.DVCon2.addThicknessConstraints1D(ptList, self.NC, [0,0,1], lower=0.5, upper=ub, name='tcs')
 
+        print("excuse me")
         dummy = rank
         dsum = comm.allgather(dummy)
 
@@ -244,7 +225,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         self.DVCon2.evalFunctions(funcs, includeLinear=True)
 
         outputs['Cd_m'] = E
-        outputs['Cd_v'] = V
+        outputs['Cd_v'] = math.sqrt(V)
         rho = self.uoptions['rho']
         outputs['Cd_r'] = E + rho*math.sqrt(V)
         if self.ooptions['use_area_con']:
@@ -279,12 +260,12 @@ class PlateComponentLHS(om.ExplicitComponent):
             musp[i] = funcs[astr]
             pmup.append(arr[0])
             psump += arr[0]
-
+            
         sum = comm.allreduce(sump)
         mus = comm.allgather(musp)
         pmu = comm.allgather(pmup)
         psum = comm.allreduce(psump)
-
+        #import pdb; pdb.set_trace()
         #import pdb; pdb.set_trace()
 
         # compute variance sensitivity
@@ -295,9 +276,10 @@ class PlateComponentLHS(om.ExplicitComponent):
             for j in range(len(mus[i])): #range(self.nsp):
                 sum2 += (mus[i][j]-E)**2
 
-                temp = pmu[i][j] - psum
-                arr2 = [x*2*(mus[i][j]-E) for x in temp]
+                temp = pmu[i][j]*ns - psum
+                arr2 = [x*2*(mus[i][j]-E)/ns for x in temp]
                 psum2 += arr2
+                #import pdb; pdb.set_trace()
         V = sum2/ns
         #import pdb; pdb.set_trace()
 
@@ -305,7 +287,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         self.DVCon2.evalFunctionsSens(funcSens, includeLinear=True)
  
         J['Cd_m','a'] = psum
-        J['Cd_v','a'] = psum2
+        J['Cd_v','a'] = (1./(2*math.sqrt(V)))*psum2
         rho = self.uoptions['rho']
         J['Cd_r','a'] = psum + rho*(1./(2*math.sqrt(V)))*psum2
         if self.ooptions['use_area_con']:

@@ -40,7 +40,7 @@ prob.model.add_constraint('bump_plate.EQ', equals = 0.0, scaler=1)
 prob.setup()
 
 if ooptions['check_partials']:
-    prob.check_partials(method = 'fd')
+    prob.check_partials(method = 'fd', step = 1e-6)
 elif ooptions['run_once']:
     prob.run_model()
 else:
