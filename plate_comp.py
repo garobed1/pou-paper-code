@@ -1,4 +1,5 @@
 import numpy
+import os, sys
 import openmdao.api as om
 import plate_ffd as pf
 import math
@@ -13,6 +14,7 @@ class PlateComponent(om.ExplicitComponent):
     """Deterministic Bump Flow Problem"""
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
+        sys.stdout = open(os.devnull, "w")
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
@@ -107,6 +109,8 @@ class PlateComponent(om.ExplicitComponent):
         else:
             self.DVCon2.addThicknessConstraints1D(ptList, self.NC, [0,0,1], lower=0.5, upper=ub, name='tcs')
 
+        sys.stdout = sys.__stdout__
+
     def setup(self):
         #initialize shape and set deformation points as inputs
         a_init = self.CFDSolver.DVGeo.getValues()
@@ -114,8 +118,8 @@ class PlateComponent(om.ExplicitComponent):
         # mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
         # mult = numpy.concatenate((mult, mult))
         # a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
-        if self.ooptions['run_once']:
-            a_init['pnts'] = self.ooptions['ro_shape']
+        #if self.ooptions['run_once']:
+        #    a_init['pnts'] = self.ooptions['ro_shape']
         self.add_input('a', a_init['pnts'], desc="Bump Shape Control Points")
         #self.add_input('a', 0.2, desc="Bump Shape Control Points")
 

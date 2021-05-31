@@ -1,5 +1,5 @@
-gridFile = f'grid_mlmc_test_97_25_1.cgns'
-probName = 'mlmc_test'
+gridFile = f'grid_paper_results_193_97_1.cgns'
+probName = 'lhs_fixed_10'
 
 astar = [0.28788225, 0.29621159, 0.34267779, 0.18972925, 0.19873263, 0.30842999,
     0.27963309, 0.23999633, 0.28788225, 0.29621159, 0.34267779, 0.18972925,
@@ -12,14 +12,14 @@ dist = [
     [0.45482143, 0.133625,   0.6625,     0.85      ]]
 
 gridFilesML = [
-f'grid_mlmc_test_49_25_1.cgns',
-f'grid_mlmc_test_97_25_1.cgns',
-f'grid_mlmc_test_193_25_1.cgns'
+f'grid_paper_results_49_25_1.cgns',
+f'grid_paper_results_97_49_1.cgns',
+f'grid_paper_results_193_97_1.cgns'
 ]
 
 optOptions = { #general optimization parameters
     'prob_name':probName,
-    'NX':10, #number of x FFD points, not necessarily the number of design vars
+    'NX':20, #number of x FFD points, not necessarily the number of design vars
     'bumpBounds':[1.00, 2.00], #ends of the bump
     'mach':0.85, #inflow mach number
     'Re':3000000, #inflow reynolds number
@@ -32,8 +32,8 @@ optOptions = { #general optimization parameters
     'DCThickFrac':0.75, #percentage of bump area to constrain
     'constrain_opt':True,
     'use_area_con':True,
-    'check_partials':True,  #check partial derivatives
-    'run_once':False, # run a single iteration of the model with given settings
+    'check_partials':False,  #check partial derivatives
+    'run_once':True, # run a single iteration of the model with given settings
     'ro_shape':astar # shape variables 
 }
 
@@ -43,9 +43,11 @@ uqOptions = { #general UQ parameters
     'NS':4, #number of sample points
     'NS0':4, #start up sample number for multi-level
     'rho':2., #robust objective std dev ratio
+    'use-predetermined-samples':False, #input N1 at each level instead of running MLMC
+    'predet-N1':[100,10,4], #user-determined N1
     'dist':dist, #distribution to use ONLY IF running the model once
     'gridFileLevels':gridFilesML, #all available meshes for multi-level (need at least 3)
-    'vartol': 3e-5 #ML variance tolerance for convergence
+    'vartol': 2e-5 #ML variance tolerance for convergence
 }
 
 aeroOptions = { #ADflow aero solver options
@@ -69,7 +71,7 @@ aeroOptions = { #ADflow aero solver options
     # Common Parameters
     'MGCycle':'sg',
     'nCycles':100000,
-    'monitorvariables':['resrho','resmom','cl','cd','resturb'],
+    'monitorvariables':['resrho','resmom','cd','resturb'],
     'useNKSolver':True,
     'NKSwitchTol':1e-6,
     'NKSubspaceSize':200,

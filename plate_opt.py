@@ -1,4 +1,6 @@
 import math
+import os, sys
+import time
 import numpy as np
 import openmdao.api as om
 import plate_comp as pc
@@ -11,13 +13,15 @@ ooptions = optOptions
 log = open("./plate_comp_opts.py", "r").read()
 print(log)
 
+#sys.stdout = open(os.devnull, "w")
+
 prob = om.Problem()
 prob.model.add_subsystem('bump_plate', pc.PlateComponent(), promotes_inputs=['a'])
 
 # setup the optimization
 prob.driver = om.ScipyOptimizeDriver()
 prob.driver.options['optimizer'] = 'SLSQP'
-prob.driver.options['debug_print'] = ['desvars','objs','totals','nl_cons']
+#prob.driver.options['debug_print'] = ['desvars','objs','totals','nl_cons']
 prob.driver.options['tol'] = 1e-6
 
 
@@ -39,6 +43,9 @@ prob.model.add_constraint('bump_plate.EQ', equals = 0.0, scaler=1)
 
 prob.setup()
 
+wc0 = time.perf_counter()
+pc0 = time.process_time()
+
 if ooptions['check_partials']:
     prob.check_partials(method = 'fd', step = 1e-6)
 elif ooptions['run_once']:
@@ -46,14 +53,23 @@ elif ooptions['run_once']:
 else:
     prob.run_driver()
 
+wc1 = time.perf_counter()
+pc1 = time.process_time()
+wct = wc1 - wc0
+pct = pc1 - pc0
+
+#sys.stdout = sys.__stdout__
 
 prob.model.list_inputs(values = False, hierarchical=False)
 prob.model.list_outputs(values = False, hierarchical=False)
 
 # minimum value
-print(prob['bump_plate.Cd'])
-if ooptions['use_area_con']:
-    print(prob['bump_plate.SA'])
-else:
-    print(prob['bump_plate.TC'])
-print(prob['a'])
+print('WC time = ', wct)
+print('PC time = ', pct)
+print('Cd = ', prob['bump_plate.Cd'])
+if ooptions['constrain_opt']:
+    if ooptions['use_area_con']:
+        print('SA = ', prob['bump_plate.SA'])
+    else:
+        print('TC = ', prob['bump_plate.TC'])
+print('Sol = ', prob['a'])

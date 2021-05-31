@@ -22,6 +22,7 @@ class PlateComponentMLMC(om.ExplicitComponent):
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
+        sys.stdout = open(os.devnull, "w")
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
@@ -67,7 +68,13 @@ class PlateComponentMLMC(om.ExplicitComponent):
         self.N1 = None
 ##########
         # call distribute samples here?
-        self.MLMC()
+        if not self.uoptions['use-predetermined-samples']:
+            self.MLMC()
+        else:
+            self.N1 = self.uoptions['predet-N1']
+
+        self.dist_samples()
+
 ##########
 
         # Set constraints, should only need one of those solvers, the meshes are all the same
@@ -121,6 +128,7 @@ class PlateComponentMLMC(om.ExplicitComponent):
         dummy = rank
         dsum = comm.allgather(dummy)
 
+        sys.stdout = sys.__stdout__
 
     def setup(self):
         #initialize shape and set deformation points as inputs
@@ -522,170 +530,174 @@ class PlateComponentMLMC(om.ExplicitComponent):
             #import pdb; pdb.set_trace()
 
             # mean at each level
-            #for l in range(L+1):
-            E.append((sum1[L]+summ[L])/nslt[L])
+            E = numpy.zeros(L+1)
+            for l in range(L+1):
+                E[l] = (sum1[l]+summ[l])/nslt[l]
 
             # variance at each level
-            
-            #import pdb; pdb.set_trace()
-            #for l in range(L+1):
-            sum2 = 0.
-            for i in range(len(mus[L])): #range(size):
-                for j in range(len(mus[L][i])): #range(self.nsp):
-                    if L > 0:
-                        sum2 += ((mus[L][i][j] + musm[L][i][j])-E[L])**2
-                    else:
-                        sum2 += (mus[L][i][j]-E[L])**2
-            V.append(sum2/nslt[L])
+            V = numpy.zeros(L+1)
+            for l in range(L+1):
+                sum2 = 0.
+                for i in range(len(mus[l])): #range(size):
+                    for j in range(len(mus[l][i])): #range(self.nsp):
+                        if l > 0:
+                            sum2 += ((mus[l][i][j] + musm[l][i][j])-E[l])**2
+                        else:
+                            sum2 += (mus[l][i][j]-E[l])**2
+                V[l] = sum2/nslt[l]
 
+            #import pdb; pdb.set_trace()
             # now determine the optimal number of samples at each level
+            N1.append(0.)
             worksum = 0
             for l in range(L+1):
                 worksum += numpy.sqrt(V[l]*(M**l))
-
-            nlf = 2*numpy.sqrt(V[l]/(M**l)) * worksum / (eps*eps)
-            nlfm = max(self.NS0, math.ceil(nlf))
-            N1.append(nlfm)
+            for l in range(L+1):
+                nlf = 2*numpy.sqrt(V[l]/(M**l)) * worksum / (eps*eps)
+                nlfm = max(nslt[l], math.ceil(nlf))
+                N1[l] = nlfm
 
             # now compute and generate additional samples at each level
-            # first partition samples (just do it once at each level, no need to repeat)
-            # create the extra number of solvers at the current level
+            # first partition samples  NEVERMIND (just do it once at each level, no need to repeat)
+            # create the extra number of solvers at each (the current) level
 
+            # need to loop everything from here on
 
-            alist = self.aps[L][0:nslp[L]]
-            slist = self.solvers[L][0:nslp[L]]
-            mlist = self.meshes[L][0:nslp[L]]
-            if L > 0:
-                alist2 = self.aps[L][nslp[L]:]
-                slist2 = self.solvers[L][nslp[L]:]
-                mlist2 = self.meshes[L][nslp[L]:]
-            
-            self.naddedtot[L] = N1[L] - self.NS0
-            self.current_samples += self.naddedtot[L]
-            #import pdb; pdb.set_trace()
-            if rank == 0:
-                rank0sam = plate_sa_lhs.genLHS(s=self.current_samples)
-            else:
-                rank0sam = None
-            self.sample = comm.bcast(rank0sam, root=0)
-            
-            if self.naddedtot[L] > 0:
-                temp = divide_cases(self.naddedtot[L], size) 
-                for i in range(len(temp)):
-                    for j in range(len(temp[i])):
-                        temp[i][j] += self.Lmax*self.NS0 + sum(self.naddedtot[0:L])
-            else:
-                temp = []
-            if len(temp):
-                for ns in range(size):
-                    self.cases[L][ns] += temp[ns] #append
-            nslpnew = len(self.cases[L][rank])
-            nsltnew = sum([len(self.cases[L][x]) for x in range(size)])
-            #self.nsp[L] = len(self.cases[L][rank]) #int(ns/size) # samples per processor
-            self.samplep[L] = self.sample[self.cases[L][rank]]
-            
-            for i in range(nslp[L], nslpnew): #need it to be just the extra cases
+            for l in range(L+1):
+                alist = self.aps[l][0:nslp[l]]
+                slist = self.solvers[l][0:nslp[l]]
+                mlist = self.meshes[l][0:nslp[l]]
+                if l > 0:
+                    alist2 = self.aps[l][nslp[l]:]
+                    slist2 = self.solvers[l][nslp[l]:]
+                    mlist2 = self.meshes[l][nslp[l]:]
+                
+                self.naddedtot[l] = N1[l] - nslt[l]
+                self.current_samples += self.naddedtot[l]
                 #import pdb; pdb.set_trace()
-                namestr = self.gridSol + "_" + str(self.cases[L][rank][i])
-
-                # create meshes
-                leveloptions = self.woptions
-                leveloptions['gridFile'] = self.meshnames[L] 
-                mlist.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
-
-                # create aeroproblems
-                aloptions = self.aoptions
-                aloptions['gridFile'] = self.meshnames[L] 
-                alist.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
-                time.sleep(0.1) # this solves a few problems for some reason
-                # create solvers
-                slist.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
-
-                saconstsm = self.samplep[L][i].tolist()
-                self.saconsts = saconstsm + self.saconstsb
-                slist[i].setOption('SAConsts', self.saconsts)
-                slist[i].setDVGeo(self.DVGeo)
-                slist[i].setMesh(mlist[i])
-                coords = slist[i].getSurfaceCoordinates(groupName=slist[i].allWallsGroup)
-                slist[i].DVGeo.addPointSet(coords, 'coords')
-                time.sleep(0.1)
-                if L > 0: #create additional solvers at higher levels for the estimators
-                    # create meshes
+                if rank == 0:
+                    rank0sam = plate_sa_lhs.genLHS(s=self.current_samples)
+                else:
+                    rank0sam = None
+                self.sample = comm.bcast(rank0sam, root=0)
+                
+                if self.naddedtot[l] > 0:
+                    temp = divide_cases(self.naddedtot[l], size) 
+                    for i in range(len(temp)):
+                        for j in range(len(temp[i])):
+                            temp[i][j] += self.current_samples - self.naddedtot[l] #self.Lmax*self.NS0 + sum(self.naddedtot[0:L])
+                else:
+                    temp = []
+                if len(temp):
+                    for ns in range(size):
+                        self.cases[l][ns] += temp[ns] #append
+                nslpnew = len(self.cases[l][rank])
+                nsltnew = sum([len(self.cases[l][x]) for x in range(size)])
+                #self.nsp[L] = len(self.cases[L][rank]) #int(ns/size) # samples per processor
+                self.samplep[l] = self.sample[self.cases[l][rank]]
+                
+                for i in range(nslp[l], nslpnew): #need it to be just the extra cases
                     #import pdb; pdb.set_trace()
-                    namestr = self.gridSol + "_" + str(self.cases[L][rank][i]) + "_m"
+                    namestr = self.gridSol + "_" + str(self.cases[l][rank][i])
+    
+                    # create meshes
                     leveloptions = self.woptions
-                    leveloptions['gridFile'] = self.meshnames[L-1] 
-                    mlist2.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
-                    # create aeroproblems 
+                    leveloptions['gridFile'] = self.meshnames[l] 
+                    mlist.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
+    
+                    # create aeroproblems
                     aloptions = self.aoptions
-                    aloptions['gridFile'] = self.meshnames[L-1]
-                    alist2.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
+                    aloptions['gridFile'] = self.meshnames[l] 
+                    alist.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
                     time.sleep(0.1) # this solves a few problems for some reason
                     # create solvers
-                    slist2.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
-                    slist2[i].setOption('SAConsts', self.saconsts)
-                    slist2[i].setDVGeo(self.DVGeo)
-                    slist2[i].setMesh(mlist2[i])
-                    coords = slist[i].getSurfaceCoordinates(groupName=slist2[i].allWallsGroup)
-                    slist2[i].DVGeo.addPointSet(coords, 'coords')
-            nslp[L] = nslpnew
-            nslt[L] = nsltnew
-            
-
-            self.aps[L] = alist
-            self.solvers[L] = slist
-            self.meshes[L] = mlist
-            if L > 0:
-                self.aps[L] += alist2
-                self.solvers[L] += slist2
-                self.meshes[L] += mlist2
-
-            # compute remaining samples
-            sump[L] = 0
-            sumpm[L] = 0
-            musp[L] = numpy.zeros(nslp[L])
-            muspm[L] = numpy.zeros(nslp[L])
-            for i in range(nslp[L]):
-                # just do this again in case
-                saconstsm = self.samplep[L][i].tolist()
-                self.saconsts = saconstsm + self.saconstsb
-                self.solvers[L][i].setOption('SAConsts', self.saconsts)
-                self.solvers[L][i].DVGeo.setDesignVars(dvdict)
-                self.aps[L][i].setDesignVars(dvdict)
-                self.solvers[L][i](self.aps[L][i])
-                self.solvers[L][i].evalFunctions(self.aps[L][i], funcs)
-                astr = self.gridSol + "_" + str(self.cases[L][rank][i]) +"_cd"
-                musp[L][i] = funcs[astr]
-                sump[L] += funcs[astr]   
-                #import pdb; pdb.set_trace()
-                if L > 0:
-                    self.solvers[L][i+nslp[L]].setOption('SAConsts', self.saconsts)
-                    self.solvers[L][i+nslp[L]].DVGeo.setDesignVars(dvdict)
-                    self.aps[L][i+nslp[L]].setDesignVars(dvdict)
-                    self.solvers[L][i+nslp[L]](self.aps[L][i+nslp[L]])
-                    self.solvers[L][i+nslp[L]].evalFunctions(self.aps[L][i+nslp[L]], funcs)
-                    astr = self.gridSol + "_" + str(self.cases[L][rank][i]) +"_m_cd" 
-                    muspm[L][i] = -funcs[astr]
-                    sumpm[L] += -funcs[astr]     
-
-            # compute mean and variance estimate from all samples
-            sum1[L] = comm.allreduce(sump[L])
-            mus[L] = comm.allgather(musp[L])
-            summ[L] = comm.allreduce(sumpm[L])
-            musm[L] = comm.allgather(muspm[L])
-
-            # mean at each level
-            E[L] = (sum1[L]+summ[L])/nslt[L]
-
-            # variance at each level
-            sum2 = 0.
-            for i in range(len(mus[L])): #range(size):
-                for j in range(len(mus[L][i])): #range(self.nsp):
-                    if L > 0:
-                        sum2 += ((mus[L][i][j] + musm[L][i][j])-E[L])**2
-                    else:
-                        sum2 += (mus[L][i][j]-E[L])**2
-            V[L] = sum2/nslt[L]
+                    slist.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
+    
+                    saconstsm = self.samplep[l][i].tolist()
+                    self.saconsts = saconstsm + self.saconstsb
+                    slist[i].setOption('SAConsts', self.saconsts)
+                    slist[i].setDVGeo(self.DVGeo)
+                    slist[i].setMesh(mlist[i])
+                    coords = slist[i].getSurfaceCoordinates(groupName=slist[i].allWallsGroup)
+                    slist[i].DVGeo.addPointSet(coords, 'coords')
+                    time.sleep(0.1)
+                    if l > 0: #create additional solvers at higher levels for the estimators
+                        # create meshes
+                        #import pdb; pdb.set_trace()
+                        namestr = self.gridSol + "_" + str(self.cases[l][rank][i]) + "_m"
+                        leveloptions = self.woptions
+                        leveloptions['gridFile'] = self.meshnames[l-1] 
+                        mlist2.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
+                        # create aeroproblems 
+                        aloptions = self.aoptions
+                        aloptions['gridFile'] = self.meshnames[l-1]
+                        alist2.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
+                        time.sleep(0.1) # this solves a few problems for some reason
+                        # create solvers
+                        slist2.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
+                        slist2[i].setOption('SAConsts', self.saconsts)
+                        slist2[i].setDVGeo(self.DVGeo)
+                        slist2[i].setMesh(mlist2[i])
+                        coords = slist[i].getSurfaceCoordinates(groupName=slist2[i].allWallsGroup)
+                        slist2[i].DVGeo.addPointSet(coords, 'coords')
+                nslp[l] = nslpnew
+                nslt[l] = nsltnew
+                
+    
+                self.aps[l] = alist
+                self.solvers[l] = slist
+                self.meshes[l] = mlist
+                if l > 0:
+                    self.aps[l] += alist2
+                    self.solvers[l] += slist2
+                    self.meshes[l] += mlist2
+    
+                # compute remaining samples
+                sump[l] = 0
+                sumpm[l] = 0
+                musp[l] = numpy.zeros(nslp[l])
+                muspm[l] = numpy.zeros(nslp[l])
+                for i in range(nslp[l]):
+                    # just do this again in case
+                    saconstsm = self.samplep[l][i].tolist()
+                    self.saconsts = saconstsm + self.saconstsb
+                    self.solvers[l][i].setOption('SAConsts', self.saconsts)
+                    self.solvers[l][i].DVGeo.setDesignVars(dvdict)
+                    self.aps[l][i].setDesignVars(dvdict)
+                    self.solvers[l][i](self.aps[l][i])
+                    self.solvers[l][i].evalFunctions(self.aps[l][i], funcs)
+                    astr = self.gridSol + "_" + str(self.cases[l][rank][i]) +"_cd"
+                    musp[l][i] = funcs[astr]
+                    sump[l] += funcs[astr]   
+                    #import pdb; pdb.set_trace()
+                    if l > 0:
+                        self.solvers[l][i+nslp[l]].setOption('SAConsts', self.saconsts)
+                        self.solvers[l][i+nslp[l]].DVGeo.setDesignVars(dvdict)
+                        self.aps[l][i+nslp[l]].setDesignVars(dvdict)
+                        self.solvers[l][i+nslp[l]](self.aps[l][i+nslp[l]])
+                        self.solvers[l][i+nslp[l]].evalFunctions(self.aps[l][i+nslp[l]], funcs)
+                        astr = self.gridSol + "_" + str(self.cases[l][rank][i]) +"_m_cd" 
+                        muspm[l][i] = -funcs[astr]
+                        sumpm[l] += -funcs[astr]     
+    
+                # compute mean and variance estimate from all samples
+                sum1[l] = comm.allreduce(sump[l])
+                mus[l] = comm.allgather(musp[l])
+                summ[l] = comm.allreduce(sumpm[l])
+                musm[l] = comm.allgather(muspm[l])
+    
+                # mean at each level
+                E[l] = (sum1[l]+summ[l])/nslt[l]
+    
+                # variance at each level
+                sum2 = 0.
+                for i in range(len(mus[l])): #range(size):
+                    for j in range(len(mus[l][i])): #range(self.nsp):
+                        if l > 0:
+                            sum2 += ((mus[l][i][j] + musm[l][i][j])-E[l])**2
+                        else:
+                            sum2 += (mus[l][i][j]-E[l])**2
+                V[l] = sum2/nslt[l]
             
             
             # if L == 1:
@@ -707,7 +719,107 @@ class PlateComponentMLMC(om.ExplicitComponent):
 
         # once done, we have aps, solvers, meshes, which is all we need
 
+    def dist_samples(self):
+        # If we already have the number of samples, just create as many solvers as needed at each level
+        # Just do this after running MLMC() anyway 
 
+        # flow characteristics
+        alpha = 0.0
+        mach = self.ooptions['mach']#0.95
+        Re = self.ooptions['Re']#50000
+        Re_L = 1.0
+        tempR = 540
+        arearef = 2.0
+        chordref = 1.0
+        a_init = self.DVGeo.getValues()
+        a_init['pnts'][:] = self.ooptions['DVInit']
+        
+        self.current_samples = sum(self.N1)
+        if rank == 0:
+            rank0sam = plate_sa_lhs.genLHS(s=self.current_samples)
+        else:
+            rank0sam = None
+        self.sample = comm.bcast(rank0sam, root=0)
+
+        # Scatter samples on each level, multi-point parallelism
+        self.cases = []
+        for i in range(self.Lmax):
+            self.cases.append(divide_cases(self.N1[i], size)) 
+            for j in range(len(self.cases[i])):
+                for k in range(len(self.cases[i][j])):
+                    self.cases[i][j][k] += sum(self.N1[0:i])
+            #self.nsp.append(len(self.cases[i][rank]))#int(ns/size) # samples per processor
+            self.samplep.append(self.sample[self.cases[i][rank]])
+        
+        # Actually create solvers (and aeroproblems?) (and mesh?) now
+        self.aps = []
+        self.solvers = []
+        self.meshes = []
+        nslp = []
+        nslt = []
+        for k in range(self.Lmax): 
+            alist = []
+            slist = []
+            mlist = []
+            alist2 = []
+            slist2 = []
+            mlist2 = []
+            nslp.append(len(self.cases[k][rank]))
+            nslt.append(sum([len(self.cases[k][x]) for x in range(size)]))
+            for i in range(nslp[k]):
+                namestr = self.gridSol + "_" + str(self.cases[k][rank][i])
+
+                # create meshes
+                leveloptions = self.woptions
+                leveloptions['gridFile'] = self.meshnames[k] 
+                mlist.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
+
+                # create aeroproblems 
+                aloptions = self.aoptions
+                aloptions['gridFile'] = self.meshnames[k] 
+                alist.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
+                time.sleep(0.1) # this solves a few problems for some reason
+                # create solvers
+                slist.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
+                
+                # if not self.ooptions['run_once']:
+                #     saconstsm = self.samplep[i].tolist()
+                # else:
+                saconstsm = self.samplep[k][i].tolist()
+                self.saconsts = saconstsm + self.saconstsb
+                slist[i].setOption('SAConsts', self.saconsts)
+                slist[i].setDVGeo(self.DVGeo)
+                slist[i].setMesh(mlist[i])
+                coords = slist[i].getSurfaceCoordinates(groupName=slist[i].allWallsGroup)
+                slist[i].DVGeo.addPointSet(coords, 'coords')
+
+                if k > 0: #create additional solvers at higher levels for the estimators
+                     # create meshes
+                    namestr = self.gridSol + "_" + str(self.cases[k][rank][i]) + "_m"
+                    leveloptions = self.woptions
+                    leveloptions['gridFile'] = self.meshnames[k-1] 
+                    mlist2.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
+                    # create aeroproblems 
+                    aloptions = self.aoptions
+                    aloptions['gridFile'] = self.meshnames[k-1] 
+                    alist2.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
+                    time.sleep(0.1) # this solves a few problems for some reason
+                    # create solvers
+                    slist2.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
+                    slist2[i].setOption('SAConsts', self.saconsts)
+                    slist2[i].setDVGeo(self.DVGeo)
+                    slist2[i].setMesh(mlist2[i])
+                    coords = slist[i].getSurfaceCoordinates(groupName=slist2[i].allWallsGroup)
+                    slist2[i].DVGeo.addPointSet(coords, 'coords')
+                
+            self.aps.append(alist)
+            self.solvers.append(slist)
+            self.meshes.append(mlist)
+            if k > 0:
+                self.aps[k] += alist2
+                self.solvers[k] += slist2
+                self.meshes[k] += mlist2
+        
 
 def divide_cases(ncases, nprocs):
     """

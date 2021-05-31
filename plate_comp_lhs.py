@@ -1,4 +1,5 @@
 import numpy
+import sys, os
 import openmdao.api as om
 import plate_ffd as pf
 import math
@@ -21,6 +22,7 @@ class PlateComponentLHS(om.ExplicitComponent):
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
+        sys.stdout = open(os.devnull, "w")
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
@@ -56,14 +58,14 @@ class PlateComponentLHS(om.ExplicitComponent):
         self.gridSol = f'{solname}_sol'
 
         # Get a set of UQ sample points (LHS)
-        if self.ooptions['run_once']:
-            self.sample = self.uoptions['dist']
+        #if self.ooptions['run_once']:
+        #    self.sample = self.uoptions['dist']
+        #else:
+        if rank == 0:
+            rank0sam = plate_sa_lhs.genLHS(s=self.uoptions['NS'])
         else:
-            if rank == 0:
-                rank0sam = plate_sa_lhs.genLHS(s=self.uoptions['NS'])
-            else:
-                rank0sam = None
-            self.sample = comm.bcast(rank0sam, root=0)
+            rank0sam = None
+        self.sample = comm.bcast(rank0sam, root=0)
 
         # Scatter samples, multi-point parallelism
         ns = self.uoptions['NS']
@@ -91,10 +93,10 @@ class PlateComponentLHS(om.ExplicitComponent):
             time.sleep(0.1) # this solves a few problems for some reason
             # create solvers
             self.solvers.append(ADFLOW(options=self.aoptions, comm=MPI.COMM_SELF))
-            if not self.ooptions['run_once']:
-                saconstsm = self.samplep[i].tolist()
-            else:
-                saconstsm = self.samplep[i]
+            # if not self.ooptions['run_once']:
+                # saconstsm = self.samplep[i].tolist()
+            # else:
+            saconstsm = self.samplep[i]
             self.saconsts = saconstsm + self.saconstsb
             self.solvers[i].setOption('SAConsts', self.saconsts)
             self.solvers[i].setDVGeo(self.DVGeo)
@@ -155,6 +157,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         dummy = rank
         dsum = comm.allgather(dummy)
 
+        sys.stdout = sys.__stdout__
 
     def setup(self):
         #initialize shape and set deformation points as inputs
@@ -162,8 +165,8 @@ class PlateComponentLHS(om.ExplicitComponent):
         a_init['pnts'][:] = self.ooptions['DVInit']
         # mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
         # mult = numpy.concatenate((mult, mult))
-        if self.ooptions['run_once']:
-            a_init['pnts'] = self.ooptions['ro_shape']
+        #if self.ooptions['run_once']:
+        #    a_init['pnts'] = self.ooptions['ro_shape']
         #a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
         self.add_input('a', a_init['pnts'], desc="Bump Shape Control Points")
         #self.add_input('a', 0.2, desc="Bump Shape Control Points")
