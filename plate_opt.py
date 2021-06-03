@@ -64,12 +64,12 @@ prob.model.list_inputs(values = False, hierarchical=False)
 prob.model.list_outputs(values = False, hierarchical=False)
 
 # minimum value
-print('WC time = ', wct)
-print('PC time = ', pct)
-print('Cd = ', prob['bump_plate.Cd'])
+print('WC time = %.15g' % wct)
+print('PC time = %.15g' % pct)
+print('Cd = %.15g' % prob['bump_plate.Cd'])
 if ooptions['constrain_opt']:
     if ooptions['use_area_con']:
-        print('SA = ', prob['bump_plate.SA'])
+        print('SA = %.15g' % prob['bump_plate.SA'])
     else:
         print('TC = ', prob['bump_plate.TC'])
 print('Sol = ', prob['a'])

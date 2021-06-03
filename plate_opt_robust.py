@@ -16,10 +16,13 @@ rank = comm.Get_rank()
 ooptions = optOptions
 uoptions = uqOptions
 
+fname = ooptions['prob_name']+'.txt'
+resfile = open(fname, 'w')
+
 # Print options file
 if rank == 0:
     log = open("./plate_comp_opts.py", "r").read()
-    print(log)
+    print(log, file = resfile)
 
 #sys.stdout = open(os.devnull, "w")
 prob = om.Problem()
@@ -75,17 +78,17 @@ prob.model.list_outputs(values = False, hierarchical=False)
 
 # minimum value
 if rank == 0:
-    print('WC time = ', wct)
-    print('PC time = ', pct)
-    print('E = ', prob['bump_plate.Cd_m'])
-    print('V = ', prob['bump_plate.Cd_v'])
-    print('E + rhoV = ', prob['bump_plate.Cd_r'])
+    print('WC time = %.15g' % wct, file = resfile)
+    print('PC time = %.15g' % pct, file = resfile)
+    print('E = %.15g' % prob['bump_plate.Cd_m'], file = resfile)
+    print('V = %.15g' % prob['bump_plate.Cd_v'], file = resfile)
+    print('E + rhoV = %.15g' % prob['bump_plate.Cd_r'], file = resfile)
     if ooptions['constrain_opt']:
         if ooptions['use_area_con']:
-            print('SA = ', prob['bump_plate.SA'])
+            print('SA = ', prob['bump_plate.SA'], file = resfile)
         else:
-            print('TC = ', prob['bump_plate.TC'])
-    print('Sol = ', prob['a'])
+            print('TC = ', prob['bump_plate.TC'], file = resfile)
+    print('Sol = ', prob['a'], file = resfile)
 
-    # if uoptions['mode'] == 'MLMC':
-    #     print()
+    if uoptions['mode'] == 'MLMC':
+        print('N1 = ', prob['bump_plate.N1'], file = resfile)

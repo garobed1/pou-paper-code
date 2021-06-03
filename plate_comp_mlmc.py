@@ -78,52 +78,53 @@ class PlateComponentMLMC(om.ExplicitComponent):
 ##########
 
         # Set constraints, should only need one of those solvers, the meshes are all the same
-        self.DVCon = DVConstraints()
-        self.DVCon2 = DVConstraints() 
-        self.DVCon.setDVGeo(self.solvers[self.Lmax-1][0].DVGeo.getFlattenedChildren()[1])
-        self.DVCon2.setDVGeo(self.solvers[self.Lmax-1][0].DVGeo)
+        if rank == 0:
+            self.DVCon = DVConstraints()
+            self.DVCon2 = DVConstraints() 
+            self.DVCon.setDVGeo(self.solvers[self.Lmax-1][0].DVGeo.getFlattenedChildren()[1])
+            self.DVCon2.setDVGeo(self.solvers[self.Lmax-1][0].DVGeo)
 
-        self.DVCon.setSurface(self.solvers[self.Lmax-1][0].getTriangulatedMeshSurface(groupName='allSurfaces'))
-        # set extra group for surface area condition
-        self.DVCon2.setSurface(self.solvers[self.Lmax-1][0].getTriangulatedMeshSurface(), name='wall')
+            self.DVCon.setSurface(self.solvers[self.Lmax-1][0].getTriangulatedMeshSurface(groupName='allSurfaces'))
+            # set extra group for surface area condition
+            self.DVCon2.setSurface(self.solvers[self.Lmax-1][0].getTriangulatedMeshSurface(), name='wall')
 
-        # DV should be same into page (not doing anything right now)
-        #import pdb; pdb.set_trace()
-        lIndex = self.solvers[self.Lmax-1][0].DVGeo.getFlattenedChildren()[1].getLocalIndex(0)
-        indSetA = []
-        indSetB = []
-        nXc = optOptions['NX']
-        self.NC = math.trunc(((1.0 - self.ooptions['DVFraction'])*self.ooptions['NX']))
-        ind = [int(nXc/2) - int(self.NC/2), int(nXc/2) + int(self.NC/2)]
-        for i in range(ind[0], ind[1]):
-            indSetA.append(lIndex[i, 0, 1])
-            indSetB.append(lIndex[i, 1, 1])
-        # for i in range(lIndex.shape[0]):
-        #     indSetA.append(lIndex[i, 0, 1])
-        #     indSetB.append(lIndex[i, 1, 1])
-        self.DVCon.addLinearConstraintsShape(indSetA, indSetB, factorA=1.0, factorB=-1.0, lower=0, upper=0, name='eqs')
+            # DV should be same into page (not doing anything right now)
+            #import pdb; pdb.set_trace()
+            lIndex = self.solvers[self.Lmax-1][0].DVGeo.getFlattenedChildren()[1].getLocalIndex(0)
+            indSetA = []
+            indSetB = []
+            nXc = optOptions['NX']
+            self.NC = math.trunc(((1.0 - self.ooptions['DVFraction'])*self.ooptions['NX']))
+            ind = [int(nXc/2) - int(self.NC/2), int(nXc/2) + int(self.NC/2)]
+            for i in range(ind[0], ind[1]):
+                indSetA.append(lIndex[i, 0, 1])
+                indSetB.append(lIndex[i, 1, 1])
+            # for i in range(lIndex.shape[0]):
+            #     indSetA.append(lIndex[i, 0, 1])
+            #     indSetB.append(lIndex[i, 1, 1])
+            self.DVCon.addLinearConstraintsShape(indSetA, indSetB, factorA=1.0, factorB=-1.0, lower=0, upper=0, name='eqs')
 
-        # Thickness constraints (one for each active DV)
-        #import pdb; pdb.set_trace()
+            # Thickness constraints (one for each active DV)
+            #import pdb; pdb.set_trace()
 
-        # Maximum thickness of the domain, translates to minimum thickness of bump
-        ub = 1.0 - self.ooptions['DCMinThick']
-        tcf = self.ooptions['DCThickFrac']
-        ra = self.ooptions['bumpBounds']
-        lim = self.ooptions['DCMinArea']
-        span = numpy.linspace(0, 1, nXc)
-        xc = span * (ra[1] - ra[0]) + ra[0]
-        #ind = range(int(nXc/2) - int(self.NC/2), int(nXc/2) + int(self.NC/2)))
-        ind = [int(nXc/2) - int(tcf*self.NC/2), int(nXc/2) + int(tcf*self.NC/2)]
-        ptList = numpy.zeros([2, 3])
-        ptList[:,0] = xc[ind]
-        ptList[:,1] = 0.5
-        ptList[:,2] = 0.5
+            # Maximum thickness of the domain, translates to minimum thickness of bump
+            ub = 1.0 - self.ooptions['DCMinThick']
+            tcf = self.ooptions['DCThickFrac']
+            ra = self.ooptions['bumpBounds']
+            lim = self.ooptions['DCMinArea']
+            span = numpy.linspace(0, 1, nXc)
+            xc = span * (ra[1] - ra[0]) + ra[0]
+            #ind = range(int(nXc/2) - int(self.NC/2), int(nXc/2) + int(self.NC/2)))
+            ind = [int(nXc/2) - int(tcf*self.NC/2), int(nXc/2) + int(tcf*self.NC/2)]
+            ptList = numpy.zeros([2, 3])
+            ptList[:,0] = xc[ind]
+            ptList[:,1] = 0.5
+            ptList[:,2] = 0.5
 
-        if self.ooptions['use_area_con']:
-            self.DVCon2.addSurfaceAreaConstraint(lower=lim, upper=10., name='sas', surfaceName='wall')
-        else:
-            self.DVCon2.addThicknessConstraints1D(ptList, self.NC, [0,0,1], lower=0.5, upper=ub, name='tcs')
+            if self.ooptions['use_area_con']:
+                self.DVCon2.addSurfaceAreaConstraint(lower=lim, upper=10., name='sas', surfaceName='wall')
+            else:
+                self.DVCon2.addThicknessConstraints1D(ptList, self.NC, [0,0,1], lower=0.5, upper=ub, name='tcs')
 
         dummy = rank
         dsum = comm.allgather(dummy)
@@ -136,8 +137,8 @@ class PlateComponentMLMC(om.ExplicitComponent):
         a_init['pnts'][:] = self.ooptions['DVInit']
         # mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
         # mult = numpy.concatenate((mult, mult))
-        if self.ooptions['run_once']:
-            a_init['pnts'] = self.ooptions['ro_shape']
+        #if self.ooptions['run_once']:
+        #    a_init['pnts'] = self.ooptions['ro_shape']
         #a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
         self.add_input('a', a_init['pnts'], desc="Bump Shape Control Points")
         #self.add_input('a', 0.2, desc="Bump Shape Control Points")
@@ -151,7 +152,7 @@ class PlateComponentMLMC(om.ExplicitComponent):
         self.add_output('Cd_r', 0.0, desc="Robust Drag Objective")
         self.add_output('EQ', numpy.zeros(int(len(a_init['pnts'])/2)), desc="Control Point Symmetry")
 
-
+        self.add_output('N1', self.N1, desc="MLMC Samples at each level")
     
     def setup_partials(self):
         self.declare_partials('Cd_m','a', method='exact')
@@ -228,20 +229,28 @@ class PlateComponentMLMC(om.ExplicitComponent):
                         sum2 += (mus[k][i][j]-E[k])**2
             V[k] = sum2/nslt[k]
 
-        self.DVCon.evalFunctions(funcs, includeLinear=True)
-        self.DVCon2.evalFunctions(funcs, includeLinear=True)
+        if rank == 0:
+            self.DVCon.evalFunctions(funcs, includeLinear=True)
+            self.DVCon2.evalFunctions(funcs, includeLinear=True)
+            eq0 = funcs['eqs']
+            sa0 = funcs['sas']
+        else:
+            eq0 = None
+            sa0 = None
+        eq = comm.bcast(eq0, root=0)
+        sa = comm.bcast(sa0, root=0)
 
         outputs['Cd_m'] = sum(E)
         outputs['Cd_v'] = V[0] #by assumption
         rho = self.uoptions['rho']
         outputs['Cd_r'] = sum(E) + rho*math.sqrt(V[0])
         if self.ooptions['use_area_con']:
-            outputs['SA'] = funcs['sas']
+            outputs['SA'] = sa
         else:
             outputs['TC'] = funcs['tcs']
         
-        outputs['EQ'] = funcs['eqs']
-
+        outputs['EQ'] = eq
+        outputs['N1'] = self.N1
         #outputs['Cd'] = inputs['a']*inputs['a']
 
     def compute_partials(self, inputs, J):
@@ -344,9 +353,17 @@ class PlateComponentMLMC(om.ExplicitComponent):
         # compute variance sensitivity
 
         #import pdb; pdb.set_trace()
-
-        self.DVCon.evalFunctionsSens(funcSens, includeLinear=True)
-        self.DVCon2.evalFunctionsSens(funcSens, includeLinear=True)
+        if rank == 0:
+            self.DVCon.evalFunctionsSens(funcSens, includeLinear=True)
+            self.DVCon2.evalFunctionsSens(funcSens, includeLinear=True)
+            eq0p = funcSens['eqs']['pnts']
+            sa0p = funcSens['sas']['pnts']
+        else:
+            eq0p = None
+            sa0p = None
+        eqp = comm.bcast(eq0p, root=0)
+        sap = comm.bcast(sa0p, root=0)
+        
  
         J['Cd_m','a'] = sum(psum1) + sum(psumm)
         J['Cd_v','a'] = psum2
@@ -354,10 +371,10 @@ class PlateComponentMLMC(om.ExplicitComponent):
         J['Cd_r','a'] = sum(psum1) + sum(psumm) + rho*(1./(2*math.sqrt(V)))*psum2
         #import pdb; pdb.set_trace()
         if self.ooptions['use_area_con']:
-            J['SA','a'] = funcSens['sas']['pnts']
+            J['SA','a'] = sap
         else:
             J['TC','a'] = funcSens['tcs']['pnts']
-        J['EQ','a'] = funcSens['eqs']['pnts']
+        J['EQ','a'] = eqp
 
        #J['Cd','a'][0] = 2*inputs['a']
 
@@ -470,7 +487,7 @@ class PlateComponentMLMC(om.ExplicitComponent):
         #import pdb; pdb.set_trace()
         # start looping over mesh levels
         L = 0
-        M = 2.0 #0.5 #refinement factor?
+        M = 4.0 #0.5 #refinement factor?
         converged = 0
         eps = self.uoptions['vartol']
         sum1 = []
@@ -708,7 +725,7 @@ class PlateComponentMLMC(om.ExplicitComponent):
         if rank == 0:
             print("MLMC Completed, Samples per level: ", N1)
         self.N1 = N1   
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
       
             # test for convergence
             # don't actually need this, won't ever end early
@@ -740,9 +757,10 @@ class PlateComponentMLMC(om.ExplicitComponent):
         else:
             rank0sam = None
         self.sample = comm.bcast(rank0sam, root=0)
-
+        #import pdb; pdb.set_trace()
         # Scatter samples on each level, multi-point parallelism
         self.cases = []
+        self.samplep = []
         for i in range(self.Lmax):
             self.cases.append(divide_cases(self.N1[i], size)) 
             for j in range(len(self.cases[i])):

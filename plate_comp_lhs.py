@@ -96,7 +96,7 @@ class PlateComponentLHS(om.ExplicitComponent):
             # if not self.ooptions['run_once']:
                 # saconstsm = self.samplep[i].tolist()
             # else:
-            saconstsm = self.samplep[i]
+            saconstsm = self.samplep[i].tolist()
             self.saconsts = saconstsm + self.saconstsb
             self.solvers[i].setOption('SAConsts', self.saconsts)
             self.solvers[i].setDVGeo(self.DVGeo)
@@ -196,7 +196,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         # run the bump shape model
         #import pdb; pdb.set_trace()
         # evaluate each sample point
-        print("hello")
+        #print("hello")
         dvdict = {'pnts':inputs['a']}
         funcs = {}
         ns = self.uoptions['NS']

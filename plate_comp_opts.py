@@ -1,5 +1,5 @@
-gridFile = f'grid_paper_results_193_97_1.cgns'
-probName = 'lhs_fixed_10'
+gridFile = f'grid_paper_results_97_49_1.cgns'
+probName = 'file_printing_test'
 
 astar = [0.28788225, 0.29621159, 0.34267779, 0.18972925, 0.19873263, 0.30842999,
     0.27963309, 0.23999633, 0.28788225, 0.29621159, 0.34267779, 0.18972925,
@@ -38,13 +38,13 @@ optOptions = { #general optimization parameters
 }
 
 uqOptions = { #general UQ parameters
-    'mode':'MLMC', # MC: Normal Monte Carlo with LHS points
+    'mode':'MC', # MC: Normal Monte Carlo with LHS points
                  # MLMC: Multi-Level Monte Carlo with LHS points
     'NS':4, #number of sample points
     'NS0':4, #start up sample number for multi-level
     'rho':2., #robust objective std dev ratio
-    'use-predetermined-samples':False, #input N1 at each level instead of running MLMC
-    'predet-N1':[100,10,4], #user-determined N1
+    'use-predetermined-samples':True, #input N1 at each level instead of running MLMC
+    'predet-N1':[4,4,4], #user-determined N1
     'dist':dist, #distribution to use ONLY IF running the model once
     'gridFileLevels':gridFilesML, #all available meshes for multi-level (need at least 3)
     'vartol': 2e-5 #ML variance tolerance for convergence
