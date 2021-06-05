@@ -6,7 +6,7 @@ import openmdao.api as om
 from mpi4py import MPI
 import plate_comp as pc
 import plate_comp_lhs as pcl
-import plate_comp_mlmc as pcm
+import plate_comp_mfmc as pcf
 from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
 
 comm = MPI.COMM_WORLD
@@ -26,8 +26,8 @@ if rank == 0:
 
 #sys.stdout = open(os.devnull, "w")
 prob = om.Problem()
-if uqOptions['mode'] == 'MLMC':
-    prob.model.add_subsystem('bump_plate', pcm.PlateComponentMLMC(), promotes_inputs=['a'])
+if uqOptions['mode'] == 'MFMC':
+    prob.model.add_subsystem('bump_plate', pcf.PlateComponentMFMC(), promotes_inputs=['a'])
 else:
     prob.model.add_subsystem('bump_plate', pcl.PlateComponentLHS(), promotes_inputs=['a'])
 
@@ -90,5 +90,8 @@ if rank == 0:
             print('TC = ', prob['bump_plate.TC'], file = resfile)
     print('Sol = ', prob['a'], file = resfile)
 
-    if uoptions['mode'] == 'MLMC':
-        print('N1 = ', prob['bump_plate.N1'], file = resfile)
+    #if uoptions['mode'] == 'MLMC':
+    print('N1 = ', prob['bump_plate.N1'], file = resfile)
+    if uoptions['mode'] == 'MLMC':   
+        print('a1 = ', prob['bump_plate.a1'], file = resfile)
+    print('Pr = ', prob['bump_plate.Pr'], file = resfile)

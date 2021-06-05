@@ -1,5 +1,5 @@
-gridFile = f'grid_paper_results_97_49_1.cgns'
-probName = 'file_printing_test'
+gridFile = f'test_mfmc_121_25_1.cgns'
+probName = 'mc_test'
 
 astar = [0.28788225, 0.29621159, 0.34267779, 0.18972925, 0.19873263, 0.30842999,
     0.27963309, 0.23999633, 0.28788225, 0.29621159, 0.34267779, 0.18972925,
@@ -12,9 +12,9 @@ dist = [
     [0.45482143, 0.133625,   0.6625,     0.85      ]]
 
 gridFilesML = [
-f'grid_paper_results_49_25_1.cgns',
-f'grid_paper_results_97_49_1.cgns',
-f'grid_paper_results_193_97_1.cgns'
+f'test_mfmc_41_25_1.cgns',
+f'test_mfmc_81_25_1.cgns',
+f'test_mfmc_121_25_1.cgns'
 ]
 
 optOptions = { #general optimization parameters
@@ -39,15 +39,18 @@ optOptions = { #general optimization parameters
 
 uqOptions = { #general UQ parameters
     'mode':'MC', # MC: Normal Monte Carlo with LHS points
-                 # MLMC: Multi-Level Monte Carlo with LHS points
+                 # MFMC: Multi-Level Monte Carlo with LHS points
+    'MCTimeBudget':True, #
     'NS':4, #number of sample points
     'NS0':4, #start up sample number for multi-level
     'rho':2., #robust objective std dev ratio
-    'use-predetermined-samples':True, #input N1 at each level instead of running MLMC
-    'predet-N1':[4,4,4], #user-determined N1
+    'use-predetermined-samples':False, #input N1 at each level instead of running MLMC
+    'predet-N1':[3,4,5], #user-determined N1
+    'predet-a1':[1,1.1,1.2], #user-determined N1
     'dist':dist, #distribution to use ONLY IF running the model once
     'gridFileLevels':gridFilesML, #all available meshes for multi-level (need at least 3)
-    'vartol': 2e-5 #ML variance tolerance for convergence
+    'vartol': 2e-5, #ML variance tolerance for convergence
+    'P':600. #computational budget in seconds
 }
 
 aeroOptions = { #ADflow aero solver options

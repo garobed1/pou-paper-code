@@ -22,12 +22,15 @@ class PlateComponentLHS(om.ExplicitComponent):
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
-        sys.stdout = open(os.devnull, "w")
+        #sys.stdout = open(os.devnull, "w")
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
         self.uoptions = uqOptions
 
+        self.Pr = 0.
+        self.P = self.uoptions['P']
+        self.NS0 = self.uoptions['NS0']
         # Generate FFD and DVs
         if rank == 0:
             rank0dvg = pf.createFFD()
@@ -60,21 +63,88 @@ class PlateComponentLHS(om.ExplicitComponent):
         # Get a set of UQ sample points (LHS)
         #if self.ooptions['run_once']:
         #    self.sample = self.uoptions['dist']
-        #else:
+        #else
+
+        # Scatter samples, multi-point parallelism
+        if self.uoptions['MCTimeBudget']:
+            self.aps = []
+            self.solvers = []
+            self.meshes = []
+            self.current_samples = self.NS0
+            if rank == 0:
+                rank0sam = plate_sa_lhs.genLHS(s=self.current_samples)
+            else:
+                rank0sam = None
+            self.sample = comm.bcast(rank0sam, root=0)
+            self.cases = divide_cases(self.NS0, size)
+            # Scatter samples on each level, multi-point parallelism
+            self.samplep = self.sample[self.cases[rank]]
+            self.nsp = len(self.cases[rank])
+            
+            # Create solvers for the preliminary data
+            for i in range(self.nsp):
+                namestr = self.gridSol + "_" + str(self.cases[rank][i])
+            
+                # create meshes 
+                self.meshes.append(USMesh(options=self.woptions, comm=MPI.COMM_SELF))
+
+                # create aeroproblems 
+                self.aps.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
+                time.sleep(0.1) # this solves a few problems for some reason
+                # create solvers
+                self.solvers.append(ADFLOW(options=self.aoptions, comm=MPI.COMM_SELF))
+
+                saconstsm = self.samplep[i].tolist()
+                self.saconsts = saconstsm + self.saconstsb
+                self.solvers[i].setOption('SAConsts', self.saconsts)
+                self.solvers[i].setDVGeo(self.DVGeo)
+                self.solvers[i].setMesh(self.meshes[i])
+                print("what up %i", str(rank))
+                coords = self.solvers[i].getSurfaceCoordinates(groupName=self.solvers[i].allWallsGroup)
+                self.solvers[i].DVGeo.addPointSet(coords, 'coords')
+
+            # start looping over mesh levels
+            sumt = 0.
+            sumtp = 0.
+            Et = 0.
+            funcs = {}
+            a_init = self.DVGeo.getValues()
+            a_init['pnts'][:] = self.ooptions['DVInit']
+            dvdict = {'pnts':a_init['pnts']}
+            for i in range(self.nsp):
+                saconstsm = self.samplep[i].tolist()
+                self.saconsts = saconstsm + self.saconstsb
+                self.solvers[i].setOption('SAConsts', self.saconsts)
+                self.solvers[i].DVGeo.setDesignVars(dvdict)
+                self.aps[i].setDesignVars(dvdict)
+                pc0 = time.process_time()
+                self.solvers[i](self.aps[i])
+                self.solvers[i].evalFunctions(self.aps[i], funcs)
+                pc1 = time.process_time()
+                astr = self.gridSol + "_" + str(self.cases[rank][i]) +"_cd"
+                sumtp += (pc1-pc0)   
+            
+            sumt = comm.allreduce(sumtp)
+            Et = sumt/self.NS0
+            self.NS = math.ceil(self.P/Et)
+            self.Pr = self.NS*Et
+        else:
+            self.NS = self.uoptions['NS']
+
+        #import pdb; pdb.set_trace()
+
         if rank == 0:
-            rank0sam = plate_sa_lhs.genLHS(s=self.uoptions['NS'])
+            rank0sam = plate_sa_lhs.genLHS(s=self.NS)
         else:
             rank0sam = None
         self.sample = comm.bcast(rank0sam, root=0)
 
-        # Scatter samples, multi-point parallelism
-        ns = self.uoptions['NS']
-        self.cases = divide_cases(ns, size)
+        self.cases = divide_cases(self.NS, size)
         self.nsp = len(self.cases[rank])#int(ns/size) # samples per processor
-
+        #import pdb; pdb.set_trace()
         self.samplep = self.sample[self.cases[rank]]#self.sample[(rank*self.nsp):(rank*self.nsp+(self.nsp))] #shouldn't really need to "scatter" per se
         #import pdb; pdb.set_trace()
-        assert len(self.samplep) == self.nsp
+        #assert len(self.samplep) == self.nsp
 
         # Actually create solvers (and aeroproblems?) (and mesh?) now
         self.aps = []
@@ -179,6 +249,8 @@ class PlateComponentLHS(om.ExplicitComponent):
         self.add_output('Cd_v', 0.0, desc="Variance Drag Coefficient")
         self.add_output('Cd_r', 0.0, desc="Robust Drag Objective")
         self.add_output('EQ', numpy.zeros(int(len(a_init['pnts'])/2)), desc="Control Point Symmetry")
+        self.add_output('N1', self.NS, desc="Number of samples used")
+        self.add_output('Pr', self.Pr, desc="MFMC Samples at each level")
 
 
     
@@ -199,7 +271,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         #print("hello")
         dvdict = {'pnts':inputs['a']}
         funcs = {}
-        ns = self.uoptions['NS']
+        ns = self.NS
         sump = 0.
         musp = numpy.zeros(self.nsp)
         #self.aps[0].setDesignVars(dvdict)
@@ -237,7 +309,8 @@ class PlateComponentLHS(om.ExplicitComponent):
             outputs['TC'] = funcs['tcs']
         
         outputs['EQ'] = funcs['eqs']
-
+        outputs['N1'] = self.NS
+        outputs['Pr'] = self.Pr
         #outputs['Cd'] = inputs['a']*inputs['a']
 
     def compute_partials(self, inputs, J):
@@ -245,7 +318,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         dvdict = {'pnts':inputs['a']}
         funcs = {}
         funcSens = {}
-        ns = self.uoptions['NS']
+        ns = self.NS
         sump = 0.
         musp = numpy.zeros(self.nsp)
         pmup = []

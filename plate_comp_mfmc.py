@@ -17,17 +17,18 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-class PlateComponentMLMC(om.ExplicitComponent):
+class PlateComponentMFMC(om.ExplicitComponent):
     """Robust Bump Flow Problem, with LHS Multi Level Monte Carlo Samples"""
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
-        sys.stdout = open(os.devnull, "w")
+        #sys.stdout = open(os.devnull, "w")
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
         self.uoptions = uqOptions
 
+        self.Pr = 0.
         # Generate FFD and DVs
         if rank == 0:
             rank0dvg = pf.createFFD()
@@ -38,6 +39,8 @@ class PlateComponentMLMC(om.ExplicitComponent):
         # Get a full list of every mesh name we have, assume they are ordered properly by level
         self.meshnames = self.uoptions['gridFileLevels']
         self.Lmax = len(self.meshnames) #as many levels as we have meshes
+        self.mord = [*range(self.Lmax)]
+        self.mord.reverse()
 
         if self.Lmax < 3:
             raise ValueError('Not enough meshes available, ' + self.Lmax + ' < 3')
@@ -53,7 +56,7 @@ class PlateComponentMLMC(om.ExplicitComponent):
         self.gridSol = f'{solname}_sol'
 
         self.cases = []
-        self.nsp = []   #keep track per level
+        #self.nsp = []   #keep track per level
         self.samplep = []
         self.naddedtot = []
         for i in range(self.Lmax):
@@ -66,12 +69,15 @@ class PlateComponentMLMC(om.ExplicitComponent):
         self.NS0 = self.uoptions['NS0']
         self.current_samples = self.NS0*self.Lmax
         self.N1 = None
+        self.a1 = None
+        self.P = self.uoptions['P']
 ##########
         # call distribute samples here?
         if not self.uoptions['use-predetermined-samples']:
-            self.MLMC()
+            self.MFMC()
         else:
             self.N1 = self.uoptions['predet-N1']
+            self.a1 = self.uoptions['predet-a1']
 
         self.dist_samples()
 
@@ -81,16 +87,16 @@ class PlateComponentMLMC(om.ExplicitComponent):
         if rank == 0:
             self.DVCon = DVConstraints()
             self.DVCon2 = DVConstraints() 
-            self.DVCon.setDVGeo(self.solvers[self.Lmax-1][0].DVGeo.getFlattenedChildren()[1])
-            self.DVCon2.setDVGeo(self.solvers[self.Lmax-1][0].DVGeo)
+            self.DVCon.setDVGeo(self.solvers[0][0].DVGeo.getFlattenedChildren()[1])
+            self.DVCon2.setDVGeo(self.solvers[0][0].DVGeo)
 
-            self.DVCon.setSurface(self.solvers[self.Lmax-1][0].getTriangulatedMeshSurface(groupName='allSurfaces'))
+            self.DVCon.setSurface(self.solvers[0][0].getTriangulatedMeshSurface(groupName='allSurfaces'))
             # set extra group for surface area condition
-            self.DVCon2.setSurface(self.solvers[self.Lmax-1][0].getTriangulatedMeshSurface(), name='wall')
+            self.DVCon2.setSurface(self.solvers[0][0].getTriangulatedMeshSurface(), name='wall')
 
             # DV should be same into page (not doing anything right now)
             #import pdb; pdb.set_trace()
-            lIndex = self.solvers[self.Lmax-1][0].DVGeo.getFlattenedChildren()[1].getLocalIndex(0)
+            lIndex = self.solvers[0][0].DVGeo.getFlattenedChildren()[1].getLocalIndex(0)
             indSetA = []
             indSetB = []
             nXc = optOptions['NX']
@@ -152,7 +158,9 @@ class PlateComponentMLMC(om.ExplicitComponent):
         self.add_output('Cd_r', 0.0, desc="Robust Drag Objective")
         self.add_output('EQ', numpy.zeros(int(len(a_init['pnts'])/2)), desc="Control Point Symmetry")
 
-        self.add_output('N1', self.N1, desc="MLMC Samples at each level")
+        self.add_output('N1', self.N1, desc="MFMC Samples at each level")
+        self.add_output('a1', self.a1, desc="MFMC Coeffs at each level")
+        self.add_output('Pr', 0., desc="MFMC Samples at each level")
     
     def setup_partials(self):
         self.declare_partials('Cd_m','a', method='exact')
@@ -190,9 +198,12 @@ class PlateComponentMLMC(om.ExplicitComponent):
             sump.append(0.0)
             musp.append(numpy.zeros(nslp[k]))
             sumpm.append(0.)
-            muspm.append(numpy.zeros(nslp[k]))
+            if k > 0:
+                muspm.append(numpy.zeros(nslp[k-1]))
+            else:
+                muspm.append(numpy.zeros(nslp[k])) #not used
             for i in range(nslp[k]):
-                saconstsm = self.samplep[k][i].tolist()
+                saconstsm = self.samplep[self.Lmax-1][i].tolist()
                 self.saconsts = saconstsm + self.saconstsb
                 self.solvers[k][i].setOption('SAConsts', self.saconsts)
                 self.solvers[k][i].DVGeo.setDesignVars(dvdict)
@@ -202,13 +213,7 @@ class PlateComponentMLMC(om.ExplicitComponent):
                 astr = self.gridSol + "_" + str(self.cases[k][rank][i]) +"_cd"
                 musp[k][i] = funcs[astr]
                 sump[k] += funcs[astr]     
-                if k > 0:
-                    self.solvers[k][i+nslp[k]].setOption('SAConsts', self.saconsts)
-                    self.solvers[k][i+nslp[k]].DVGeo.setDesignVars(dvdict)
-                    self.aps[k][i+nslp[k]].setDesignVars(dvdict)
-                    self.solvers[k][i+nslp[k]](self.aps[k][i+nslp[k]])
-                    self.solvers[k][i+nslp[k]].evalFunctions(self.aps[k][i+nslp[k]], funcs)
-                    astr = self.gridSol + "_" + str(self.cases[k][rank][i]) +"_m_cd"
+                if k > 0 and i < nslp[k-1]:
                     muspm[k][i] = -funcs[astr]
                     sumpm[k] += -funcs[astr]       
                     
@@ -219,17 +224,25 @@ class PlateComponentMLMC(om.ExplicitComponent):
             summ.append(comm.allreduce(sumpm[k]))
             musm.append(comm.allgather(muspm[k]))
         #import pdb; pdb.set_trace()
-            E[k] = (sum1[k]+summ[k])/nslt[k]
+            if k > 0:
+                E[k] = (sum1[k]/nslt[k]+summ[k]/nslt[k-1])
+            else:
+                E[k] = (sum1[k]/nslt[k])
             sum2 = 0.
             for i in range(len(mus[k])): #loop over processors
                 for j in range(len(mus[k][i])): #loop over samples on processors
                     if k > 0:
-                        sum2 += ((mus[k][i][j] + musm[k][i][j])-E[k])**2
+                        #sum2 = 0
+                        
+                        sum2 += ((mus[k][i][j] - sum1[k]/nslt[k])**2)/nslt[k]
+                        if j < len(mus[k-1][i]):
+                            sum2 -= ((musm[k][i][j] - summ[k]/nslt[k-1])**2)/nslt[k-1]
+                            
                     else:
-                        sum2 += (mus[k][i][j]-E[k])**2
-            V[k] = sum2/nslt[k]
+                        sum2 += ((mus[k][i][j]-E[k])**2)/nslt[k]
+            V[k] = sum2
 
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         if rank == 0:
             self.DVCon.evalFunctions(funcs, includeLinear=True)
             self.DVCon2.evalFunctions(funcs, includeLinear=True)
@@ -241,10 +254,11 @@ class PlateComponentMLMC(om.ExplicitComponent):
         eq = comm.bcast(eq0, root=0)
         sa = comm.bcast(sa0, root=0)
 
-        outputs['Cd_m'] = sum(E)
-        outputs['Cd_v'] = V[0] #by assumption
+        outputs['Cd_m'] = numpy.dot(self.a1, E)
+        outputs['Cd_v'] = numpy.dot(self.a1, V) #by assumption
         rho = self.uoptions['rho']
-        outputs['Cd_r'] = sum(E) + rho*math.sqrt(V[0])
+        outputs['Cd_r'] = numpy.dot(self.a1, E) + rho*math.sqrt(numpy.dot(self.a1, V))
+        #import pdb; pdb.set_trace()
         if self.ooptions['use_area_con']:
             outputs['SA'] = sa
         else:
@@ -252,6 +266,8 @@ class PlateComponentMLMC(om.ExplicitComponent):
         
         outputs['EQ'] = eq
         outputs['N1'] = self.N1
+        outputs['a1'] = self.a1
+        outputs['Pr'] = self.Pr
         #outputs['Cd'] = inputs['a']*inputs['a']
 
     def compute_partials(self, inputs, J):
@@ -292,7 +308,10 @@ class PlateComponentMLMC(om.ExplicitComponent):
             sump.append(0.0)
             musp.append(numpy.zeros(nslp[k]))
             sumpm.append(0.)
-            muspm.append(numpy.zeros(nslp[k]))
+            if k > 0:
+                muspm.append(numpy.zeros(nslp[k-1]))
+            else:
+                muspm.append(numpy.zeros(nslp[k])) #not used
             pmup.append([])
             psump.append(numpy.zeros(len(inputs['a'])))
             pmupm.append([])
@@ -307,25 +326,17 @@ class PlateComponentMLMC(om.ExplicitComponent):
                 self.solvers[k][i].evalFunctions(self.aps[k][i], funcs)
                 self.solvers[k][i].evalFunctionsSens(self.aps[k][i], funcSens, ['cd'])
                 astr = self.gridSol + "_" + str(self.cases[k][rank][i]) +"_cd"
-                arr = [x*(1./nslt[k]) for x in funcSens[astr]['pnts']]
+                arr = [x*(self.a1[k]/nslt[k]) for x in funcSens[astr]['pnts']]
                 musp[k][i] = funcs[astr]
                 sump[k] += funcs[astr]
                 pmup[k].append(arr[0])
                 psump[k] += arr[0]    
-                if k > 0:
-                    self.solvers[k][i+nslp[k]].setOption('SAConsts', self.saconsts)
-                    self.solvers[k][i+nslp[k]].DVGeo.setDesignVars(dvdict)
-                    #import pdb; pdb.set_trace()
-                    self.aps[k][i+nslp[k]].setDesignVars(dvdict)
-                    self.solvers[k][i+nslp[k]](self.aps[k][i+nslp[k]])
-                    self.solvers[k][i+nslp[k]].evalFunctions(self.aps[k][i+nslp[k]], funcs)
-                    self.solvers[k][i+nslp[k]].evalFunctionsSens(self.aps[k][i+nslp[k]], funcSens, ['cd'])
-                    astr = self.gridSol + "_" + str(self.cases[k][rank][i]) +"_m_cd"
-                    arr = [x*(1./nslt[k]) for x in funcSens[astr]['pnts']]
+                if k > 0 and i < nslp[k-1]:
+                    arrm = [x*(self.a1[k]/nslt[k-1]) for x in funcSens[astr]['pnts']]
                     muspm[k][i] = -funcs[astr]
                     sumpm[k] += -funcs[astr]
-                    pmupm[k].append(-arr[0])
-                    psumpm[k] -= arr[0]   
+                    pmupm[k].append(-arrm[0])
+                    psumpm[k] -= arrm[0]   
 
 
         # compute mean and variance
@@ -340,18 +351,44 @@ class PlateComponentMLMC(om.ExplicitComponent):
             psumm.append(comm.allreduce(psumpm[k]))
             pmum.append(comm.allgather(pmupm[k]))
 
-            E[k] = (sum1[k]+summ[k])/nslt[k]
-        sum2 = 0.
-        for i in range(len(mus[0])): #loop over processors
-            for j in range(len(mus[0][i])): #loop over samples on processors
-                #import pdb; pdb.set_trace()
-                sum2 += (mus[0][i][j]-E[0])**2
-                temp = pmu[0][i][j]*nslt[0] - psum1[0]
-                arr2 = [x*2*(mus[0][i][j]-E[0])/nslt[0] for x in temp]
-                psum2 += arr2
-        V = sum2/nslt[0]
+            if k > 0:
+                E[k] = (sum1[k]/nslt[k]+summ[k]/nslt[k-1])
+            else:
+                E[k] = (sum1[k]/nslt[k])
+            sum2 = 0.
+            for i in range(len(mus[k])): #loop over processors
+                for j in range(len(mus[k][i])): #loop over samples on processors
+                    if k > 0:
+                        #sum2 = 0
+                        
+                        sum2 += ((mus[k][i][j] - sum1[k]/nslt[k])**2)/nslt[k]
+                        if j < len(mus[k-1][i]):
+                            sum2 -= ((musm[k][i][j] - summ[k]/nslt[k-1])**2)/nslt[k-1]
+                            
+                    else:
+                        sum2 += ((mus[k][i][j]-E[k])**2)/nslt[k]
+            V[k] = sum2
 
         # compute variance sensitivity
+        psum2 = []
+        for k in range(self.Lmax):
+            psum2.append(numpy.zeros(len(inputs['a'])))
+            for i in range(len(mus[0])): #loop over processors
+                for j in range(len(mus[0][i])): #loop over samples on processors
+                    if k > 0:
+                        temp = pmu[k][i][j]*nslt[k] - psum1[k]
+                        arr2 = [x*2*(mus[k][i][j] - sum1[k])/nslt[k] for x in temp]
+                        psum2[k] += arr2
+                        if j < len(mus[k-1][i]):
+                            temp = pmu[k][i][j]*nslt[k-1] - psum1[k]
+                            arr2 = [x*2*(musm[k][i][j] - summ[k]/nslt[k-1])/nslt[k-1] for x in temp]
+                            psum2[k] -= arr2
+                    else:
+                        temp = pmu[k][i][j]*nslt[k] - psum1[k]
+                        arr2 = [x*2*(mus[k][i][j]-E[k])/nslt[k] for x in temp]
+                        psum2[k] += arr2
+
+        
 
         #import pdb; pdb.set_trace()
         if rank == 0:
@@ -367,10 +404,9 @@ class PlateComponentMLMC(om.ExplicitComponent):
         
  
         J['Cd_m','a'] = sum(psum1) + sum(psumm)
-        J['Cd_v','a'] = psum2
+        J['Cd_v','a'] = sum(psum2)
         rho = self.uoptions['rho']
-        J['Cd_r','a'] = sum(psum1) + sum(psumm) + rho*(1./(2*math.sqrt(V)))*psum2
-        #import pdb; pdb.set_trace()
+        J['Cd_r','a'] = sum(psum1) + sum(psumm) + rho*(1./(2*math.sqrt(numpy.dot(self.a1, V))))*sum(psum2)
         if self.ooptions['use_area_con']:
             J['SA','a'] = sap
         else:
@@ -379,9 +415,9 @@ class PlateComponentMLMC(om.ExplicitComponent):
 
        #J['Cd','a'][0] = 2*inputs['a']
 
-    def MLMC(self):
-        # Use an MLMC algorithm to determine an optimal sample distribution between existing mesh levels
-        # We do this once before optimization, then compute statistics with the same set of samples at every iteration
+    def MFMC(self):
+        # Use an MFMC algorithm to determine optimal sample distribution and coefficients among mesh levels
+        # We do this once before optimization, then compute statistics with the same set of samples and coeffs at every iteration
 
         # start with initial samples
         # Get a set of UQ sample points (LHS), enough for each level at the start
@@ -405,6 +441,10 @@ class PlateComponentMLMC(om.ExplicitComponent):
             rank0sam = None
         self.sample = comm.bcast(rank0sam, root=0)
 
+        N1 = []
+        a1 = numpy.zeros(self.Lmax)
+        r1 = numpy.zeros(self.Lmax)
+
         # Scatter samples on each level, multi-point parallelism
         
         for i in range(self.Lmax):
@@ -420,16 +460,13 @@ class PlateComponentMLMC(om.ExplicitComponent):
         # for i in range(self.Lmax):
         #     assert len(self.samplep[i]) == self.nsp[i]
         
-        # Actually create solvers (and aeroproblems?) (and mesh?) now
+        # Create solvers for the preliminary data
         nslp = []
         nslt = []
         for k in range(self.Lmax): 
             alist = []
             slist = []
             mlist = []
-            alist2 = []
-            slist2 = []
-            mlist2 = []
             nslp.append(len(self.cases[k][rank]))
             nslt.append(sum([len(self.cases[k][x]) for x in range(size)]))
             for i in range(nslp[k]):
@@ -437,12 +474,13 @@ class PlateComponentMLMC(om.ExplicitComponent):
 
                 # create meshes
                 leveloptions = self.woptions
-                leveloptions['gridFile'] = self.meshnames[k] 
+                leveloptions['gridFile'] = self.meshnames[self.mord[k]] 
+                #import pdb; pdb.set_trace()
                 mlist.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
 
                 # create aeroproblems 
                 aloptions = self.aoptions
-                aloptions['gridFile'] = self.meshnames[k] 
+                aloptions['gridFile'] = self.meshnames[self.mord[k]] 
                 alist.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
                 time.sleep(0.1) # this solves a few problems for some reason
                 # create solvers
@@ -451,46 +489,27 @@ class PlateComponentMLMC(om.ExplicitComponent):
                 # if not self.ooptions['run_once']:
                 #     saconstsm = self.samplep[i].tolist()
                 # else:
-                saconstsm = self.samplep[k][i].tolist()
+                saconstsm = self.samplep[0][i].tolist()
                 self.saconsts = saconstsm + self.saconstsb
                 slist[i].setOption('SAConsts', self.saconsts)
                 slist[i].setDVGeo(self.DVGeo)
                 slist[i].setMesh(mlist[i])
                 coords = slist[i].getSurfaceCoordinates(groupName=slist[i].allWallsGroup)
                 slist[i].DVGeo.addPointSet(coords, 'coords')
-
-                if k > 0: #create additional solvers at higher levels for the estimators
-                     # create meshes
-                    namestr = self.gridSol + "_" + str(self.cases[k][rank][i]) + "_m"
-                    leveloptions = self.woptions
-                    leveloptions['gridFile'] = self.meshnames[k-1] 
-                    mlist2.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
-                    # create aeroproblems 
-                    aloptions = self.aoptions
-                    aloptions['gridFile'] = self.meshnames[k-1] 
-                    alist2.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
-                    time.sleep(0.1) # this solves a few problems for some reason
-                    # create solvers
-                    slist2.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
-                    slist2[i].setOption('SAConsts', self.saconsts)
-                    slist2[i].setDVGeo(self.DVGeo)
-                    slist2[i].setMesh(mlist2[i])
-                    coords = slist[i].getSurfaceCoordinates(groupName=slist2[i].allWallsGroup)
-                    slist2[i].DVGeo.addPointSet(coords, 'coords')
                 
             self.aps.append(alist)
             self.solvers.append(slist)
             self.meshes.append(mlist)
-            if k > 0:
-                self.aps[k] += alist2
-                self.solvers[k] += slist2
-                self.meshes[k] += mlist2
-        #import pdb; pdb.set_trace()
+
+
+        # Solve the preliminary samples
+        
+        
         # start looping over mesh levels
-        L = 0
-        M = 4.0 #0.5 #refinement factor?
-        converged = 0
-        eps = self.uoptions['vartol']
+        sumt = []
+        sumtp = []
+        nslp = []
+        nslt = []
         sum1 = []
         mus = []
         sump = []
@@ -499,243 +518,120 @@ class PlateComponentMLMC(om.ExplicitComponent):
         muspm = []
         summ = []
         musm = []
-        E = []
-        V = []
+        Et = numpy.zeros(self.Lmax)
+        E = numpy.zeros(self.Lmax)
+        V = numpy.zeros(self.Lmax)
+        S = numpy.zeros(self.Lmax)
         N1 = []
-        while ~converged & L < self.Lmax:
-            # compute start up samples to estimate variance
+        for k in range(self.Lmax): 
+            nslp.append(len(self.cases[k][rank]))
+            nslt.append(sum([len(self.cases[k][x]) for x in range(size)]))
             dvdict = {'pnts':a_init['pnts']}
             funcs = {}
-            nslp = []
-            nslt = []
-            for k in range(self.Lmax): 
-                nslp.append(len(self.cases[k][rank]))
-                nslt.append(sum([len(self.cases[k][x]) for x in range(size)]))
+            sumtp.append(0.0)
             sump.append(0.)
-            musp.append(numpy.zeros(nslp[L]))
+            musp.append(numpy.zeros(nslp[k]))
             sumpm.append(0.)
-            muspm.append(numpy.zeros(nslp[L]))
+            muspm.append(numpy.zeros(nslp[k]))
 
-            for i in range(nslp[L]):
+            for i in range(nslp[k]):
                 # just do this again in case
-                saconstsm = self.samplep[L][i].tolist()
+                saconstsm = self.samplep[0][i].tolist()
                 self.saconsts = saconstsm + self.saconstsb
-                self.solvers[L][i].setOption('SAConsts', self.saconsts)
-                self.solvers[L][i].DVGeo.setDesignVars(dvdict)
-                self.aps[L][i].setDesignVars(dvdict)
-                self.solvers[L][i](self.aps[L][i])
-                self.solvers[L][i].evalFunctions(self.aps[L][i], funcs)
-                astr = self.gridSol + "_" + str(self.cases[L][rank][i]) +"_cd"
-                musp[L][i] = funcs[astr]
-                sump[L] += funcs[astr]   
-                #import pdb; pdb.set_trace()
-                if L > 0:
-                    self.solvers[L][i+nslp[L]].setOption('SAConsts', self.saconsts)
-                    self.solvers[L][i+nslp[L]].DVGeo.setDesignVars(dvdict)
-                    self.aps[L][i+nslp[L]].setDesignVars(dvdict)
-                    self.solvers[L][i+nslp[L]](self.aps[L][i+nslp[L]])
-                    self.solvers[L][i+nslp[L]].evalFunctions(self.aps[L][i+nslp[L]], funcs)
-                    astr = self.gridSol + "_" + str(self.cases[L][rank][i]) +"_m_cd" 
-                    muspm[L][i] = -funcs[astr]
-                    sumpm[L] += -funcs[astr]       
-                
-            # compute mean and variance estimate from start up samples
-            sum1.append(comm.allreduce(sump[L]))
-            mus.append(comm.allgather(musp[L]))
-            summ.append(comm.allreduce(sumpm[L]))
-            musm.append(comm.allgather(muspm[L]))
-
-            #import pdb; pdb.set_trace()
-
-            # mean at each level
-            E = numpy.zeros(L+1)
-            for l in range(L+1):
-                E[l] = (sum1[l]+summ[l])/nslt[l]
-
-            # variance at each level
-            V = numpy.zeros(L+1)
-            for l in range(L+1):
-                sum2 = 0.
-                for i in range(len(mus[l])): #range(size):
-                    for j in range(len(mus[l][i])): #range(self.nsp):
-                        if l > 0:
-                            sum2 += ((mus[l][i][j] + musm[l][i][j])-E[l])**2
-                        else:
-                            sum2 += (mus[l][i][j]-E[l])**2
-                V[l] = sum2/nslt[l]
-
-            #import pdb; pdb.set_trace()
-            # now determine the optimal number of samples at each level
-            N1.append(0.)
-            worksum = 0
-            for l in range(L+1):
-                worksum += numpy.sqrt(V[l]*(M**l))
-            for l in range(L+1):
-                nlf = 2*numpy.sqrt(V[l]/(M**l)) * worksum / (eps*eps)
-                nlfm = max(nslt[l], math.ceil(nlf))
-                N1[l] = nlfm
-
-            # now compute and generate additional samples at each level
-            # first partition samples  NEVERMIND (just do it once at each level, no need to repeat)
-            # create the extra number of solvers at each (the current) level
-
-            # need to loop everything from here on
-
-            for l in range(L+1):
-                alist = self.aps[l][0:nslp[l]]
-                slist = self.solvers[l][0:nslp[l]]
-                mlist = self.meshes[l][0:nslp[l]]
-                if l > 0:
-                    alist2 = self.aps[l][nslp[l]:]
-                    slist2 = self.solvers[l][nslp[l]:]
-                    mlist2 = self.meshes[l][nslp[l]:]
-                
-                self.naddedtot[l] = N1[l] - nslt[l]
-                self.current_samples += self.naddedtot[l]
-                #import pdb; pdb.set_trace()
-                if rank == 0:
-                    rank0sam = plate_sa_lhs.genLHS(s=self.current_samples)
-                else:
-                    rank0sam = None
-                self.sample = comm.bcast(rank0sam, root=0)
-                
-                if self.naddedtot[l] > 0:
-                    temp = divide_cases(self.naddedtot[l], size) 
-                    for i in range(len(temp)):
-                        for j in range(len(temp[i])):
-                            temp[i][j] += self.current_samples - self.naddedtot[l] #self.Lmax*self.NS0 + sum(self.naddedtot[0:L])
-                else:
-                    temp = []
-                if len(temp):
-                    for ns in range(size):
-                        self.cases[l][ns] += temp[ns] #append
-                nslpnew = len(self.cases[l][rank])
-                nsltnew = sum([len(self.cases[l][x]) for x in range(size)])
-                #self.nsp[L] = len(self.cases[L][rank]) #int(ns/size) # samples per processor
-                self.samplep[l] = self.sample[self.cases[l][rank]]
-                
-                for i in range(nslp[l], nslpnew): #need it to be just the extra cases
-                    #import pdb; pdb.set_trace()
-                    namestr = self.gridSol + "_" + str(self.cases[l][rank][i])
-    
-                    # create meshes
-                    leveloptions = self.woptions
-                    leveloptions['gridFile'] = self.meshnames[l] 
-                    mlist.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
-    
-                    # create aeroproblems
-                    aloptions = self.aoptions
-                    aloptions['gridFile'] = self.meshnames[l] 
-                    alist.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
-                    time.sleep(0.1) # this solves a few problems for some reason
-                    # create solvers
-                    slist.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
-    
-                    saconstsm = self.samplep[l][i].tolist()
-                    self.saconsts = saconstsm + self.saconstsb
-                    slist[i].setOption('SAConsts', self.saconsts)
-                    slist[i].setDVGeo(self.DVGeo)
-                    slist[i].setMesh(mlist[i])
-                    coords = slist[i].getSurfaceCoordinates(groupName=slist[i].allWallsGroup)
-                    slist[i].DVGeo.addPointSet(coords, 'coords')
-                    time.sleep(0.1)
-                    if l > 0: #create additional solvers at higher levels for the estimators
-                        # create meshes
-                        #import pdb; pdb.set_trace()
-                        namestr = self.gridSol + "_" + str(self.cases[l][rank][i]) + "_m"
-                        leveloptions = self.woptions
-                        leveloptions['gridFile'] = self.meshnames[l-1] 
-                        mlist2.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
-                        # create aeroproblems 
-                        aloptions = self.aoptions
-                        aloptions['gridFile'] = self.meshnames[l-1]
-                        alist2.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
-                        time.sleep(0.1) # this solves a few problems for some reason
-                        # create solvers
-                        slist2.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
-                        slist2[i].setOption('SAConsts', self.saconsts)
-                        slist2[i].setDVGeo(self.DVGeo)
-                        slist2[i].setMesh(mlist2[i])
-                        coords = slist[i].getSurfaceCoordinates(groupName=slist2[i].allWallsGroup)
-                        slist2[i].DVGeo.addPointSet(coords, 'coords')
-                nslp[l] = nslpnew
-                nslt[l] = nsltnew
-                
-    
-                self.aps[l] = alist
-                self.solvers[l] = slist
-                self.meshes[l] = mlist
-                if l > 0:
-                    self.aps[l] += alist2
-                    self.solvers[l] += slist2
-                    self.meshes[l] += mlist2
-    
-                # compute remaining samples
-                sump[l] = 0
-                sumpm[l] = 0
-                musp[l] = numpy.zeros(nslp[l])
-                muspm[l] = numpy.zeros(nslp[l])
-                for i in range(nslp[l]):
-                    # just do this again in case
-                    saconstsm = self.samplep[l][i].tolist()
-                    self.saconsts = saconstsm + self.saconstsb
-                    self.solvers[l][i].setOption('SAConsts', self.saconsts)
-                    self.solvers[l][i].DVGeo.setDesignVars(dvdict)
-                    self.aps[l][i].setDesignVars(dvdict)
-                    self.solvers[l][i](self.aps[l][i])
-                    self.solvers[l][i].evalFunctions(self.aps[l][i], funcs)
-                    astr = self.gridSol + "_" + str(self.cases[l][rank][i]) +"_cd"
-                    musp[l][i] = funcs[astr]
-                    sump[l] += funcs[astr]   
-                    #import pdb; pdb.set_trace()
-                    if l > 0:
-                        self.solvers[l][i+nslp[l]].setOption('SAConsts', self.saconsts)
-                        self.solvers[l][i+nslp[l]].DVGeo.setDesignVars(dvdict)
-                        self.aps[l][i+nslp[l]].setDesignVars(dvdict)
-                        self.solvers[l][i+nslp[l]](self.aps[l][i+nslp[l]])
-                        self.solvers[l][i+nslp[l]].evalFunctions(self.aps[l][i+nslp[l]], funcs)
-                        astr = self.gridSol + "_" + str(self.cases[l][rank][i]) +"_m_cd" 
-                        muspm[l][i] = -funcs[astr]
-                        sumpm[l] += -funcs[astr]     
-    
-                # compute mean and variance estimate from all samples
-                sum1[l] = comm.allreduce(sump[l])
-                mus[l] = comm.allgather(musp[l])
-                summ[l] = comm.allreduce(sumpm[l])
-                musm[l] = comm.allgather(muspm[l])
-    
-                # mean at each level
-                E[l] = (sum1[l]+summ[l])/nslt[l]
-    
-                # variance at each level
-                sum2 = 0.
-                for i in range(len(mus[l])): #range(size):
-                    for j in range(len(mus[l][i])): #range(self.nsp):
-                        if l > 0:
-                            sum2 += ((mus[l][i][j] + musm[l][i][j])-E[l])**2
-                        else:
-                            sum2 += (mus[l][i][j]-E[l])**2
-                V[l] = sum2/nslt[l]
-            
-            
-            # if L == 1:
-            #     import pdb; pdb.set_trace()
-            L += 1
-        #import pdb; pdb.set_trace()
-        #sys.stdout = sys.__stdout__
-        if rank == 0:
-            print("MLMC Completed, Samples per level: ", N1)
-        self.N1 = N1   
-        #import pdb; pdb.set_trace()
+                self.solvers[k][i].setOption('SAConsts', self.saconsts)
+                self.solvers[k][i].DVGeo.setDesignVars(dvdict)
+                self.aps[k][i].setDesignVars(dvdict)
+                pc0 = time.process_time()
+                self.solvers[k][i](self.aps[k][i])
+                self.solvers[k][i].evalFunctions(self.aps[k][i], funcs)
+                pc1 = time.process_time()
+                astr = self.gridSol + "_" + str(self.cases[k][rank][i]) +"_cd"
+                musp[k][i] = funcs[astr]
+                sump[k] += funcs[astr]
+                sumtp[k] += (pc1-pc0)   
       
-            # test for convergence
-            # don't actually need this, won't ever end early
-            # range = -1:0
-            # if L > 1 & M**L >= 4:
-            #     con = M**(range.*suml(2,L+1+range)./suml(1,L+1+range))
-            #     converged = (max(abs(con)) < (M-1)*eps/sqrt(2))
+        # compute mean and variance estimate from start up samples
+        for k in range(self.Lmax):
+            sumt.append(comm.allreduce(sumtp[k]))
+            sum1.append(comm.allreduce(sump[k]))
+            mus.append(comm.allgather(musp[k]))
+            summ.append(comm.allreduce(sumpm[k]))
+            musm.append(comm.allgather(muspm[k]))
+            mus[k] = numpy.concatenate(mus[k][:])
+            musm[k] = numpy.concatenate(musm[k][:])
+        #import pdb; pdb.set_trace()
+            # mean at each level
+            Et[k] = sumt[k]/nslt[k]
+            E[k] = (sum1[k])/nslt[k] #+summ[k]
+            sum2 = 0.
+            for i in range(len(mus[k])): #loop over processors
+                sum2 += (mus[k][i]-E[k])**2
+            V[k] = sum2/nslt[k]
+            S[k] = math.sqrt(V[k])
 
-        # once done, we have aps, solvers, meshes, which is all we need
+        # compute correlation matrix and rearrange models if necessary
+        ordered = False
+        while not ordered:
+            rho = numpy.corrcoef(mus)
+            ordered = True # check if contradicted
+            #tarr = rho[0,1:]
+            for k in range(self.Lmax-2):
+                test = rho[0,1+k]**2 - rho[0,2+k]**2
+                if test < 0:
+                    ordered = False
+            tarr = -rho[0,:]**2
+
+            if not ordered:
+                sind = numpy.argsort(tarr)
+                #import pdb; pdb.set_trace()
+                self.mord[:] = [self.mord[i] for i in sind]
+                E[:] = [E[i] for i in sind]
+                Et[:] = [Et[i] for i in sind]
+                V[:] = [V[i] for i in sind]
+                S[:] = [S[i] for i in sind]
+                mus[:] = [mus[i] for i in sind]
+
+        # now compute N1 and a1 using sigma, rho, w, and p
+        for k in range(self.Lmax):
+            a1[k] = S[0]*rho[0,k]/S[k]
+            
+            if k == 0:
+                r1[k] = 1
+            elif k == self.Lmax-1:
+                work = Et[0]*(rho[0,k]**2)
+                work /= Et[k]*(1 - rho[0,1]**2)
+                r1[k] = math.sqrt(work)
+            else:
+                work = Et[0]*(rho[0,k-1]**2 - rho[0,k]**2)
+                work /= Et[k]*(1 - rho[0,1]**2)
+                r1[k] = math.sqrt(work)
+
+        for k in range(self.Lmax):
+            N1.append(0)
+
+        nsf = self.P/numpy.dot(Et,r1)
+        N1[0] = math.ceil(nsf)
+        for k in range(self.Lmax):
+            nsf = N1[0]*r1[k]
+            N1[k] = math.ceil(nsf)
+
+        # limit the number of samples on the last one to pass the sanity check, for debug
+        sanity = numpy.dot(N1, Et)
+        if sanity > 1.2*self.P:
+            N1n = (self.P - numpy.dot(N1[0:self.Lmax-2], Et[0:self.Lmax-2]))/Et[self.Lmax-1]
+            N1[self.Lmax-1] = math.ceil(N1n)
+
+        self.Pr = numpy.dot(N1, Et)
+
+        self.N1 = N1
+        self.a1 = a1
+        #import pdb; pdb.set_trace()    
+        if rank == 0:
+            print("MFMC Completed, Samples per level: ", N1)
+
+         
+
+        # call dist_samples after this
 
     def dist_samples(self):
         # If we already have the number of samples, just create as many solvers as needed at each level
@@ -780,9 +676,6 @@ class PlateComponentMLMC(om.ExplicitComponent):
             alist = []
             slist = []
             mlist = []
-            alist2 = []
-            slist2 = []
-            mlist2 = []
             nslp.append(len(self.cases[k][rank]))
             nslt.append(sum([len(self.cases[k][x]) for x in range(size)]))
             for i in range(nslp[k]):
@@ -790,54 +683,29 @@ class PlateComponentMLMC(om.ExplicitComponent):
 
                 # create meshes
                 leveloptions = self.woptions
-                leveloptions['gridFile'] = self.meshnames[k] 
+                leveloptions['gridFile'] = self.meshnames[self.mord[k]] 
                 mlist.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
 
                 # create aeroproblems 
                 aloptions = self.aoptions
-                aloptions['gridFile'] = self.meshnames[k] 
+                aloptions['gridFile'] = self.meshnames[self.mord[k]] 
                 alist.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
                 time.sleep(0.1) # this solves a few problems for some reason
                 # create solvers
                 slist.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
                 
-                # if not self.ooptions['run_once']:
-                #     saconstsm = self.samplep[i].tolist()
-                # else:
-                saconstsm = self.samplep[k][i].tolist()
+                saconstsm = self.samplep[self.Lmax-1][i].tolist()
                 self.saconsts = saconstsm + self.saconstsb
                 slist[i].setOption('SAConsts', self.saconsts)
                 slist[i].setDVGeo(self.DVGeo)
                 slist[i].setMesh(mlist[i])
                 coords = slist[i].getSurfaceCoordinates(groupName=slist[i].allWallsGroup)
                 slist[i].DVGeo.addPointSet(coords, 'coords')
-
-                if k > 0: #create additional solvers at higher levels for the estimators
-                     # create meshes
-                    namestr = self.gridSol + "_" + str(self.cases[k][rank][i]) + "_m"
-                    leveloptions = self.woptions
-                    leveloptions['gridFile'] = self.meshnames[k-1] 
-                    mlist2.append(USMesh(options=leveloptions, comm=MPI.COMM_SELF))
-                    # create aeroproblems 
-                    aloptions = self.aoptions
-                    aloptions['gridFile'] = self.meshnames[k-1] 
-                    alist2.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=tempR, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
-                    time.sleep(0.1) # this solves a few problems for some reason
-                    # create solvers
-                    slist2.append(ADFLOW(options=aloptions, comm=MPI.COMM_SELF))
-                    slist2[i].setOption('SAConsts', self.saconsts)
-                    slist2[i].setDVGeo(self.DVGeo)
-                    slist2[i].setMesh(mlist2[i])
-                    coords = slist[i].getSurfaceCoordinates(groupName=slist2[i].allWallsGroup)
-                    slist2[i].DVGeo.addPointSet(coords, 'coords')
-                
+   
             self.aps.append(alist)
             self.solvers.append(slist)
             self.meshes.append(mlist)
-            if k > 0:
-                self.aps[k] += alist2
-                self.solvers[k] += slist2
-                self.meshes[k] += mlist2
+
         
 
 def divide_cases(ncases, nprocs):
