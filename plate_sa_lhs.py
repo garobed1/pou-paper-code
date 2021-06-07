@@ -1,5 +1,6 @@
 from pyDOE import lhs
 import numpy as np
+import random
 import math
 
 # Test to generate sample points in the space of Spalart-Allmaras constants,
@@ -12,8 +13,19 @@ import math
 # Diffusion
 # kappa^2 * (1+cb2)/(sigma/cb1) \approx 3
 
+
 # kappa = []
-def genLHS(s):
+
+# Pure monte carlo function
+def mc(n, s):
+    set = []
+    for j in range(s):
+        set.append([])
+        for i in range(n):
+            set[j].append(random.random())
+    return set
+
+def genLHS(s, mcs = False):
     cb1 = [0.128, 0.137]
     cb2 = [0.6, 0.7]
     sigma = [0.6, 1.0]
@@ -31,21 +43,25 @@ def genLHS(s):
     kappa = [min(kap), max(kap)]
 
     n = 4
-
-    set = lhs(n, samples = s)#, criterion = 'center')
+    
+    set = []
+    if mcs == False:
+        set = lhs(n, samples = s)#, criterion = 'center')
+    else:
+        set = mc(n, s)
 
     dist = np.zeros([s,n])
     for i in range(s):
         dist[i][0] = set[i][0]*(kappa[1]-kappa[0]) + kappa[0]
-        dist[i][1] = set[i][0]*(cb1[1]-cb1[0]) + cb1[0]
-        dist[i][2] = set[i][0]*(cb2[1]-cb2[0]) + cb2[0]
-        dist[i][3] = set[i][0]*(sigma[1]-sigma[0]) + sigma[0]
+        dist[i][1] = set[i][1]*(cb1[1]-cb1[0]) + cb1[0]
+        dist[i][2] = set[i][2]*(cb2[1]-cb2[0]) + cb2[0]
+        dist[i][3] = set[i][3]*(sigma[1]-sigma[0]) + sigma[0]
 
     #print(dist)
     return dist
 
 
-#print(genLHS(10))
+#print(genLHS(10, mcs = False))
 #print(kap)
 
 

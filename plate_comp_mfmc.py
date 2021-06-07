@@ -22,7 +22,7 @@ class PlateComponentMFMC(om.ExplicitComponent):
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
-        #sys.stdout = open(os.devnull, "w")
+        sys.stdout = open(os.devnull, "w")
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
@@ -435,7 +435,7 @@ class PlateComponentMFMC(om.ExplicitComponent):
         
         self.current_samples = self.NS0*self.Lmax
         if rank == 0:
-            rank0sam = plate_sa_lhs.genLHS(s=self.current_samples)
+            rank0sam = plate_sa_lhs.genLHS(s=self.current_samples, mcs = self.uoptions['MCPure'])
         else:
             rank0sam = None
         self.sample = comm.bcast(rank0sam, root=0)
@@ -635,7 +635,7 @@ class PlateComponentMFMC(om.ExplicitComponent):
         
         self.current_samples = sum(self.N1)
         if rank == 0:
-            rank0sam = plate_sa_lhs.genLHS(s=self.current_samples)
+            rank0sam = plate_sa_lhs.genLHS(s=self.current_samples, mcs = self.uoptions['MCPure'])
         else:
             rank0sam = None
         self.sample = comm.bcast(rank0sam, root=0)
