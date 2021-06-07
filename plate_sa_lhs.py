@@ -32,7 +32,7 @@ def genLHS(s):
 
     n = 4
 
-    set = lhs(n, samples = s, criterion = 'center')
+    set = lhs(n, samples = s)#, criterion = 'center')
 
     dist = np.zeros([s,n])
     for i in range(s):
@@ -41,12 +41,12 @@ def genLHS(s):
         dist[i][2] = set[i][0]*(cb2[1]-cb2[0]) + cb2[0]
         dist[i][3] = set[i][0]*(sigma[1]-sigma[0]) + sigma[0]
 
-    print(dist)
+    #print(dist)
     return dist
 
 
-
+#print(genLHS(10))
 #print(kap)
-#print(dist)
+
 
 

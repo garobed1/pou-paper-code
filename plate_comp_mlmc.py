@@ -576,8 +576,7 @@ class PlateComponentMLMC(om.ExplicitComponent):
                 N1[l] = nlfm
 
             # now compute and generate additional samples at each level
-            # first partition samples  NEVERMIND (just do it once at each level, no need to repeat)
-            # create the extra number of solvers at each (the current) level
+            # create the extra number of solvers at each level
 
             # need to loop everything from here on
 

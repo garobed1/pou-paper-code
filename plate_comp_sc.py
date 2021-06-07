@@ -3,7 +3,7 @@ import sys, os
 import openmdao.api as om
 import plate_ffd as pf
 import math
-import plate_sa_lhs
+import plate_sa_sc
 import subprocess
 import time
 from mpi4py import MPI
@@ -17,12 +17,12 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-class PlateComponentLHS(om.ExplicitComponent):
-    """Robust Bump Flow Problem, with LHS Samples"""
+class PlateComponentSC(om.ExplicitComponent):
+    """Robust Bump Flow Problem, with Stochastic Collocation"""
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
-        #sys.stdout = open(os.devnull, "w")
+        sys.stdout = open(os.devnull, "w")
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
@@ -31,6 +31,8 @@ class PlateComponentLHS(om.ExplicitComponent):
         self.Pr = 0.
         self.P = self.uoptions['P']
         self.NS0 = self.uoptions['NS0']
+        self.NS = self.uoptions['NS']
+        self.SC = self.uoptions['SCPts']
         # Generate FFD and DVs
         if rank == 0:
             rank0dvg = pf.createFFD()
@@ -60,79 +62,20 @@ class PlateComponentLHS(om.ExplicitComponent):
         solname = self.ooptions['prob_name']
         self.gridSol = f'{solname}_sol'
 
-        # Get a set of UQ sample points (LHS)
-        #if self.ooptions['run_once']:
-        #    self.sample = self.uoptions['dist']
-        #else
-
-        # Scatter samples, multi-point parallelism
-        if self.uoptions['MCTimeBudget']:
-            self.aps = []
-            self.solvers = []
-            self.meshes = []
-            self.current_samples = self.NS0
-            if rank == 0:
-                rank0sam = plate_sa_lhs.genLHS(s=self.current_samples)
-            else:
-                rank0sam = None
-            self.sample = comm.bcast(rank0sam, root=0)
-            self.cases = divide_cases(self.NS0, size)
-            # Scatter samples on each level, multi-point parallelism
-            self.samplep = self.sample[self.cases[rank]]
-            self.nsp = len(self.cases[rank])
-
-            # create aeroproblems 
-            for i in range(self.nsp):
-                namestr = self.gridSol + "_" + str(self.cases[rank][i])
-                self.aps.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
-            # create meshes 
-            self.meshes = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
-            # create solvers
-            time.sleep(0.1)
-            self.solvers = ADFLOW(options=self.aoptions, comm=MPI.COMM_SELF)
-            self.solvers.setOption('SAConsts', self.saconsts)
-            self.solvers.setDVGeo(self.DVGeo)
-            self.solvers.setMesh(self.meshes[i])
-            coords = self.solvers.getSurfaceCoordinates(groupName=self.solvers.allWallsGroup)
-            self.solvers.DVGeo.addPointSet(coords, 'coords')
-
-            sumt = 0.
-            sumtp = 0.
-            Et = 0.
-            funcs = {}
-            a_init = self.DVGeo.getValues()
-            a_init['pnts'][:] = self.ooptions['DVInit']
-            dvdict = {'pnts':a_init['pnts']}
-            for i in range(self.nsp):
-                saconstsm = self.samplep[i].tolist()
-                self.saconsts = saconstsm + self.saconstsb
-                self.solvers.setOption('SAConsts', self.saconsts)
-                self.solvers.DVGeo.setDesignVars(dvdict)
-                self.aps[i].setDesignVars(dvdict)
-                pc0 = time.process_time()
-                self.solvers(self.aps[i])
-                self.solvers.evalFunctions(self.aps[i], funcs)
-                pc1 = time.process_time()
-                sumtp += (pc1-pc0)   
-            
-            sumt = comm.allreduce(sumtp)
-            Et = sumt/self.NS0
-            self.NS = math.ceil(self.P/Et)
-            self.Pr = self.NS*Et
-        else:
-            self.NS = self.uoptions['NS']
-
         #now do it again
         if rank == 0:
-            rank0sam = plate_sa_lhs.genLHS(s=self.NS)
+            rank0sam, rank0w = plate_sa_sc.genSC(s=self.SC)
         else:
             rank0sam = None
+            rank0w = None
         self.sample = comm.bcast(rank0sam, root=0)
+        self.weight = comm.bcast(rank0w, root=0)
+        self.NS = len(self.weight)
 
-        self.cases = divide_cases(self.NS, size)
+        self.cases = divide_cases(len(self.weight), size)
         self.nsp = len(self.cases[rank])#int(ns/size) # samples per processor
         self.samplep = self.sample[self.cases[rank]]#self.sample[(rank*self.nsp):(rank*self.nsp+(self.nsp))] #shouldn't really need to "scatter" per se
-        #assert len(self.samplep) == self.nsp
+        self.weightp = self.weight[self.cases[rank]]
 
         # Actually create solvers (and aeroproblems?) (and mesh?) now
         self.aps = []
@@ -244,12 +187,13 @@ class PlateComponentLHS(om.ExplicitComponent):
 
         dvdict = {'pnts':inputs['a']}
         funcs = {}
-        ns = self.NS
         sump = 0.
         musp = numpy.zeros(self.nsp)
-        #self.aps[0].setDesignVars(dvdict)
+        sumsp = 0.
+        mussp = numpy.zeros(self.nsp)
         for i in range(self.nsp):
             saconstsm = self.samplep[i].tolist()
+            w = self.weightp[i]
             self.saconsts = saconstsm + self.saconstsb
             self.solvers.setOption('SAConsts', self.saconsts)
             self.solvers.DVGeo.setDesignVars(dvdict)
@@ -258,23 +202,25 @@ class PlateComponentLHS(om.ExplicitComponent):
             self.solvers.evalFunctions(self.aps[i], funcs)
             astr = self.gridSol + "_" + str(self.cases[rank][i]) +"_cd"
             musp[i] = funcs[astr]
-            sump += funcs[astr]
-        
+            sump += funcs[astr]*w
+            mussp[i] = (funcs[astr]**2)
+            sumsp += (funcs[astr]**2)*w
         
         # compute mean and variance
         sum = comm.allreduce(sump)
         mus = comm.allgather(musp)
+        sums = comm.allreduce(sumsp)
+        muss = comm.allgather(mussp)
         #import pdb; pdb.set_trace()
-        E = sum/ns
-        sum2 = 0.
-        for i in range(len(mus)): #range(size):
-            for j in range(len(mus[i])): #range(self.nsp):
-                sum2 += (mus[i][j]-E)**2
-        V = sum2/ns
+        E = sum
+        sum2 = sums - sum**2.
+        # for i in range(len(mus)): #range(size):
+        #     for j in range(len(mus[i])): #range(self.nsp):
+        #         sum2 += (mus[i][j]-E)**2
+        V = sum2
 
         self.DVCon.evalFunctions(funcs, includeLinear=True)
         self.DVCon2.evalFunctions(funcs, includeLinear=True)
-        #import pdb; pdb.set_trace()
         outputs['Cd_m'] = E
         outputs['Cd_v'] = V
         outputs['Cd_s'] = math.sqrt(V)
@@ -295,13 +241,15 @@ class PlateComponentLHS(om.ExplicitComponent):
         dvdict = {'pnts':inputs['a']}
         funcs = {}
         funcSens = {}
-        ns = self.NS
         sump = 0.
         musp = numpy.zeros(self.nsp)
-        pmup = []
+        sumsp = 0.
+        mussp = numpy.zeros(self.nsp)
         psump = numpy.zeros(len(inputs['a']))
+        pmup = []
         for i in range(self.nsp):
             saconstsm = self.samplep[i].tolist()
+            w = self.weightp[i]
             self.saconsts = saconstsm + self.saconstsb
             self.solvers.setOption('SAConsts', self.saconsts)
             self.solvers.DVGeo.setDesignVars(dvdict)
@@ -310,28 +258,31 @@ class PlateComponentLHS(om.ExplicitComponent):
             self.solvers.evalFunctions(self.aps[i], funcs)
             self.solvers.evalFunctionsSens(self.aps[i], funcSens, ['cd'])
             astr = self.gridSol + "_" + str(self.cases[rank][i])+"_cd"
-            arr = [x*(1./ns) for x in funcSens[astr]['pnts']]
-            sump += funcs[astr]
+            arr = funcSens[astr]['pnts']
             musp[i] = funcs[astr]
-            pmup.append(arr[0])
-            psump += arr[0]
+            sump += funcs[astr]*w
+            mussp[i] = (funcs[astr]**2)
+            sumsp += (funcs[astr]**2)*w
+            pmup.append(arr[0]*w)
+            psump += arr[0]*w
             
         sum = comm.allreduce(sump)
         mus = comm.allgather(musp)
+        sums = comm.allreduce(sumsp)
+        muss = comm.allgather(mussp)
         pmu = comm.allgather(pmup)
         psum = comm.allreduce(psump)
         #import pdb; pdb.set_trace()
         # compute variance sensitivity
-        E = sum/ns
-        sum2 = 0.
+        E = sum
+        sum2 = sums - sum**2.
         psum2 = numpy.zeros(len(inputs['a']))
         for i in range(len(mus)): #range(size):
             for j in range(len(mus[i])): #range(self.nsp):
-                sum2 += (mus[i][j]-E)**2
-                temp = pmu[i][j]*ns - psum
-                arr2 = [x*2*(mus[i][j]-E)/ns for x in temp]
-                psum2 += arr2
-        V = sum2/ns
+                temp = pmu[i][j]*2*mus[i][j]
+                psum2 += temp
+        V = sum2
+        psum2 = psum2 - 2*E*psum
 
         self.DVCon.evalFunctionsSens(funcSens, includeLinear=True)
         self.DVCon2.evalFunctionsSens(funcSens, includeLinear=True)

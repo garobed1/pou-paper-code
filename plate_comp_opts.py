@@ -1,5 +1,5 @@
 gridFile = f'test_mfmc_121_25_1.cgns'
-probName = 'mc_test'
+probName = 'debug_mfmc2_no_center_600'
 
 astar = [0.28788225, 0.29621159, 0.34267779, 0.18972925, 0.19873263, 0.30842999,
     0.27963309, 0.23999633, 0.28788225, 0.29621159, 0.34267779, 0.18972925,
@@ -19,7 +19,7 @@ f'test_mfmc_121_25_1.cgns'
 
 optOptions = { #general optimization parameters
     'prob_name':probName,
-    'NX':20, #number of x FFD points, not necessarily the number of design vars
+    'NX':8, #number of x FFD points, not necessarily the number of design vars
     'bumpBounds':[1.00, 2.00], #ends of the bump
     'mach':0.85, #inflow mach number
     'Re':3000000, #inflow reynolds number
@@ -32,21 +32,24 @@ optOptions = { #general optimization parameters
     'DCThickFrac':0.75, #percentage of bump area to constrain
     'constrain_opt':True,
     'use_area_con':True,
-    'check_partials':False,  #check partial derivatives
+    'check_partials':True,  #check partial derivatives
     'run_once':True, # run a single iteration of the model with given settings
     'ro_shape':astar # shape variables 
 }
 
 uqOptions = { #general UQ parameters
-    'mode':'MC', # MC: Normal Monte Carlo with LHS points
-                 # MFMC: Multi-Level Monte Carlo with LHS points
-    'MCTimeBudget':True, #
-    'NS':4, #number of sample points
-    'NS0':4, #start up sample number for multi-level
+    'mode':'MFMC', # MC: Normal Monte Carlo with LHS points
+                 # SC: Stochastic Collocation
+                 # MFMC: Multi-Fidelity Monte Carlo with LHS points
+                 # MLMC: Multi-Level Monte Carlo with LHS points
+    'MCTimeBudget':False, #
+    'SCPts':3, # number of sc points, 2*SCPts - 1 order of SC polynomial
+    'NS':28, #number of sample points
+    'NS0':8, #start up sample number for multi-level
     'rho':2., #robust objective std dev ratio
-    'use-predetermined-samples':False, #input N1 at each level instead of running MLMC
+    'use-predetermined-samples':True, #input N1 at each level instead of running MLMC
     'predet-N1':[3,4,5], #user-determined N1
-    'predet-a1':[1,1.1,1.2], #user-determined N1
+    'predet-a1':[1,1.1,1.2], #user-determined a1 for MFMC
     'dist':dist, #distribution to use ONLY IF running the model once
     'gridFileLevels':gridFilesML, #all available meshes for multi-level (need at least 3)
     'vartol': 2e-5, #ML variance tolerance for convergence

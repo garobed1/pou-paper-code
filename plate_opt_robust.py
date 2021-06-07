@@ -7,6 +7,7 @@ from mpi4py import MPI
 import plate_comp as pc
 import plate_comp_lhs as pcl
 import plate_comp_mfmc as pcf
+import plate_comp_sc as pcs
 from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
 
 comm = MPI.COMM_WORLD
@@ -28,6 +29,8 @@ if rank == 0:
 prob = om.Problem()
 if uqOptions['mode'] == 'MFMC':
     prob.model.add_subsystem('bump_plate', pcf.PlateComponentMFMC(), promotes_inputs=['a'])
+elif uqOptions['mode'] == 'SC':
+    prob.model.add_subsystem('bump_plate', pcs.PlateComponentSC(), promotes_inputs=['a'])
 else:
     prob.model.add_subsystem('bump_plate', pcl.PlateComponentLHS(), promotes_inputs=['a'])
 
@@ -82,7 +85,8 @@ if rank == 0:
     print('PC time = %.15g' % pct, file = resfile)
     print('E = %.15g' % prob['bump_plate.Cd_m'], file = resfile)
     print('V = %.15g' % prob['bump_plate.Cd_v'], file = resfile)
-    print('E + rhoV = %.15g' % prob['bump_plate.Cd_r'], file = resfile)
+    print('S = %.15g' % prob['bump_plate.Cd_s'], file = resfile)
+    print('E + rhoS = %.15g' % prob['bump_plate.Cd_r'], file = resfile)
     if ooptions['constrain_opt']:
         if ooptions['use_area_con']:
             print('SA = ', prob['bump_plate.SA'], file = resfile)
