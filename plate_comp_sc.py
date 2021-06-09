@@ -33,6 +33,7 @@ class PlateComponentSC(om.ExplicitComponent):
         self.NS0 = self.uoptions['NS0']
         self.NS = self.uoptions['NS']
         self.SC = self.uoptions['SCPts']
+        self.FF = self.uoptions['FullFactor']
         # Generate FFD and DVs
         if rank == 0:
             rank0dvg = pf.createFFD()
@@ -64,7 +65,7 @@ class PlateComponentSC(om.ExplicitComponent):
 
         #now do it again
         if rank == 0:
-            rank0sam, rank0w = plate_sa_sc.genSC(s=self.SC)
+            rank0sam, rank0w = plate_sa_sc.genSC(s=self.SC, ff = self.FF)
         else:
             rank0sam = None
             rank0w = None
@@ -144,8 +145,6 @@ class PlateComponentSC(om.ExplicitComponent):
 
         dummy = rank
         dsum = comm.allgather(dummy)
-
-        sys.stdout = sys.__stdout__
 
     def setup(self):
         #initialize shape and set deformation points as inputs

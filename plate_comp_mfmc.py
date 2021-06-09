@@ -11,6 +11,7 @@ from idwarp import USMesh
 from baseclasses import *
 from adflow import ADFLOW
 from pygeo import DVGeometry, DVConstraints
+from itertools import combinations
 from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
 
 comm = MPI.COMM_WORLD
@@ -42,8 +43,8 @@ class PlateComponentMFMC(om.ExplicitComponent):
         self.mord = [*range(self.Lmax)]
         self.mord.reverse()
 
-        if self.Lmax < 3:
-            raise ValueError('Not enough meshes available, ' + self.Lmax + ' < 3')
+        #if self.Lmax < 3:
+        #    raise ValueError('Not enough meshes available, ' + self.Lmax + ' < 3')
 
 
         # Spalart Allmaras model constants, to be changed in UQ (4 for now)
@@ -134,8 +135,6 @@ class PlateComponentMFMC(om.ExplicitComponent):
 
         dummy = rank
         dsum = comm.allgather(dummy)
-
-        sys.stdout = sys.__stdout__
 
     def setup(self):
         #initialize shape and set deformation points as inputs
@@ -542,7 +541,6 @@ class PlateComponentMFMC(om.ExplicitComponent):
             musm.append(comm.allgather(muspm[k]))
             mus[k] = numpy.concatenate(mus[k][:])
             musm[k] = numpy.concatenate(musm[k][:])
-        #import pdb; pdb.set_trace()
             # mean at each level
             Et[k] = sumt[k]/nslt[k]
             E[k] = (sum1[k])/nslt[k] #+summ[k]
@@ -573,42 +571,100 @@ class PlateComponentMFMC(om.ExplicitComponent):
                 V[:] = [V[i] for i in sind]
                 S[:] = [S[i] for i in sind]
                 mus[:] = [mus[i] for i in sind]
+        rho0 = rho[0]
+
+        # model selection
+        combs = []
+        NM = self.Lmax
+        order = [*range(NM)] #not the same as mord, refers to mord's indices
+        for k in range(1,NM+1):
+            temp = combinations(order, k)
+            for j in temp:
+                if (0 in list(j)): #get only lists that contain the highest level
+                    combs.append(list(j))
+
+        # loop over candidates
+        vMC = V[0]*Et[0]/10 # p = 10
+        vs = vMC
+        Ms = [0]
+        for o in range(len(combs)):
+            comb = combs[o]
+            kn = len(comb)
+            F = True
+            if kn > 1:
+                for k in range(kn-1): # check feasability
+                    feas = Et[comb[k]]/Et[comb[k+1]]
+                    if k == kn-2:
+                        feas -= (rho0[comb[k]]**2 - rho0[comb[k+1]]**2)/(rho0[comb[k+1]]**2)
+                    else:
+                        feas -= (rho0[comb[k]]**2 - rho0[comb[k+1]]**2)/(rho0[comb[k+1]]**2 - rho0[comb[k+2]]**2)
+                    if feas < 0:    
+                        F = False
+                if F == False:
+                    continue
+            # if feasible, check if variance is beaten
+            v = 0.
+            for k in range(kn):
+                if k == kn-1:
+                    v += math.sqrt(Et[comb[k]]*(rho0[comb[k]]**2))
+                else:
+                    v += math.sqrt(Et[comb[k]]*(rho0[comb[k]]**2 - rho0[comb[k+1]]**2))
+            v = v**2
+            v *= V[0]/10
+            if v < vs:
+                Ms = comb
+                vs = v
+
+        # take Ms indices of mord as the new mord
+        self.mord = [self.mord[i] for i in Ms]
+        self.Lmax = len(self.mord)
 
         # now compute N1 and a1 using sigma, rho, w, and p
+        a1 = numpy.zeros(self.Lmax)
+        r1 = numpy.zeros(self.Lmax)
+        Et = [Et[i] for i in Ms]
+        E = [E[i] for i in Ms]
+        V = [V[i] for i in Ms]
+        S = [S[i] for i in Ms]
         for k in range(self.Lmax):
-            a1[k] = S[0]*rho[0,k]/S[k]
+            a1[k] = S[0]*rho0[k]/S[k]
             
             if k == 0:
                 r1[k] = 1
             elif k == self.Lmax-1:
-                work = Et[0]*(rho[0,k]**2)
-                work /= Et[k]*(1 - rho[0,1]**2)
+                work = Et[0]*(rho0[k]**2)
+                work /= Et[k]*(1 - rho0[1]**2)
                 r1[k] = math.sqrt(work)
             else:
-                work = Et[0]*(rho[0,k-1]**2 - rho[0,k]**2)
-                work /= Et[k]*(1 - rho[0,1]**2)
+                work = Et[0]*(rho0[k-1]**2 - rho0[k]**2)
+                work /= Et[k]*(1 - rho0[1]**2)
                 r1[k] = math.sqrt(work)
 
         for k in range(self.Lmax):
             N1.append(0)
 
-        nsf = self.P/numpy.dot(Et,r1)
-        N1[0] = math.ceil(nsf)
+        nsf0 = self.P/numpy.dot(Et,r1)
+        N1[0] = math.ceil(nsf0)
         for k in range(self.Lmax):
-            nsf = N1[0]*r1[k]
+            nsf = nsf0*r1[k]
             N1[k] = math.ceil(nsf)
 
-        # limit the number of samples on the last one to pass the sanity check, for debug
+        # limit the number of samples on the last one to pass the sanity check, shouldnt need this anymore
         sanity = numpy.dot(N1, Et)
         if sanity > 1.2*self.P:
             N1n = (self.P - numpy.dot(N1[0:self.Lmax-2], Et[0:self.Lmax-2]))/Et[self.Lmax-1]
             N1[self.Lmax-1] = math.ceil(N1n)
 
-        # if N1[0] == 1:
-        #     N1[0] = N1[1]-1
+        # compute the MSE beating MC condition
+        cond = 0.
+        for k in range(self.Lmax):
+            if k == self.Lmax - 1:
+                cond += math.sqrt((Et[k]/Et[0])*(rho0[k]**2))
+            else:
+                cond += math.sqrt((Et[k]/Et[0])*(rho0[k]**2 - rho0[k+1]**2))
 
         self.Pr = numpy.dot(N1, Et)
-
+        #import pdb; pdb.set_trace()
         self.N1 = N1
         self.a1 = a1   
         if rank == 0:
@@ -619,7 +675,6 @@ class PlateComponentMFMC(om.ExplicitComponent):
         # call dist_samples after this
 
     def dist_samples(self):
-        # If we already have the number of samples, just create as many solvers as needed at each level
         # Just do this after running MLMC() anyway 
 
         # flow characteristics
@@ -633,7 +688,7 @@ class PlateComponentMFMC(om.ExplicitComponent):
         a_init = self.DVGeo.getValues()
         a_init['pnts'][:] = self.ooptions['DVInit']
         
-        self.current_samples = sum(self.N1)
+        self.current_samples = self.N1[self.Lmax-1]
         if rank == 0:
             rank0sam = plate_sa_lhs.genLHS(s=self.current_samples, mcs = self.uoptions['MCPure'])
         else:
@@ -642,15 +697,19 @@ class PlateComponentMFMC(om.ExplicitComponent):
         #import pdb; pdb.set_trace()
         # Scatter samples on each level, multi-point parallelism
         self.cases = []
+        self.css = []
         self.samplep = []
         for i in range(self.Lmax):
-            self.cases.append(divide_cases(self.N1[i], size)) 
+            div = divide_cases(self.N1[i], size)
+            div2 = divide_cases(self.N1[i], size)
+            self.cases.append(div)
+            self.css.append(div2)
             for j in range(len(self.cases[i])):
                 for k in range(len(self.cases[i][j])):
-                    self.cases[i][j][k] += sum(self.N1[0:i])
-            #self.nsp.append(len(self.cases[i][rank]))#int(ns/size) # samples per processor
-            self.samplep.append(self.sample[self.cases[i][rank]])
-        
+                    self.cases[i][j][k] += sum(self.N1[0:i]) # just for aeroproblem numbering
+            self.samplep.append([]) 
+        self.samplep[self.Lmax-1] = self.sample[self.css[self.Lmax-1][rank]]
+
         # Actually create solvers (and aeroproblems?) (and mesh?) now
         self.aps = []
         self.solvers = []
@@ -680,7 +739,7 @@ class PlateComponentMFMC(om.ExplicitComponent):
             slist.setMesh(mlist)
             coords = slist.getSurfaceCoordinates(groupName=slist.allWallsGroup)
             slist.DVGeo.addPointSet(coords, 'coords')
-   
+
             self.aps.append(alist)
             self.solvers.append(slist)
             self.meshes.append(mlist)

@@ -118,8 +118,8 @@ class PlateComponent(om.ExplicitComponent):
         # mult = numpy.linspace(1.0,1.5,num=int(0.5*len(a_init['pnts'])))
         # mult = numpy.concatenate((mult, mult))
         # a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
-        #if self.ooptions['run_once']:
-        #    a_init['pnts'] = self.ooptions['ro_shape']
+        if self.ooptions['run_once']:
+            a_init['pnts'] = self.ooptions['ro_shape']
         self.add_input('a', a_init['pnts'], desc="Bump Shape Control Points")
         #self.add_input('a', 0.2, desc="Bump Shape Control Points")
 

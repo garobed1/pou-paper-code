@@ -92,7 +92,7 @@ class PlateComponentLHS(om.ExplicitComponent):
             self.solvers = ADFLOW(options=self.aoptions, comm=MPI.COMM_SELF)
             self.solvers.setOption('SAConsts', self.saconsts)
             self.solvers.setDVGeo(self.DVGeo)
-            self.solvers.setMesh(self.meshes[i])
+            self.solvers.setMesh(self.meshes)
             coords = self.solvers.getSurfaceCoordinates(groupName=self.solvers.allWallsGroup)
             self.solvers.DVGeo.addPointSet(coords, 'coords')
 
@@ -201,8 +201,6 @@ class PlateComponentLHS(om.ExplicitComponent):
 
         dummy = rank
         dsum = comm.allgather(dummy)
-
-        sys.stdout = sys.__stdout__
 
     def setup(self):
         #initialize shape and set deformation points as inputs

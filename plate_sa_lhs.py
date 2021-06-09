@@ -25,6 +25,7 @@ def mc(n, s):
             set[j].append(random.random())
     return set
 
+# mcs: use pure monte carlo instead of LHS
 def genLHS(s, mcs = False):
     cb1 = [0.128, 0.137]
     cb2 = [0.6, 0.7]

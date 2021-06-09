@@ -1,5 +1,5 @@
 gridFile = f'test_mfmc_121_25_1.cgns'
-probName = 'pure_mc_2000'
+probName = 'resolve_astar'
 
 astar = [0.28788225, 0.29621159, 0.34267779, 0.18972925, 0.19873263, 0.30842999,
     0.27963309, 0.23999633, 0.28788225, 0.29621159, 0.34267779, 0.18972925,
@@ -34,27 +34,29 @@ optOptions = { #general optimization parameters
     'use_area_con':True,
     'check_partials':False,  #check partial derivatives
     'run_once':True, # run a single iteration of the model with given settings
+    'nRuns':1, # number of times to run the code, then print the average statistics for statistics runs
     'ro_shape':astar # shape variables 
 }
 
 uqOptions = { #general UQ parameters
-    'mode':'MC', # MC: Normal Monte Carlo with LHS points
+    'mode':'SC', # MC: Normal Monte Carlo with LHS points
                  # SC: Stochastic Collocation
                  # MFMC: Multi-Fidelity Monte Carlo with LHS points
                  # MLMC: Multi-Level Monte Carlo with LHS points
     'MCTimeBudget':False, #determine number of samples by time budget option 'P'
     'MCPure':True, #don't use LHS points
-    'SCPts':3, # number of sc points, 2*SCPts - 1 order of SC polynomial
-    'NS':28, #number of sample points
-    'NS0':8, #start up sample number for multi-level
-    'rho':2., #robust objective std dev ratio
+    'SCPts':3, # number of SC points per direction, 2*SCPts - 1 order of SC polynomial
+    'FullFactor': False, # if using SC, this tells it to do a full factorial analysis instead
+    'NS':5, #number of sample points
+    'NS0':5, #start up sample number for multi-level
+    'rho':8., #robust objective std dev ratio
     'use-predetermined-samples':False, #input N1 at each level instead of running MLMC
     'predet-N1':[3,4,5], #user-determined N1
     'predet-a1':[1,1.1,1.2], #user-determined a1 for MFMC
     'dist':dist, #distribution to use ONLY IF running the model once
     'gridFileLevels':gridFilesML, #all available meshes for multi-level (need at least 3)
     'vartol': 2e-5, #ML variance tolerance for convergence
-    'P':600. #computational budget in seconds
+    'P':1000. #computational budget in seconds
 }
 
 aeroOptions = { #ADflow aero solver options
@@ -63,7 +65,7 @@ aeroOptions = { #ADflow aero solver options
     'outputDirectory':'./results/',
     'writeTecplotSurfaceSolution':False,
     'writeSurfaceSolution':False,
-    'writeVolumeSolution':False,
+    'writeVolumeSolution':True,
     
     # Physics Parameters
     'equationType':'RANS',
