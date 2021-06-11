@@ -34,6 +34,7 @@ class PlateComponentSC(om.ExplicitComponent):
         self.NS = self.uoptions['NS']
         self.SC = self.uoptions['SCPts']
         self.FF = self.uoptions['FullFactor']
+        self.sl = self.uoptions['ParamSlice']
         # Generate FFD and DVs
         if rank == 0:
             rank0dvg = pf.createFFD()
@@ -66,6 +67,8 @@ class PlateComponentSC(om.ExplicitComponent):
         #now do it again
         if rank == 0:
             rank0sam, rank0w = plate_sa_sc.genSC(s=self.SC, ff = self.FF)
+            if self.sl is not None:
+                rank0sam, rank0w = plate_sa_sc.genSlice(self.SC, self.sl)
         else:
             rank0sam = None
             rank0w = None
@@ -145,6 +148,7 @@ class PlateComponentSC(om.ExplicitComponent):
 
         dummy = rank
         dsum = comm.allgather(dummy)
+        sys.stdout = sys.__stdout__
 
     def setup(self):
         #initialize shape and set deformation points as inputs
@@ -167,6 +171,9 @@ class PlateComponentSC(om.ExplicitComponent):
         self.add_output('EQ', numpy.zeros(int(len(a_init['pnts'])/2)), desc="Control Point Symmetry")
         self.add_output('N1', self.NS, desc="Number of samples used")
         self.add_output('Pr', self.Pr, desc="Actual 'cost'")
+        if self.sl is not None:
+            self.add_output('OR', self.cases, desc="Slice order")
+            self.add_output('SL', self.cases, desc="Slice values")
 
     
     def setup_partials(self):
@@ -217,14 +224,15 @@ class PlateComponentSC(om.ExplicitComponent):
         #     for j in range(len(mus[i])): #range(self.nsp):
         #         sum2 += (mus[i][j]-E)**2
         V = sum2
-
+        if self.sl is not None:
+            V = 1.
         self.DVCon.evalFunctions(funcs, includeLinear=True)
         self.DVCon2.evalFunctions(funcs, includeLinear=True)
         outputs['Cd_m'] = E
         outputs['Cd_v'] = V
         outputs['Cd_s'] = math.sqrt(V)
         rho = self.uoptions['rho']
-        outputs['Cd_r'] = E + rho*math.sqrt(V)
+        outputs['Cd_r'] = rho*E + (1.-rho)*math.sqrt(V)
         if self.ooptions['use_area_con']:
             outputs['SA'] = funcs['sas']
         else:
@@ -233,7 +241,9 @@ class PlateComponentSC(om.ExplicitComponent):
         outputs['EQ'] = funcs['eqs']
         outputs['N1'] = self.NS
         outputs['Pr'] = self.Pr
-        #outputs['Cd'] = inputs['a']*inputs['a']
+        if self.sl is not None:
+            outputs['OR'] = self.cases
+            outputs['SL'] = mus
 
     def compute_partials(self, inputs, J):
 
@@ -290,7 +300,7 @@ class PlateComponentSC(om.ExplicitComponent):
         J['Cd_v','a'] = psum2
         J['Cd_s','a'] = (1./(2*math.sqrt(V)))*psum2
         rho = self.uoptions['rho']
-        J['Cd_r','a'] = psum + rho*(1./(2*math.sqrt(V)))*psum2
+        J['Cd_r','a'] = rho*psum + (1.-rho)*(1./(2*math.sqrt(V)))*psum2
         if self.ooptions['use_area_con']:
             J['SA','a'] = funcSens['sas']['pnts']
         else:

@@ -10,8 +10,10 @@ from plate_comp_opts import aeroOptions, warpOptions, optOptions
 ooptions = optOptions
 
 # Print options file
+fname = ooptions['prob_name']+'.txt'
+resfile = open(fname, 'w')
 log = open("./plate_comp_opts.py", "r").read()
-print(log)
+print(log, file = resfile)
 
 #sys.stdout = open(os.devnull, "w")
 
@@ -21,8 +23,9 @@ prob.model.add_subsystem('bump_plate', pc.PlateComponent(), promotes_inputs=['a'
 # setup the optimization
 prob.driver = om.ScipyOptimizeDriver()
 prob.driver.options['optimizer'] = 'SLSQP'
-#prob.driver.options['debug_print'] = ['desvars','objs','totals','nl_cons']
+prob.driver.options['debug_print'] = ['desvars','objs']
 prob.driver.options['tol'] = 1e-6
+prob.driver.options['maxiter'] = 100
 
 
 # design vars and objectives
@@ -40,6 +43,17 @@ if ooptions['constrain_opt']:
         prob.model.add_constraint('bump_plate.TC', lower = lbc, scaler=1)
 
 prob.model.add_constraint('bump_plate.EQ', equals = 0.0, scaler=1)
+
+# recording? 
+prob.driver.recording_options['includes'] = ['*']
+prob.driver.recording_options['record_objectives'] = True
+prob.driver.recording_options['record_constraints'] = True
+prob.driver.recording_options['record_desvars'] = True
+prob.driver.recording_options['record_inputs'] = True
+prob.driver.recording_options['record_outputs'] = True
+prob.driver.recording_options['record_residuals'] = True
+recorder = om.SqliteRecorder(ooptions['prob_name']+'.sql')
+prob.driver.add_recorder(recorder)
 
 prob.setup()
 
@@ -64,12 +78,12 @@ prob.model.list_inputs(values = False, hierarchical=False)
 prob.model.list_outputs(values = False, hierarchical=False)
 
 # minimum value
-print('WC time = %.15g' % wct)
-print('PC time = %.15g' % pct)
-print('Cd = %.15g' % prob['bump_plate.Cd'])
+print('WC time = %.15g' % wct, file = resfile)
+print('PC time = %.15g' % pct, file = resfile)
+print('Cd = %.15g' % prob['bump_plate.Cd'], file = resfile)
 if ooptions['constrain_opt']:
     if ooptions['use_area_con']:
-        print('SA = %.15g' % prob['bump_plate.SA'])
+        print('SA = %.15g' % prob['bump_plate.SA'], file = resfile)
     else:
-        print('TC = ', prob['bump_plate.TC'])
-print('Sol = ', prob['a'])
+        print('TC = ', prob['bump_plate.TC'], file = resfile)
+print('Sol = ', ','.join(map(str, prob['a'])), file = resfile)

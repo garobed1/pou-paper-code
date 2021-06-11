@@ -201,6 +201,7 @@ class PlateComponentLHS(om.ExplicitComponent):
 
         dummy = rank
         dsum = comm.allgather(dummy)
+        sys.stdout = sys.__stdout__
 
     def setup(self):
         #initialize shape and set deformation points as inputs
@@ -277,7 +278,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         outputs['Cd_v'] = V
         outputs['Cd_s'] = math.sqrt(V)
         rho = self.uoptions['rho']
-        outputs['Cd_r'] = E + rho*math.sqrt(V)
+        outputs['Cd_r'] = rho*E + (1.-rho)*math.sqrt(V)
         if self.ooptions['use_area_con']:
             outputs['SA'] = funcs['sas']
         else:
@@ -338,7 +339,7 @@ class PlateComponentLHS(om.ExplicitComponent):
         J['Cd_v','a'] = psum2
         J['Cd_s','a'] = (1./(2*math.sqrt(V)))*psum2
         rho = self.uoptions['rho']
-        J['Cd_r','a'] = psum + rho*(1./(2*math.sqrt(V)))*psum2
+        J['Cd_r','a'] = rho*psum + (1.-rho)*(1./(2*math.sqrt(V)))*psum2
         if self.ooptions['use_area_con']:
             J['SA','a'] = funcSens['sas']['pnts']
         else:

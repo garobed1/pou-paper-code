@@ -135,6 +135,7 @@ class PlateComponentMFMC(om.ExplicitComponent):
 
         dummy = rank
         dsum = comm.allgather(dummy)
+        sys.stdout = sys.__stdout__
 
     def setup(self):
         #initialize shape and set deformation points as inputs
@@ -256,7 +257,7 @@ class PlateComponentMFMC(om.ExplicitComponent):
         outputs['Cd_v'] = numpy.dot(self.a1, V) #by assumption
         outputs['Cd_s'] = math.sqrt(numpy.dot(self.a1, V))
         rho = self.uoptions['rho']
-        outputs['Cd_r'] = numpy.dot(self.a1, E) + rho*math.sqrt(numpy.dot(self.a1, V))
+        outputs['Cd_r'] = rho*numpy.dot(self.a1, E) + (1.-rho)*math.sqrt(numpy.dot(self.a1, V))
  #       import pdb; pdb.set_trace()
         if self.ooptions['use_area_con']:
             outputs['SA'] = sa
@@ -404,7 +405,7 @@ class PlateComponentMFMC(om.ExplicitComponent):
         J['Cd_v','a'] = sum(psum2)
         J['Cd_s','a'] = (1./(2*math.sqrt(numpy.dot(self.a1, V))))*sum(psum2)
         rho = self.uoptions['rho']
-        J['Cd_r','a'] = sum(psum1) + sum(psumm) + rho*(1./(2*math.sqrt(numpy.dot(self.a1, V))))*sum(psum2)
+        J['Cd_r','a'] = rho*sum(psum1) + rho*sum(psumm) + (1.-rho)*(1./(2*math.sqrt(numpy.dot(self.a1, V))))*sum(psum2)
         if self.ooptions['use_area_con']:
             J['SA','a'] = sap
         else:

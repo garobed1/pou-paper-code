@@ -36,9 +36,9 @@ class PlateComponent(om.ExplicitComponent):
         chordref = 1.0
 
         # Spalart Allmaras model constants, to be changed in UQ
-        saconstsm = [0.41, 0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0]
-        self.saconsts = saconstsm + [1.0, 2.0, 1.2, 0.5, 2.0]
-        self.aoptions['SAConsts'] = self.saconsts
+        saconstsm = [0.41, 0.1355, 0.622, 0.66666666667]
+        self.saconsts = saconstsm + [7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
+        #self.aoptions['SAConsts'] = self.saconsts
         #self.gridSol = f'{meshname}_{saconstsm}_sol'
         solname = self.ooptions['prob_name']
         self.gridSol = f'{solname}_sol'
@@ -50,6 +50,7 @@ class PlateComponent(om.ExplicitComponent):
         # Create solver
         self.CFDSolver = ADFLOW(options=self.aoptions, comm=MPI.COMM_WORLD)
         self.CFDSolver.setDVGeo(self.DVGeo)
+        self.CFDSolver.setOption('SAConsts', self.aoptions['SAConsts'])
 
         # Set up mesh warping
         self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_WORLD)

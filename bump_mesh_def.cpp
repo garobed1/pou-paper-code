@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 /* off-wall spacings */
 
 //z direction
-   double zs[2] = {1e-4,0.1};
+   double zs[2] = {2e-5,0.12};
    double Bz = 1./((nk-1)*sqrt(zs[1]*zs[0]));
 //solve transcendental equation sinh(delz)/delz = B
    int maxiter = 100;
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
    double drz = 0.0;
    double delz = 10.0;
    double rz = sinh(delz)/delz - Bz;
-   while(abs(rz) > 1e-8 && (count - maxiter) < 0)
+   while(fabs(rz) > 1e-8 && (count - maxiter) < 0)
    {
       drz = (delz*cosh(delz)-sinh(delz))/(delz*delz);
       delz = delz - rz/drz;
@@ -97,44 +97,38 @@ int main(int argc, char *argv[])
    }
 
 //x direction, 7 sections, middle section even
-   double fr[6] = {
+   double fr[4] = {
       1./10.,
-      1./6.,
       1./4.,
       3./4.,
-      5./6.,
       9./10.};
    double off1 = 30.*lX/(3.*ni); 
-   double off2 = lX/(12.*(fr[1]-fr[0])*ni);  
-   double off3 = 20.*lX/(3.*ni);     
-   double offm = lX/(3.*(fr[3]-fr[2])*ni);
-   double xs[6][2] = {
+   double off2 = lX/(6.*(fr[1]-fr[0])*ni);  
+   //double off3 = 20.*lX/(3.*ni);     
+   double offm = lX/(3.*(fr[2]-fr[1])*ni);
+   double xs[4][2] = {
    {off1,off2},
-   {off2,off3},
-   {off3,offm}, 
-   {offm,off3},
-   {off3,off2},
+   {off2,offm}, 
+   {offm,off2},
    {off2,off1}};
-   double Bx[7] = {
+   double Bx[5] = {
    1./((fr[0]-0.)*(ni-1)*sqrt(xs[0][1]*xs[0][0])),
    1./((fr[1]-fr[0])*(ni-1)*sqrt(xs[1][1]*xs[1][0])),
-   1./((fr[2]-fr[1])*(ni-1)*sqrt(xs[2][1]*xs[2][0])),
-   1./((fr[4]-fr[3])*(ni-1)*sqrt(xs[3][1]*xs[3][0])),
-   1./((fr[5]-fr[4])*(ni-1)*sqrt(xs[4][1]*xs[4][0])),
-   1./((1.-fr[5])*(ni-1)*sqrt(xs[5][1]*xs[5][0])),
-   1./((fr[3]-fr[2])*(ni-1)*sqrt(0.1*offm*offm))};
+   1./((fr[3]-fr[2])*(ni-1)*sqrt(xs[2][1]*xs[2][0])),
+   1./((1.-fr[3])*(ni-1)*sqrt(xs[3][1]*xs[3][0])),
+   1./((fr[2]-fr[1])*(ni-1)*sqrt(0.1*offm*offm))};
    
-   double delx[7];
+   double delx[5];
 
    double drx = 0.;
    double dx = 0.;
    double rx = 0.;
-   for(int nsec = 0; nsec < 7; nsec++)
+   for(int nsec = 0; nsec < 5; nsec++)
    {  
       count = 0;
-      dx = 10.;
+      dx = 5.;
       rx = sinh(dx)/dx - Bx[nsec];
-      while(abs(rx) > 1e-8 && (count - maxiter) < 0)
+      while(fabs(rx) > 1e-8 && (count - maxiter) < 0)
       {
          drx = (dx*cosh(dx)-sinh(dx))/(dx*dx);
          dx = dx - rx/drx;
@@ -208,11 +202,11 @@ int main(int argc, char *argv[])
    klo=1;
    khi=isize[0][2];
    double fr1 = fr[0];
-   double fr5 = fr[5];
+   double fr5 = fr[3];
    if (wall == 2)
    {
-      fr1 = fr[2];
-      fr5 = fr[3];
+      fr1 = fr[1];
+      fr5 = fr[2];
    }
    ihi1 = (int)(fr1*ihi);
    ihi2 = (int)(fr5*ihi);
@@ -290,7 +284,7 @@ double xDistFunc(int ind, int imax, double lX, double xs[][2], double *B, double
 {
    //first and last 7 sections of the domain are symmetry boundary conditions
    double lXpre = lX/6.;
-   double lXsec = lX/12.;
+   double lXsec = lX/6.;
    double lXbum = lX/3.;
 
    double A, u, X;
@@ -322,55 +316,32 @@ double xDistFunc(int ind, int imax, double lX, double xs[][2], double *B, double
    if((frac - fr[1]) > 0.0 && (frac - fr[2]) < 0.0)
    {
       double mid = fr[2]-fr[1];
-      A = sqrt(xs[2][1]/xs[2][0]);
-      u = 0.5*(1+tanh(del[2]*((frac-fr[1])/mid-0.5))/tanh(del[2]/2.));
-      X = lXsec*(u/(A+(1.-A)*u)) + lXsec + lXpre;
-
+      A = 1.0;
+      u = 0.5*(1+tanh(del[4]*((frac-fr[1])/mid-0.5))/tanh(del[4]/2.));
+      X = lXbum*(u/(A+(1.-A)*u)) + lXsec + lXpre;
+      //X = lXbum*((frac-fr[2])/mid) + 2*lXsec + lXpre;
    }
    if((frac - fr[2]) == 0.0)
    {
-      X = 2*lXsec + lXpre;
+      X = lXbum + lXsec + lXpre;
    }
    if((frac - fr[2]) > 0.0 && (frac - fr[3]) < 0.0)
    {
       double mid = fr[3]-fr[2];
-      A = 1.0;
-      u = 0.5*(1+tanh(del[6]*((frac-fr[2])/mid-0.5))/tanh(del[6]/2.));
-      X = lXbum*(u/(A+(1.-A)*u)) + 2*lXsec + lXpre;
-      //X = lXbum*((frac-fr[2])/mid) + 2*lXsec + lXpre;
+      A = sqrt(xs[2][1]/xs[2][0]);
+      u = 0.5*(1+tanh(del[2]*((frac-fr[2])/mid-0.5))/tanh(del[2]/2.));
+      X = lXsec*(u/(A+(1.-A)*u)) + lXbum + lXsec + lXpre;
    }
    if((frac - fr[3]) == 0.0)
    {
       X = lXbum + 2*lXsec + lXpre;
    }
-   if((frac - fr[3]) > 0.0 && (frac - fr[4]) < 0.0)
+   if((frac - fr[3]) > 0.0)
    {
-      double mid = fr[4]-fr[3];
+      double end = 1.-fr[3];
       A = sqrt(xs[3][1]/xs[3][0]);
-      u = 0.5*(1+tanh(del[3]*((frac-fr[3])/mid-0.5))/tanh(del[3]/2.));
-      X = lXsec*(u/(A+(1.-A)*u)) + lXbum + 2*lXsec + lXpre;
-   }
-   if((frac - fr[4]) == 0.0)
-   {
-      X = lXbum + 3*lXsec + lXpre;
-   }
-   if((frac - fr[4]) > 0.0 && (frac - fr[5]) < 0.0)
-   {
-      double mid = fr[5]-fr[4];
-      A = sqrt(xs[4][1]/xs[4][0]);
-      u = 0.5*(1+tanh(del[4]*((frac-fr[4])/mid-0.5))/tanh(del[4]/2.));
-      X = lXsec*(u/(A+(1.-A)*u)) + lXbum + 3*lXsec + lXpre;
-   }
-   if((frac - fr[5]) == 0.0)
-   {
-      X = lXbum + 4*lXsec + lXpre;
-   }
-   if((frac - fr[5]) > 0.0)
-   {
-      double end = 1.-fr[5];
-      A = sqrt(xs[5][1]/xs[5][0]);
-      u = 0.5*(1+tanh(del[5]*((frac-fr[5])/end-0.5))/tanh(del[5]/2.));
-      X = lXpre*(u/(A+(1.-A)*u)) + lXbum + 4*lXsec + lXpre;
+      u = 0.5*(1+tanh(del[3]*((frac-fr[3])/end-0.5))/tanh(del[3]/2.));
+      X = lXpre*(u/(A+(1.-A)*u)) + lXbum + 2*lXsec + lXpre;
    }
 
    // printf("f = %f\n", frac);

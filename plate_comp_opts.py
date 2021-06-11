@@ -1,9 +1,12 @@
-gridFile = f'test_mfmc_121_25_1.cgns'
-probName = 'resolve_astar'
+gridFile = f'paper_161_97_1.cgns'
+probName = 'test_time'
 
-astar = [0.28788225, 0.29621159, 0.34267779, 0.18972925, 0.19873263, 0.30842999,
-    0.27963309, 0.23999633, 0.28788225, 0.29621159, 0.34267779, 0.18972925,
-    0.19873263, 0.30842999, 0.27963309, 0.23999633]
+astar = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+ 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+ 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+ 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+ 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
+ 0.3, 0.3]
 
 dist = [
     [0.42015014, 0.131375,   0.6375,     0.75      ],
@@ -12,9 +15,9 @@ dist = [
     [0.45482143, 0.133625,   0.6625,     0.85      ]]
 
 gridFilesML = [
-f'test_mfmc_41_25_1.cgns',
-f'test_mfmc_81_25_1.cgns',
-f'test_mfmc_121_25_1.cgns'
+f'paper_41_25_1.cgns',
+f'paper_81_49_1.cgns',
+f'paper_161_97_1.cgns'
 ]
 
 optOptions = { #general optimization parameters
@@ -39,17 +42,18 @@ optOptions = { #general optimization parameters
 }
 
 uqOptions = { #general UQ parameters
-    'mode':'SC', # MC: Normal Monte Carlo with LHS points
+    'mode':'MC', # MC: Normal Monte Carlo with LHS points
                  # SC: Stochastic Collocation
                  # MFMC: Multi-Fidelity Monte Carlo with LHS points
                  # MLMC: Multi-Level Monte Carlo with LHS points
     'MCTimeBudget':False, #determine number of samples by time budget option 'P'
-    'MCPure':True, #don't use LHS points
-    'SCPts':3, # number of SC points per direction, 2*SCPts - 1 order of SC polynomial
+    'MCPure':False, #don't use LHS points
+    'SCPts':2, # number of SC points per direction, 2*SCPts - 1 order of SC polynomial
     'FullFactor': False, # if using SC, this tells it to do a full factorial analysis instead
-    'NS':5, #number of sample points
+    'ParamSlice':None, # if not none, take that param and compute slices, run once, and output the data
+    'NS':200, #number of sample points
     'NS0':5, #start up sample number for multi-level
-    'rho':8., #robust objective std dev ratio
+    'rho':0.9, #robust objective std dev ratio
     'use-predetermined-samples':False, #input N1 at each level instead of running MLMC
     'predet-N1':[3,4,5], #user-determined N1
     'predet-a1':[1,1.1,1.2], #user-determined a1 for MFMC
@@ -65,7 +69,7 @@ aeroOptions = { #ADflow aero solver options
     'outputDirectory':'./results/',
     'writeTecplotSurfaceSolution':False,
     'writeSurfaceSolution':False,
-    'writeVolumeSolution':True,
+    'writeVolumeSolution':False,
     
     # Physics Parameters
     'equationType':'RANS',
@@ -75,18 +79,18 @@ aeroOptions = { #ADflow aero solver options
     'eddyVisInfRatio':3.0,
     # [kappa, cb1,    cb2,   sigma,         cv1, cw2, cw3, ct1, ct2, ct3, ct4, rot]
     # [0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
-    'SAConsts':[0.41, 0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
+    'SAConsts':[0.41,  0.1355, 0.622, 0.66666666667, 0.68452995, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
     
     # Common Parameters
     'MGCycle':'sg',
     'nCycles':100000,
     'monitorvariables':['resrho','resmom','cd','resturb'],
     'useNKSolver':True,
-    'NKSwitchTol':1e-6,
+    'NKSwitchTol':1e-3,
     'NKSubspaceSize':200,
     'NKLS':'none',
     'useANKSolver':True,
-    'ANKCoupledSwitchTol':1e-5,
+    'ANKCoupledSwitchTol':1e-2,
     'ANKConstCFLStep':0.4,
     'ANKCFLLimit':1000000000.0,
     'L2Convergence':1e-12,
@@ -100,7 +104,7 @@ aeroOptions = { #ADflow aero solver options
 
     # Output
     'volumeVariables':['eddyratio','mach'],
-    'surfaceVariables':['yplus'],
+    'surfaceVariables':['yplus','cf'],
     'printIterations':False,
     'printTiming':False,
     'printWarnings':False,
