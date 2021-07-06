@@ -159,6 +159,8 @@ class PlateComponentSC(om.ExplicitComponent):
         #if self.ooptions['run_once']:
         #    a_init['pnts'] = self.ooptions['ro_shape']
         #a_init['pnts'] = numpy.multiply(mult, a_init['pnts'])
+        if self.ooptions['run_once']:
+            a_init['pnts'] = self.ooptions['ro_shape']
         self.add_input('a', a_init['pnts'], desc="Bump Shape Control Points")
         if self.ooptions['use_area_con']:
             self.add_output('SA', 1.0, desc='Surface Area Constraint')

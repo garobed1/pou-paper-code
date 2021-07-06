@@ -51,8 +51,8 @@ for i in range(nRuns):
     prob.driver = om.ScipyOptimizeDriver()
     prob.driver.options['optimizer'] = 'SLSQP'
     prob.driver.options['debug_print'] = ['desvars','objs']
-    prob.driver.options['tol'] = 1e-6
-    prob.driver.options['maxiter'] = 100
+    prob.driver.options['tol'] = 1e-9
+    prob.driver.options['maxiter'] = 200
 
     # design vars and objectives
     NV = 2*math.trunc(((1.0 - optOptions['DVFraction'])*optOptions['NX']))

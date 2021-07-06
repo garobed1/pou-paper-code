@@ -32,7 +32,6 @@ def genSC(s, ff = False):
 
     kappa = [min(kap), max(kap)]
     n = 4
-    
     # get list of all combinations
     if ff == False:
         x, y = np.polynomial.legendre.leggauss(s)
@@ -105,7 +104,7 @@ def genSlice(s, sl):
     return dist, weights
 
 
-print(genSC(2))
+#print(genSC(2))
 
 
 #print(kap)

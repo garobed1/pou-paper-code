@@ -1,13 +1,7 @@
 gridFile = f'paper_161_97_1.cgns'
-probName = 'test_time'
+probName = 'resolve_r03'
 
-astar = [0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
- 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
- 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
- 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
- 0.3, 0.3, 0.3, 0.3, 0.3, 0.3,
- 0.3, 0.3]
-
+astar = [ 0.0,0.17239651106915418,0.20712429015888176,0.22688131367599668,0.23642333604225535,0.23892007198131643,0.2292160292117148,0.20985039288528406,0.1718659117370424,0.1092663099649357,0.0,0.0,0.14922473510848966,0.1767008670828453,0.16050827368387088,0.14640292006048602,0.0,0.17239651106915418,0.20712429015888176,0.22688131367599668,0.23642333604225535,0.23892007198131643,0.2292160292117148,0.20985039288528406,0.1718659117370424,0.1092663099649357,0.0,0.0,0.14922473510848966,0.1767008670828453,0.16050827368387088,0.14640292006048602];
 dist = [
     [0.42015014, 0.131375,   0.6375,     0.75      ],
     [0.48949273, 0.135875,   0.6875,     0.95      ],
@@ -24,7 +18,7 @@ optOptions = { #general optimization parameters
     'prob_name':probName,
     'NX':20, #number of x FFD points, not necessarily the number of design vars
     'bumpBounds':[1.00, 2.00], #ends of the bump
-    'mach':0.85, #inflow mach number
+    'mach':0.875, #inflow mach number
     'Re':3000000, #inflow reynolds number
     'DVFraction':0.1, #fraction of NX on either side of bump control points not used as DVs
     'DVUpperBound':2.0,  #upper bound for control point movement
@@ -42,18 +36,18 @@ optOptions = { #general optimization parameters
 }
 
 uqOptions = { #general UQ parameters
-    'mode':'MC', # MC: Normal Monte Carlo with LHS points
+    'mode':'SC', # MC: Normal Monte Carlo with LHS points
                  # SC: Stochastic Collocation
                  # MFMC: Multi-Fidelity Monte Carlo with LHS points
                  # MLMC: Multi-Level Monte Carlo with LHS points
     'MCTimeBudget':False, #determine number of samples by time budget option 'P'
     'MCPure':False, #don't use LHS points
-    'SCPts':2, # number of SC points per direction, 2*SCPts - 1 order of SC polynomial
+    'SCPts':3, # number of SC points per direction, 2*SCPts - 1 order of SC polynomial
     'FullFactor': False, # if using SC, this tells it to do a full factorial analysis instead
     'ParamSlice':None, # if not none, take that param and compute slices, run once, and output the data
-    'NS':200, #number of sample points
+    'NS':5, #number of sample points
     'NS0':5, #start up sample number for multi-level
-    'rho':0.9, #robust objective std dev ratio
+    'rho':1.0, #robust objective std dev ratio
     'use-predetermined-samples':False, #input N1 at each level instead of running MLMC
     'predet-N1':[3,4,5], #user-determined N1
     'predet-a1':[1,1.1,1.2], #user-determined a1 for MFMC
@@ -68,8 +62,8 @@ aeroOptions = { #ADflow aero solver options
     'gridFile':gridFile,
     'outputDirectory':'./results/',
     'writeTecplotSurfaceSolution':False,
-    'writeSurfaceSolution':False,
-    'writeVolumeSolution':False,
+    'writeSurfaceSolution':True,
+    'writeVolumeSolution':True,
     
     # Physics Parameters
     'equationType':'RANS',
@@ -79,7 +73,7 @@ aeroOptions = { #ADflow aero solver options
     'eddyVisInfRatio':3.0,
     # [kappa, cb1,    cb2,   sigma,         cv1, cw2, cw3, ct1, ct2, ct3, ct4, rot]
     # [0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
-    'SAConsts':[0.41,  0.1355, 0.622, 0.66666666667, 0.68452995, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
+    'SAConsts':[0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
     
     # Common Parameters
     'MGCycle':'sg',
@@ -103,8 +97,8 @@ aeroOptions = { #ADflow aero solver options
     'adjointL2Convergence': 1e-06,
 
     # Output
-    'volumeVariables':['eddyratio','mach'],
-    'surfaceVariables':['yplus','cf'],
+    'volumeVariables':['eddyratio','mach','cp'],
+    'surfaceVariables':['yplus','cf','cp'],
     'printIterations':False,
     'printTiming':False,
     'printWarnings':False,
