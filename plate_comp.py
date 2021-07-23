@@ -14,7 +14,7 @@ class PlateComponent(om.ExplicitComponent):
     """Deterministic Bump Flow Problem"""
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
-        sys.stdout = open(os.devnull, "w")
+        #sys.stdout = open(os.devnull, "w")
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
@@ -51,7 +51,6 @@ class PlateComponent(om.ExplicitComponent):
         self.CFDSolver = ADFLOW(options=self.aoptions, comm=MPI.COMM_WORLD)
         self.CFDSolver.setDVGeo(self.DVGeo)
         self.CFDSolver.setOption('SAConsts', self.aoptions['SAConsts'])
-
         # Set up mesh warping
         self.mesh = USMesh(options=self.woptions, comm=MPI.COMM_WORLD)
         self.CFDSolver.setMesh(self.mesh)

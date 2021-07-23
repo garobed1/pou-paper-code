@@ -1,7 +1,7 @@
 # options file for the bump-in-channel validation case
 
-gridFile = f'hump2newtop_noplenumZ205x55.cgns'
-probName = 'hump_valid_5'
+gridFile = f'hump2newtop_noplenumZ103x28.cgns'
+probName = 'hump_valid_3'
 #'hump2newtop_noplenumZ103x28.cgns'
 #'hump2newtop_noplenumZ205x55.cgns'
 #'bump_struct_177x81_vol.cgns'
@@ -82,7 +82,7 @@ aeroOptions = { #ADflow aero solver options
     # Common Parameters
     'MGCycle':'sg',
     'nCycles':1000000,
-    'monitorvariables':['cd','cfx','cfy','cfz'],
+    'monitorvariables':['resrho','resmom','cd','resturb'],
     'useNKSolver':True,
     'NKSwitchTol':1e-3,
     'NKSubspaceSize':200,

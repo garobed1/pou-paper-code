@@ -1,10 +1,8 @@
 # options file for the bump-in-channel validation case
 
-gridFile = f'hump2newtop_noplenumZ205x55.cgns'
-probName = 'hump_valid_5'
-#'hump2newtop_noplenumZ103x28.cgns'
-#'hump2newtop_noplenumZ205x55.cgns'
-#'bump_struct_177x81_vol.cgns'
+gridFile = f'hump2newtop_noplenumZ103x28.cgns'
+probName = 'hump_valid'
+
 astar = [ 0.0,0.0]
 dist = [
     [0.42015014, 0.131375,   0.6375,     0.75      ],
@@ -22,7 +20,7 @@ optOptions = { #general optimization parameters
     'prob_name':probName,
     'NX':2, #number of x FFD points, not necessarily the number of design vars
     'bumpBounds':[1.00, 2.00], #ends of the bump
-    'mach':0.1, #inflow mach number
+    'mach':0.2, #inflow mach number
     'Re':936000, #inflow reynolds number
     'DVFraction':0.1, #fraction of NX on either side of bump control points not used as DVs
     'DVUpperBound':2.0,  #upper bound for control point movement
@@ -77,16 +75,15 @@ aeroOptions = { #ADflow aero solver options
     'eddyVisInfRatio':3.0,
     # [kappa, cb1,    cb2,   sigma,         cv1, cw2, cw3, ct1, ct2, ct3, ct4, rot]
     # [0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
-    #'SAConsts':[0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
+    'SAConsts':[0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
     
     # Common Parameters
     'MGCycle':'sg',
-    'nCycles':1000000,
-    'monitorvariables':['cd','cfx','cfy','cfz'],
+    'nCycles':100000,
+    'monitorvariables':['resrho','resmom','cd','resturb'],
     'useNKSolver':True,
     'NKSwitchTol':1e-3,
     'NKSubspaceSize':200,
-    'NKPCILUFill':3,
     'NKLS':'none',
     'useANKSolver':True,
     'ANKCoupledSwitchTol':1e-2,
@@ -103,7 +100,7 @@ aeroOptions = { #ADflow aero solver options
 
     # Output
     'volumeVariables':['eddyratio','mach','cp'],
-    'surfaceVariables':['yplus','cf','cp','cfx','cfy','cfz'],
+    'surfaceVariables':['yplus','cf','cp'],
     'printIterations':True,
     'printTiming':False,
     'printWarnings':False,

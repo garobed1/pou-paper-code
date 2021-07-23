@@ -1,11 +1,14 @@
 # mesh files
-*.cgns
+#*.cgns
 *.vtk
 *.plt
 *.xyz
 *.q
 *.fmt
 *.dat
+*.o
+*.out
+*.sql
 
 # misc
 *.bak
@@ -16,3 +19,6 @@
 # other files
 ffd_def.py
 ffd_def_ex.py
+*.txt
+pco_*
+rk4_*
