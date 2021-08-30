@@ -4,12 +4,13 @@ import openmdao.api as om
 import plate_ffd as pf
 import math
 import plate_sa_lhs
+import time
 from mpi4py import MPI
 from idwarp import USMesh
 from baseclasses import *
 from adflow import ADFLOW
 from pygeo import DVGeometry, DVConstraints
-from plate_comp_opts import aeroOptions, warpOptions, optOptions
+from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -23,6 +24,7 @@ class WMHComponentRobust(om.ExplicitComponent):
         self.aoptions = aeroOptions
         self.woptions = warpOptions
         self.ooptions = optOptions
+        self.uoptions = uqOptions
 
 
         # starting flat mesh
@@ -40,7 +42,8 @@ class WMHComponentRobust(om.ExplicitComponent):
 
         # Spalart Allmaras model constants, to be changed in UQ
         saconstsm = [0.41, 0.1355, 0.622, 0.66666666667]
-        self.saconsts = saconstsm + [7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
+        self.saconstsb = [7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
+        self.saconsts = saconstsm + self.saconstsb
         #self.aoptions['SAConsts'] = self.saconsts
         #self.gridSol = f'{meshname}_{saconstsm}_sol'
         solname = self.ooptions['prob_name']
@@ -66,17 +69,18 @@ class WMHComponentRobust(om.ExplicitComponent):
         # create aeroproblems 
         for i in range(self.nsp):
             namestr = self.gridSol + "_" + str(self.cases[rank][i])
-            self.aps.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, evalFuncs=['cd']))
-            self.aps[i].setBCVar("PressureStagnation", 1.007*self.ap.__dict__["P"], 'inflow')
-            self.aps[i].setBCVar("TemperatureStagnation", 1.002*self.ap.__dict__["T"], 'inflow')
+            self.aps.append(AeroProblem(name=namestr, alpha=alpha, mach=mach, reynolds=Re, reynoldsLength=Re_L, T=temp, areaRef=arearef, chordRef=chordref, evalFuncs=['cdp']))
+            self.aps[i].setBCVar("PressureStagnation", 1.007*self.aps[i].__dict__["P"], 'inflow')
+            self.aps[i].setBCVar("TemperatureStagnation", 1.002*self.aps[i].__dict__["T"], 'inflow')
             self.aps[i].setBCVar("VelocityUnitVectorX", 1.0, 'inflow')
             self.aps[i].setBCVar("VelocityUnitVectorY", 0.0, 'inflow')
             self.aps[i].setBCVar("VelocityUnitVectorY", 0.0, 'inflow')
-            self.aps[i].setBCVar("Pressure", 0.99962*self.ap.__dict__["P"], 'outflow')
+            self.aps[i].setBCVar("Pressure", 0.99962*self.aps[i].__dict__["P"], 'outflow')
         self.meshes = USMesh(options=self.woptions, comm=MPI.COMM_SELF)
 
         # Create solver
         self.solvers = ADFLOW(options=self.aoptions, comm=MPI.COMM_SELF)
+        time.sleep(0.1)
         self.solvers.setOption('SAConsts', self.saconsts)
         self.solvers.setMesh(self.meshes)
 
@@ -89,8 +93,11 @@ class WMHComponentRobust(om.ExplicitComponent):
         self.add_output('Cd_max', 0.0, desc="Drag Coefficient Maximal")
         self.add_output('Cd_min', 0.0, desc="Drag Coefficient Minimal")
 
-        self.add_output('sac_max', [], desc="SA Coeffs Maximal")
-        self.add_output('sac_min', [], desc="SA Coeffs Minimal")
+        saconstsm = [0.41, 0.1355, 0.622, 0.66666666667]
+        self.add_output('sac_max', saconstsm, desc="SA Coeffs Maximal")
+        self.add_output('sac_min', saconstsm, desc="SA Coeffs Minimal")
+        self.add_output('ind_max', 0, desc="Maximal Case")
+        self.add_output('ind_min', 0, desc="Minimal Case")
     
     def compute(self, inputs, outputs):
         # run the model
@@ -104,19 +111,22 @@ class WMHComponentRobust(om.ExplicitComponent):
             self.solvers.setOption('SAConsts', self.saconsts)
             self.solvers(self.aps[i])
             self.solvers.evalFunctions(self.aps[i], funcs)
-            astr = self.gridSol + "_" + str(self.cases[rank][i]) +"_cd"
+            astr = self.gridSol + "_" + str(self.cases[rank][i]) +"_cdp"
             musp[i] = funcs[astr]
 
         mus = comm.allgather(musp)
-        minc = min(mus)
-        maxc = max(mus)
-        index_min = min(range(len(mus)), key=mus.__getitem__)
-        index_max = max(range(len(mus)), key=mus.__getitem__)
-        
+        minc = min(map(min,mus))
+        maxc = max(map(max,mus))
+        index_min_1 = numpy.argmin(list(map(min,mus)))
+        index_max_1 = numpy.argmax(list(map(max,mus)))
+        index_min_2 = numpy.argmin(mus[index_min_1])
+        index_max_2 = numpy.argmax(mus[index_max_1])
         outputs['Cd_min'] = minc
         outputs['Cd_max'] = maxc
-        outputs['sac_min'] = self.sample[index_min]
-        outputs['sac_max'] = self.sample[index_max]
+        outputs['ind_min'] = self.cases[index_min_1][index_min_2]
+        outputs['ind_max'] = self.cases[index_max_1][index_max_2]
+        outputs['sac_min'] = self.sample[self.cases[index_min_1][index_min_2]]
+        outputs['sac_max'] = self.sample[self.cases[index_max_1][index_max_2]]
 
 
 
