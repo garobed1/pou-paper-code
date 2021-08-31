@@ -1,7 +1,7 @@
 # options file for the bump-in-channel validation case
 
 gridFile = f'hump2newtop_noplenumZ205x55.cgns'
-probName = 'hump_valid_5'
+probName = 'hump_valid_robust_2'
 #'hump2newtop_noplenumZ103x28.cgns'
 #'hump2newtop_noplenumZ205x55.cgns'
 #'bump_struct_177x81_vol.cgns'
@@ -49,7 +49,7 @@ uqOptions = { #general UQ parameters
     'SCPts':3, # number of SC points per direction, 2*SCPts - 1 order of SC polynomial
     'FullFactor': False, # if using SC, this tells it to do a full factorial analysis instead
     'ParamSlice':None, # if not none, take that param and compute slices, run once, and output the data
-    'NS':5, #number of sample points
+    'NS':40, #number of sample points
     'NS0':5, #start up sample number for multi-level
     'rho':1.0, #robust objective std dev ratio
     'use-predetermined-samples':False, #input N1 at each level instead of running MLMC
@@ -104,7 +104,7 @@ aeroOptions = { #ADflow aero solver options
     # Output
     'volumeVariables':['eddyratio','mach','cp'],
     'surfaceVariables':['yplus','cf','cp','cfx','cfy','cfz'],
-    'printIterations':True,
+    'printIterations':False,
     'printTiming':False,
     'printWarnings':False,
     'setMonitor':False

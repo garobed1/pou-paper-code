@@ -4,7 +4,16 @@ import time
 import numpy as np
 import openmdao.api as om
 import plate_comp as pc
-from plate_comp_opts import aeroOptions, warpOptions, optOptions
+
+# Get options from the python file specified in a command line argument, e.g. (plate_opts.py)
+# This file needs 'aeroOptions', 'warpOptions', 'optOptions', and 'uqOptions'
+if len(sys.argv) <= 1:
+    exit("Need to supply an options file argument")
+plate_comp_opts = __import__(sys.argv[1].replace('.py', ''))
+optOptions = plate_comp_opts.optOptions 
+aeroOptions = plate_comp_opts.aeroOptions 
+warpOptions = plate_comp_opts.warpOptions 
+uqOptions = plate_comp_opts.uqOptions 
 
 # Script to run plate optimization
 ooptions = optOptions
@@ -12,7 +21,7 @@ ooptions = optOptions
 # Print options file
 fname = ooptions['prob_name']+'.txt'
 resfile = open(fname, 'w')
-log = open("./plate_comp_opts.py", "r").read()
+log = open("./"+sys.argv[1], "r").read()
 print(log, file = resfile)
 
 #sys.stdout = open(os.devnull, "w")

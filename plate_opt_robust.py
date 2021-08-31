@@ -8,28 +8,35 @@ import plate_comp as pc
 import plate_comp_lhs as pcl
 import plate_comp_mfmc as pcf
 import plate_comp_sc as pcs
-from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
-
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
+
+# Get options from the python file specified in a command line argument, e.g. (plate_opts.py)
+# This file needs 'aeroOptions', 'warpOptions', 'optOptions', and 'uqOptions'
+if len(sys.argv) <= 1:
+    exit("Need to supply an options file argument")
+plate_comp_opts = __import__(sys.argv[1].replace('.py', ''))
+optOptions = plate_comp_opts.optOptions 
+aeroOptions = plate_comp_opts.aeroOptions 
+warpOptions = plate_comp_opts.warpOptions 
+uqOptions = plate_comp_opts.uqOptions 
 
 # Script to run plate optimization
 ooptions = optOptions
 uoptions = uqOptions
 
-fname = ooptions['prob_name']+'.txt'
-resfile = open(fname, 'w')
+# Print options file
+if rank == 0:
+    fname = ooptions['prob_name']+'.txt'
+    resfile = open(fname, 'w')
+    log = open("./"+sys.argv[1], "r").read()
+    print(log, file = resfile)
+
 nRuns = ooptions['nRuns']
 sl = uoptions['ParamSlice']
 if uoptions['mode'] == 'SC': #run only once for SC
     nRuns = 1
-
-# Print options file
-if rank == 0:
-    log = open("./plate_comp_opts.py", "r").read()
-    print(log, file = resfile)
-    print('Number of code runs = ', nRuns, file = resfile)
 
 meanm = []
 meanv = []
@@ -69,20 +76,6 @@ for i in range(nRuns):
             prob.model.add_constraint('bump_plate.TC', lower = lbc, scaler=1)
 
     prob.model.add_constraint('bump_plate.EQ', equals = 0.0, scaler=1)
-
-    # recording?
-    # if ooptions['run_once'] == False:
-    #     prob.driver.recording_options['includes'] = ['*']
-    #     prob.driver.recording_options['record_objectives'] = True
-    #     prob.driver.recording_options['record_constraints'] = True
-    #     prob.driver.recording_options['record_desvars'] = True
-    #     prob.driver.recording_options['record_inputs'] = True
-    #     prob.driver.recording_options['record_outputs'] = True
-    #     prob.driver.recording_options['record_residuals'] = True
-    #     recorder = om.SqliteRecorder(ooptions['prob_name']+'.sql')
-    #     #recorder._parallel = True
-    #     prob.driver.add_recorder(recorder)
-
 
     prob.setup()
 
