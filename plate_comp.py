@@ -8,16 +8,20 @@ from idwarp import USMesh
 from baseclasses import *
 from adflow import ADFLOW
 from pygeo import DVGeometry, DVConstraints
-from plate_comp_opts import aeroOptions, warpOptions, optOptions
+#from plate_comp_opts import aeroOptions, warpOptions, optOptions
 
 class PlateComponent(om.ExplicitComponent):
     """Deterministic Bump Flow Problem"""
+    def __init__(self, opts):
+        super().__init__()
+
+        # Get all the options we need
+        self.aoptions = opts.aeroOptions
+        self.woptions = opts.warpOptions
+        self.ooptions = opts.optOptions
+
     def initialize(self):
-        # Need to modify this dictionary when we change the SA constants
         #sys.stdout = open(os.devnull, "w")
-        self.aoptions = aeroOptions
-        self.woptions = warpOptions
-        self.ooptions = optOptions
 
         # Generate FFD and DVs
         self.DVGeo = pf.createFFD()

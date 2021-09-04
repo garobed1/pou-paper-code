@@ -48,11 +48,11 @@ for i in range(nRuns):
     #sys.stdout = open(os.devnull, "w")
     prob = om.Problem()
     if uqOptions['mode'] == 'MFMC':
-        prob.model.add_subsystem('bump_plate', pcf.PlateComponentMFMC(), promotes_inputs=['a'])
+        prob.model.add_subsystem('bump_plate', pcf.PlateComponentMFMC(plate_comp_opts), promotes_inputs=['a'])
     elif uqOptions['mode'] == 'SC':
-        prob.model.add_subsystem('bump_plate', pcs.PlateComponentSC(), promotes_inputs=['a'])
+        prob.model.add_subsystem('bump_plate', pcs.PlateComponentSC(plate_comp_opts), promotes_inputs=['a'])
     else:
-        prob.model.add_subsystem('bump_plate', pcl.PlateComponentLHS(), promotes_inputs=['a'])
+        prob.model.add_subsystem('bump_plate', pcl.PlateComponentLHS(plate_comp_opts), promotes_inputs=['a'])
 
     # setup the optimization
     prob.driver = om.ScipyOptimizeDriver()

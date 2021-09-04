@@ -27,7 +27,7 @@ print(log, file = resfile)
 #sys.stdout = open(os.devnull, "w")
 
 prob = om.Problem()
-prob.model.add_subsystem('bump_plate', pc.PlateComponent(), promotes_inputs=['a'])
+prob.model.add_subsystem('bump_plate', pc.PlateComponent(plate_comp_opts), promotes_inputs=['a'])
 
 # setup the optimization
 prob.driver = om.ScipyOptimizeDriver()

@@ -11,7 +11,7 @@ from idwarp import USMesh
 from baseclasses import *
 from adflow import ADFLOW
 from pygeo import DVGeometry, DVConstraints
-from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
+#from plate_comp_opts import aeroOptions, warpOptions, optOptions, uqOptions
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -19,14 +19,19 @@ size = comm.Get_size()
 
 class PlateComponentMLMC(om.ExplicitComponent):
     """Robust Bump Flow Problem, with LHS Multi Level Monte Carlo Samples"""
+    def __init__(self, opts):
+        super().__init__()
+
+        # Get all the options we need
+        self.aoptions = opts.aeroOptions
+        self.woptions = opts.warpOptions
+        self.ooptions = opts.optOptions
+        self.uoptions = opts.uqOptions
+
     def initialize(self):
         # Need to modify this dictionary when we change the SA constants
         #import pdb; pdb.set_trace()
         sys.stdout = open(os.devnull, "w")
-        self.aoptions = aeroOptions
-        self.woptions = warpOptions
-        self.ooptions = optOptions
-        self.uoptions = uqOptions
 
         # Generate FFD and DVs
         if rank == 0:
