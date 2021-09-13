@@ -28,7 +28,6 @@ class PlateComponent(om.ExplicitComponent):
 
         # starting flat mesh
         meshname = self.aoptions['gridFile']
-        gridFile = meshname
         
         # flow characteristics
         alpha = 0.0
@@ -80,7 +79,7 @@ class PlateComponent(om.ExplicitComponent):
         lIndex = self.CFDSolver.DVGeo.getFlattenedChildren()[1].getLocalIndex(0)
         indSetA = []
         indSetB = []
-        nXc = optOptions['NX']
+        nXc = self.ooptions['NX']
         self.NC = math.trunc(((1.0 - self.ooptions['DVFraction'])*self.ooptions['NX']))
         ind = [int(nXc/2) - int(self.NC/2), int(nXc/2) + int(self.NC/2)]
         for i in range(ind[0], ind[1]):
