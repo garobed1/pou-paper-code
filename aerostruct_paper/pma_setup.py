@@ -5,21 +5,10 @@ from tacs import TACS, elements, constitutive, functions
 
 aeroGridFile = f'wing_vol.cgns'
 probName = 'MPHYS_TEST'
-#'hump2newtop_noplenumZ103x28.cgns'
-#'hump2newtop_noplenumZ205x55.cgns'
 
 astar = [ 0.0,0.0]
-dist = [
-    [0.42015014, 0.131375,   0.6375,     0.75      ],
-    [0.48949273, 0.135875,   0.6875,     0.95      ],
-    [0.38547884, 0.129125,   0.6125,     0.65      ],
-    [0.45482143, 0.133625,   0.6625,     0.85      ]]
-
-gridFilesML = [
-f'paper_41_25_1.cgns',
-f'paper_81_49_1.cgns',
-f'paper_161_97_1.cgns'
-]
+dist = []
+gridFilesML = []
 
 optOptions = { #general optimization parameters
     'prob_name':probName,
@@ -103,8 +92,8 @@ aeroOptions = { #ADflow aero solver options
     "forcesAsTractions": False,
     
     # Design options
-    'meshSurfaceFamily':'allSurfaces',
-    'designSurfaceFamily':'allSurfaces',
+    #'meshSurfaceFamily':'allSurfaces',
+    #'designSurfaceFamily':'allSurfaces',
 
     # Adjoint options
     'adjointL2Convergence': 1e-06,

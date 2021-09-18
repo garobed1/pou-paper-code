@@ -13,12 +13,12 @@ from pygeo import DVGeometry, DVConstraints
 class PlateComponent(om.ExplicitComponent):
     """Deterministic Bump Flow Problem"""
     def __init__(self, opts):
-        super().__init__()
-
         # Get all the options we need
         self.aoptions = opts.aeroOptions
         self.woptions = opts.warpOptions
         self.ooptions = opts.optOptions
+        
+        super().__init__()
 
     def initialize(self):
         #sys.stdout = open(os.devnull, "w")
