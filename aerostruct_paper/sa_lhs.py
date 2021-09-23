@@ -43,6 +43,8 @@ def genLHS(s, mcs = False):
 
     kappa = [min(kap), max(kap)]
 
+    print(kappa)
+
     n = 4
     
     set = []
@@ -62,8 +64,7 @@ def genLHS(s, mcs = False):
     return dist
 
 
-#print(genLHS(10, mcs = False))
-#print(kap)
+print(genLHS(10, mcs = False))
 
 
 

@@ -24,18 +24,22 @@ class SampleUQGroup(MultipointParallel):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.add('sample_points', om.IndepVarComp('xi', val=np.zeros((np, 4))),
+        self.dim = len(kwargs)
+
+        # Get keywords to determine random independent inputs and their distributions (e.g. kwargs = {'kappa': [0.36814, 0.50683, 'u']}) 
+
+        # Stamp out all the points you need
+        #TODO: allow for a variable number of SA sample points, eventually incorporate other uncertainties
+        self.sample = self.generate_samples()
+        self.add('sample_points', om.IndepVarComp('xi', val=np.zeros((len(self.sample), self.dim))),
                                         promotes=['xi'])
 
         #TODO: develop an aggregate container for outputs of each sample group (e.g. drag, etc.)
-        self.add('aggregate', np.zeros(np))
-
+        self.add('aggregate', np.zeros(len(self.sample)))
 
         cycleg = self.add('multi_point', om.ParallelGroup())
 
-        #Stamp out all the points you need
-        #TODO: allow for a variable number of SA sample points, eventually incorporate other uncertainties
-        self.sample = sa_lhs.genLHS(s=np, mcs=lhs)
+        
         for i in range(np):
             s_name = 's%d'%i
             cycleg.add(s_name, om.Point(i))
@@ -45,5 +49,19 @@ class SampleUQGroup(MultipointParallel):
 
     # Generate samples and weights
     def generate_samples():
+        return 0 # This method must be overloaded
 
-            
+    def compute_statistics():
+        return 0
+
+# Monte Carlo Points
+class MonteCarloGroup(SampleUQGroup):
+
+    def __init__(self, ns, **kwargs):
+        self.ns = ns
+
+        super().__init__(**kwargs)
+
+    def generate_samples():
+        x = zeros
+        return x, w
