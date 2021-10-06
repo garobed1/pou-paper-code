@@ -78,13 +78,15 @@ int main(int argc, char *argv[])
    double Rs = 287.055; double gam = 1.4;
    double M0, M1, P0, P1, T0, T1, r0, r1;
    double a_shock, a_flow;
-   a_shock = 10.;
+   a_shock = 25.;
    M0 = 3.;
    P0 = 2919.;
    T0 = 217.;
    r0 = P0/(Rs*T0);
    impinging_shock(a_shock, M0, P0, r0, T0, a_flow, M1, P1, r1, T1, lZ);
    double a = sqrt(gam*P0/r0); //speed of sound
+
+   a_flow *= PI/180.;
 
 /* off-wall spacings */
 
@@ -306,7 +308,34 @@ int main(int argc, char *argv[])
    ipnts[1][0]=ihi;
    ipnts[1][1]=jhi;
    ipnts[1][2]=khi;
-   cg_boco_write(index_file,index_base,index_zone,"Khi",BCFarfield,PointRange,2,*ipnts,&index_bc);
+   //index_bc = 8;
+   cg_boco_write(index_file,index_base,index_zone,"Khi",BCInflowSupersonic,PointRange,2,*ipnts,&index_bc);
+   bcind = 8;
+   dsind = 1;
+   ier = cg_dataset_write(index_file,index_base,index_zone,bcind,"BCDataSet",BCInflowSupersonic,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Khi/BCDataSet/");
+   ier = cg_bcdata_write(index_file,index_base,index_zone,bcind,dsind,Dirichlet);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Khi/BCDataSet/DirichletData");
+   // data[0] = P1; 
+   // ier = cg_array_write("PressureStagnation",RealDouble,1,ids,data);
+   // data[0] = r1; 
+   // ier = cg_array_write("DensityStagnation",RealDouble,1,ids,data);
+   // data[0] = cos(a_flow); 
+   // ier = cg_array_write("VelocityUnitVectorX",RealDouble,1,ids,data);
+   // data[0] = 0.; 
+   // ier = cg_array_write("VelocityUnitVectorY",RealDouble,1,ids,data);
+   // data[0] = -sin(a_flow); 
+   // ier = cg_array_write("VelocityUnitVectorZ",RealDouble,1,ids,data);
+   data[0] = P1; 
+   ier = cg_array_write("Pressure",RealDouble,1,ids,data);
+   data[0] = r1; 
+   ier = cg_array_write("Density",RealDouble,1,ids,data);
+   data[0] = cos(a_flow)*M1*a; 
+   ier = cg_array_write("VelocityX",RealDouble,1,ids,data);
+   data[0] = 0.; 
+   ier = cg_array_write("VelocityY",RealDouble,1,ids,data);
+   data[0] = -sin(a_flow)*M1*a; 
+   ier = cg_array_write("VelocityZ",RealDouble,1,ids,data);
    cg_close(index_file);
    printf("\nSuccessfully wrote BCs to file\n");
    return 0;
