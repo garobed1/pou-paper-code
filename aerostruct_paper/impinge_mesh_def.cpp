@@ -61,9 +61,9 @@ int main(int argc, char *argv[])
    char basename[33],zonename[33];
 
 /* create gridpoints: */
-   double lX = 2.5;
+   double lX = 2.5 + 0.35;
    double lY = 1.0;
-   double lZ = 0.15;
+   double lZ;
    // ni=96;
    nj=2;
    // nk=49;
@@ -71,13 +71,14 @@ int main(int argc, char *argv[])
    cz >> nk;
    shocks >> shocka;
 
-   double x[nk*nj*ni],y[nk*nj*ni],z[nk*nj*ni];
-
+   double *x = (double*)malloc(nk*nj*ni * sizeof(*x));
+   double *y = (double*)malloc(nk*nj*ni * sizeof(*y));
+   double *z = (double*)malloc(nk*nj*ni * sizeof(*z));
 
 /* hardcode boundary settings */
    double Rs = 287.055; double gam = 1.4;
-   double M0, M1, P0, P1, T0, T1, r0, r1;
-   double a_shock, a_flow;
+   double M0, M1=2, P0, P1=4000, T0, T1=400, r0, r1=0.06;
+   double a_shock, a_flow = 10;
    a_shock = shocka;//25.;
    M0 = 3.;
    P0 = 2919.;
@@ -87,6 +88,7 @@ int main(int argc, char *argv[])
    double a = sqrt(gam*P0/r0); //speed of sound
 
    a_flow *= PI/180.;
+
 
 /* off-wall spacings */
 
@@ -111,13 +113,14 @@ int main(int argc, char *argv[])
    double zs = 2e-5;
    double dz = transcend_approx(zs);
    // OVERRIDE
-   dz = 8;
+   dz = 10;
 
 //x direction, 3 sections, middle section even
-   double fr[3] = {
+   double fr[4] = {
       1./12.,
       5./12.,
-      10./12.};
+      10./12.,
+      23./24.};
    // double off1 = 3.*lX/(ni); 
    double offm = lX/((fr[2]-fr[1])*ni);
    // double off2 = 3.*lX/((1.-fr[1])*ni);
@@ -151,7 +154,6 @@ int main(int argc, char *argv[])
    //    delx[nsec] = dx;
    // }
    
-
    for (k=0; k < nk; ++k)
    {
      for (j=0; j < nj; ++j)
@@ -168,12 +170,18 @@ int main(int argc, char *argv[])
 
 /* WRITE X, Y, Z GRID POINTS TO CGNS FILE */
 /* open CGNS file for write */
+   int ier;
+   int index_fam_1, index_fam_2, index_fam_3;
    if (cg_open(cstr,CG_MODE_WRITE,&index_file)) cg_error_exit();
 /* create base (user can give any name) */
    strcpy(basename,"Base");
    icelldim=3;
    iphysdim=3;
    cg_base_write(index_file,basename,icelldim,iphysdim,&index_base);
+/* define families */
+   ier = cg_family_write(index_file,index_base,"wall1",&index_fam_1);
+   ier = cg_family_write(index_file,index_base,"wall2",&index_fam_2);
+   ier = cg_family_write(index_file,index_base,"wall3",&index_fam_3);
 /* define zone name (user can give any name) */
    strcpy(zonename,"Zone  1");
 /* vertex size */
@@ -206,7 +214,7 @@ int main(int argc, char *argv[])
    index_base=1;
    index_zone=1;
    cg_zone_read(index_file,index_base,index_zone,zonename,*isize);
-   int ilo, ihi, jlo, jhi, ihi0, ihi1, ihi2, klo, khi;
+   int ilo, ihi, jlo, jhi, ihi0, ihi1, ihi2, ihi3, klo, khi;
    int index_bc;
    ilo=1;
    ihi=isize[0][0];
@@ -219,7 +227,7 @@ int main(int argc, char *argv[])
    ihi0 = (int)(fr[0]*ihi);
    ihi1 = (int)(fr[1]*ihi);
    ihi2 = (int)(fr[2]*ihi);
-   int ier;
+   ihi3 = (int)(fr[3]*ihi);
    int bcind;
    int dsind;
    double data[1];
@@ -290,7 +298,10 @@ int main(int argc, char *argv[])
    ipnts[1][0]=ihi1;
    ipnts[1][1]=jhi;
    ipnts[1][2]=klo;
+   //cg_fambc_write(index_file,index_base,index_fam_1,"fambc",BCWallViscousHeatFlux,&index_bc);
    cg_boco_write(index_file,index_base,index_zone,"Klo1",BCWallViscousHeatFlux,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo1/");
+   ier = cg_famname_write("wall1");
    //wall face 2
    ipnts[0][0]=ihi1;
    ipnts[0][1]=jlo;
@@ -298,15 +309,29 @@ int main(int argc, char *argv[])
    ipnts[1][0]=ihi2;
    ipnts[1][1]=jhi;
    ipnts[1][2]=klo;
+   //cg_fambc_write(index_file,index_base,index_fam_2,"fambc",BCWallViscousHeatFlux,&index_bc);
    cg_boco_write(index_file,index_base,index_zone,"Klo2",BCWallViscousHeatFlux,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo2/");
+   ier = cg_famname_write("wall2");
    //wall face 3
    ipnts[0][0]=ihi2;
+   ipnts[0][1]=jlo;
+   ipnts[0][2]=klo;
+   ipnts[1][0]=ihi3;
+   ipnts[1][1]=jhi;
+   ipnts[1][2]=klo;
+   //cg_fambc_write(index_file,index_base,index_fam_3,"fambc",BCWallViscousHeatFlux,&index_bc);
+   cg_boco_write(index_file,index_base,index_zone,"Klo3",BCWallViscousHeatFlux,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo3/");
+   ier = cg_famname_write("wall3");
+   //post wall
+   ipnts[0][0]=ihi3;
    ipnts[0][1]=jlo;
    ipnts[0][2]=klo;
    ipnts[1][0]=ihi;
    ipnts[1][1]=jhi;
    ipnts[1][2]=klo;
-   cg_boco_write(index_file,index_base,index_zone,"Klo3",BCWallViscousHeatFlux,PointRange,2,*ipnts,&index_bc);
+   cg_boco_write(index_file,index_base,index_zone,"Klo4",BCSymmetryPlane,PointRange,2,*ipnts,&index_bc);
    //upper face
    ipnts[0][0]=ilo;
    ipnts[0][1]=jlo;
@@ -316,7 +341,7 @@ int main(int argc, char *argv[])
    ipnts[1][2]=khi;
    //index_bc = 8;
    cg_boco_write(index_file,index_base,index_zone,"Khi",BCFarfield,PointRange,2,*ipnts,&index_bc);
-   bcind = 9;
+   bcind = 10;
    dsind = 1;
    ier = cg_dataset_write(index_file,index_base,index_zone,bcind,"BCDataSet",BCFarfield,&index_bc);
    ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Khi/BCDataSet/");
@@ -344,6 +369,9 @@ int main(int argc, char *argv[])
    // ier = cg_array_write("VelocityZ",RealDouble,1,ids,data);
    cg_close(index_file);
    printf("\nSuccessfully wrote BCs to file\n");
+   free(x);
+   free(y);
+   free(z);
    return 0;
 }
 
@@ -351,10 +379,11 @@ int main(int argc, char *argv[])
 double xDistFunc(int ind, int imax, double lX, double xs, double del, double *fr)
 {
    // just do three sections
-   double lXpre1 = lX*2./5.;
-   double lXpre2 = lX*2./5.;
-   double lXbum = lX*25.4/250.; // in centimeters
-   double lXpos = lX-lXbum-lXpre2-lXpre1;
+   double lXpre1 = 1.0;
+   double lXpre2 = 1.0;
+   double lXbum = 0.254; // in centimeters
+   double lXpos = 2.5-lXbum-lXpre2-lXpre1;
+   double lXpos2 = 2.85-2.5;
 
    double t, X;
    //points up to leading edge
@@ -391,9 +420,9 @@ double xDistFunc(int ind, int imax, double lX, double xs, double del, double *fr
    {
       X = lXbum + lXpre1 + lXpre2;
    }
-   if((frac - fr[2]) > 0.0)
+   if((frac - fr[2]) > 0.0 && (frac - fr[3]) < 0.0) 
    {
-      double mid = 1.0-fr[2];
+      double mid = fr[3]-fr[2];
       // A = 1.0;
       // u = 0.5*(1+tanh(del[1]*((frac-fr[1])/mid-0.5))/tanh(del[1]/2.));
       // X = lXpos*(u/(A+(1.-A)*u)) + lXbum + lXpre;
@@ -402,6 +431,21 @@ double xDistFunc(int ind, int imax, double lX, double xs, double del, double *fr
       //double t = 1. + tan(del*((frac-fr[1])/mid - 1.))/tan(del);
       t = sinh(del*((frac-fr[2])/mid))/sinh(del);
       X = lXpos*t + lXbum + lXpre1 + lXpre2;
+   }
+   if((frac - fr[3]) == 0.0)
+   {
+      X = lXpos + lXbum + lXpre1 + lXpre2;
+   }
+   if((frac - fr[3]) > 0.0) 
+   {
+      double mid = 1.0 - fr[3];
+      // A = 1.0;
+      // u = 0.5*(1+tanh(del[1]*((frac-fr[1])/mid-0.5))/tanh(del[1]/2.));
+      // X = lXpos*(u/(A+(1.-A)*u)) + lXbum + lXpre;
+      //X = lXbum*((frac-fr[2])/mid) + 2*lXsec + lXpre;
+
+      //double t = 1. + tan(del*((frac-fr[1])/mid - 1.))/tan(del);
+      X = lXpos2*(frac - fr[3])/mid  + lXpos + lXbum + lXpre1 + lXpre2;
    }
 
    // printf("f = %f\n", frac);
