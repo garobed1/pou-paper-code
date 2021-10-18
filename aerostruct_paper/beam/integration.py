@@ -99,5 +99,5 @@ def GaussQuad(n):
     return xi, w
 
 
-print(CalcElemStiff(10, 4, 3, 2))
-print(CalcElemLoad(4, 3, 2))
+# print(CalcElemStiff(10, 4, 3, 2))
+# print(CalcElemLoad(4, 3, 2))
