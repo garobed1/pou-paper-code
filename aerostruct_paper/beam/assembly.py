@@ -28,6 +28,10 @@ def StiffAssemble(L, E, Iyy, Nelem):
     Aelem = CalcElemStiff(E, Iyy[0], Iyy[1], dx)
     A[0:2, 0:2] += Aelem[2:4, 2:4]
 
+    # fix at both ends? 
+    Aelem = CalcElemStiff(E, Iyy[Nelem-1], Iyy[Nelem], dx)
+    A[(2*Nelem)-2:(2*Nelem), (2*Nelem)-2:(2*Nelem)] += Aelem[0:2, 0:2]
+
     Asp = sps.csr_matrix(A)
     return Asp
 
@@ -54,5 +58,9 @@ def LoadAssemble(L, f, Nelem):
     # boundary in here for now, fixed at left end
     belem = CalcElemLoad(f[0], f[1], dx)
     b[0:1] += belem[2:3]
+
+    # fix at both ends? 
+    belem = CalcElemLoad(f[Nelem-1], f[Nelem], dx)
+    b[(2*Nelem)-2:(2*Nelem)] += belem[0:2]
 
     return b

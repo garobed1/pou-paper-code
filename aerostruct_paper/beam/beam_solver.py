@@ -55,6 +55,7 @@ class EulerBeamSolver():
 
         # solution vector
         self.u = None
+        self.res = None
 
         # call setup if we have settings
         if(settings):
@@ -68,13 +69,23 @@ class EulerBeamSolver():
         if(self.req_update):
             self.assemble
 
-        import pdb; pdb.set_trace()
-
         # solve
         self.u = spsolve(self.A, self.b)
 
-        import pdb; pdb.set_trace()
+        return self.u
 
+    def getResidual(self):
+
+        if(self.req_setup):
+            Error("Must call setup(settings) at least once before attemping to solve")
+
+        if(self.req_update):
+            self.assemble
+
+        # multiply through
+        self.res = self.A*self.u - self.b
+
+        return self.res
 
     def setup(self, settings):
 
@@ -84,6 +95,15 @@ class EulerBeamSolver():
         self.E = settings["E"]
         self.force = settings["force"]
         self.Iyy = settings["Iyy"]
+
+        self.u = np.zeros(2*self.Nelem)
+        self.res = np.zeros(2*self.Nelem)
+
+        if(self.Iyy == None):
+            if "th" in settings:
+                self.computeRectMoment(settings["th"])
+            else:
+                Error("If Iyy not supplied directly, we must compute it from th")
 
         # assemble matrix and load vector
         self.assemble()
@@ -112,6 +132,18 @@ class EulerBeamSolver():
         self.Iyy = Iyy
         self.req_update = True
 
+    def computeRectMoment(self, th):
+
+        # Compute moment of an (infinitely) rectangular beam, given thickness
+
+        # technically moment per unit length, since Iyy = w*h^3/12, and width goes "into page"
+        Iyy = np.zeros(self.Nelem + 1)
+
+        for i in range(self.Nelem + 1):
+            Iyy[i] = th[i]*th[i]*th[i]/12.
+
+        self.setIyy(Iyy)
+
 
 settings = {
     "name":"hello",
@@ -119,10 +151,13 @@ settings = {
     "L":4,
     "E":300,
     "force":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    "Iyy":[10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+    "Iyy":None,
+    "th":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 }
 
 beamsolve = EulerBeamSolver(settings)
+
+beamsolve.getResidual()
 
 beamsolve()
 
