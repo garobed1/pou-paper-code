@@ -40,6 +40,7 @@ class EulerBeamSolver():
         # flags
         self.req_update = True
         self.req_setup = True
+        self.req_solve = True
 
         # variables
         self.name = None
@@ -72,6 +73,15 @@ class EulerBeamSolver():
         # solve
         self.u = spsolve(self.A, self.b)
 
+        self.req_solve = False
+
+        return self.u
+
+    def getSolution(self):
+
+        if(self.req_solve):
+            self.__call__()
+
         return self.u
 
     def getResidual(self):
@@ -95,9 +105,15 @@ class EulerBeamSolver():
         self.E = settings["E"]
         self.force = settings["force"]
         self.Iyy = settings["Iyy"]
+        
+        #set left bound of beam in x just for mesh transfer purposes
+        if "bounds" in settings:
+            self.bounds = [settings["l_bound"], settings["l_bound"] + self.L ] 
+        else:
+            self.bounds = [0.0, self.L]
 
-        self.u = np.zeros(2*self.Nelem)
-        self.res = np.zeros(2*self.Nelem)
+        self.u = np.zeros(2*(self.Nelem-1))
+        self.res = np.zeros(2*(self.Nelem-1))
 
         if(self.Iyy == None):
             if "th" in settings:
@@ -126,11 +142,13 @@ class EulerBeamSolver():
 
         self.force = force
         self.req_update = True
+        self.req_solve = True
 
     def setIyy(self, Iyy):
 
         self.Iyy = Iyy
         self.req_update = True
+        self.req_solve = True
 
     def computeRectMoment(self, th):
 
@@ -144,6 +162,17 @@ class EulerBeamSolver():
 
         self.setIyy(Iyy)
 
+    def getMeshPoints(self):
+
+        # Return mesh node locations in space
+
+        pts = np.zeros(self.Nelem+1)
+        dx = self.L/self.Nelem
+        for i in range(pts.size):
+            pts[i] = self.bounds[0] + i*dx
+
+        return pts
+
 
 settings = {
     "name":"hello",
@@ -155,9 +184,9 @@ settings = {
     "th":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 }
 
-beamsolve = EulerBeamSolver(settings)
+# beamsolve = EulerBeamSolver(settings)
 
-beamsolve.getResidual()
+# beamsolve.getResidual()
 
-beamsolve()
+# beamsolve()
 

@@ -224,10 +224,10 @@ int main(int argc, char *argv[])
    khi=isize[0][2];
    // double fr1 = fr[0];
    // double fr5 = 1.0;
-   ihi0 = (int)(fr[0]*ihi);
-   ihi1 = (int)(fr[1]*ihi);
-   ihi2 = (int)(fr[2]*ihi);
-   ihi3 = (int)(fr[3]*ihi);
+   ihi0 = (int)(fr[0]*ihi+1);
+   ihi1 = (int)(fr[1]*ihi+1);
+   ihi2 = (int)(fr[2]*ihi+1);
+   ihi3 = (int)(fr[3]*ihi+1);
    int bcind;
    int dsind;
    double data[1];

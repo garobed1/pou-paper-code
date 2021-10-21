@@ -15,11 +15,11 @@ def StiffAssemble(L, E, Iyy, Nelem):
         A - sparse global stiffness matrix
     """
 
-    A = np.zeros([2*(Nelem),2*(Nelem)])
+    A = np.zeros([2*(Nelem-1),2*(Nelem-1)])
 
     dx = L/Nelem
     # interior loop
-    for i in range(2,Nelem+1):
+    for i in range(2,Nelem):
         Aelem = CalcElemStiff(E, Iyy[i-1], Iyy[i], dx)
         A[(i-2)*2:i*2, (i-2)*2:i*2] += Aelem
     
@@ -30,7 +30,7 @@ def StiffAssemble(L, E, Iyy, Nelem):
 
     # fix at both ends? 
     Aelem = CalcElemStiff(E, Iyy[Nelem-1], Iyy[Nelem], dx)
-    A[(2*Nelem)-2:(2*Nelem), (2*Nelem)-2:(2*Nelem)] += Aelem[0:2, 0:2]
+    A[(2*(Nelem-1))-2:(2*(Nelem-1)), (2*(Nelem-1))-2:(2*(Nelem-1))] += Aelem[0:2, 0:2]
 
     Asp = sps.csr_matrix(A)
     return Asp
@@ -47,11 +47,11 @@ def LoadAssemble(L, f, Nelem):
         b - global load vector
     """
 
-    b = np.zeros(2*(Nelem))
+    b = np.zeros(2*(Nelem-1))
 
     dx = L/Nelem
     # interior loop
-    for i in range(2,Nelem+1):
+    for i in range(2,Nelem):
         belem = CalcElemLoad(f[i-1], f[i], dx)
         b[(i-2)*2:i*2] += belem
 
@@ -61,6 +61,6 @@ def LoadAssemble(L, f, Nelem):
 
     # fix at both ends? 
     belem = CalcElemLoad(f[Nelem-1], f[Nelem], dx)
-    b[(2*Nelem)-2:(2*Nelem)] += belem[0:2]
+    b[(2*(Nelem-1))-2:(2*(Nelem-1))] += belem[0:2]
 
     return b
