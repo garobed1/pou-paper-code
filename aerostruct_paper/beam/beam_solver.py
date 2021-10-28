@@ -74,7 +74,6 @@ class EulerBeamSolver():
         self.u = spsolve(self.A, self.b)
 
         self.req_solve = False
-
         return self.u
 
     def getSolution(self):
@@ -107,7 +106,7 @@ class EulerBeamSolver():
         self.Iyy = settings["Iyy"]
         
         #set left bound of beam in x just for mesh transfer purposes
-        if "bounds" in settings:
+        if "l_bound" in settings:
             self.bounds = [settings["l_bound"], settings["l_bound"] + self.L ] 
         else:
             self.bounds = [0.0, self.L]

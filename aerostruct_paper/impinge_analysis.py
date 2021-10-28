@@ -1,3 +1,4 @@
+import imp
 import numpy as np
 import argparse
 from mpi4py import MPI
@@ -13,6 +14,7 @@ from mphys.scenario_aerostructural import ScenarioAeroStructural
 # these imports will be from the respective codes' repos rather than mphys
 from mphys.mphys_adflow import ADflowBuilder
 from mphys_eb import EBBuilder
+from mphys_onetoone import OTOBuilder
 from mphys.mphys_meld import MeldBuilder
 #from mphys.mphys_rlt import RltBuilder
 
@@ -27,16 +29,6 @@ import impinge_setup
 comm = MPI.COMM_WORLD
 rank = comm.rank
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--xfer", default="meld", choices=["meld", "rlt"])
-args = parser.parse_args()
-
-if args.xfer == "meld":
-    forcesAsTractions = False
-else:
-    forcesAsTractions = True
-
-
 class Top(Multipoint):
     def setup(self):
 
@@ -44,10 +36,12 @@ class Top(Multipoint):
         # ADflow Setup
         ################################################################################
         aero_options = impinge_setup.aeroOptions
+        warp_options = impinge_setup.warpOptions
 
-        aero_builder = ADflowBuilder(aero_options, scenario="aerostructural")
+        aero_builder = ADflowBuilder(options=aero_options,  scenario="aerostructural") #mesh_options=warp_options,
         aero_builder.initialize(self.comm)
         aero_builder.solver.addFunction('cdv','wall2','cd_def')
+
         self.add_subsystem("mesh_aero", aero_builder.get_mesh_coordinate_subsystem())
 
         ################################################################################
@@ -65,9 +59,15 @@ class Top(Multipoint):
         # Transfer Scheme Setup
         ################################################################################
 
-        isym = 1
-        ldxfer_builder = MeldBuilder(aero_builder, struct_builder, isym=isym)
-        ldxfer_builder.initialize(self.comm)
+        self.onetoone = True
+
+        if(self.onetoone):
+            ldxfer_builder = OTOBuilder(aero_builder, struct_builder)
+            ldxfer_builder.initialize(self.comm)
+        else:
+            isym = 0
+            ldxfer_builder = MeldBuilder(aero_builder, struct_builder, isym=isym)
+            ldxfer_builder.initialize(self.comm)
 
         ################################################################################
         # MPHYS Setup
@@ -120,7 +120,7 @@ prob = om.Problem()
 prob.model = Top()
 model = prob.model
 prob.setup()
-om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html" % args.xfer)
+om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
 prob.run_model()
 
 prob.model.list_outputs()

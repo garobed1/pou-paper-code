@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 /* WRITE X, Y, Z GRID POINTS TO CGNS FILE */
 /* open CGNS file for write */
    int ier;
-   int index_fam_1, index_fam_2, index_fam_3;
+   int index_fam_1, index_fam_2, index_fam_3, index_fam_4, index_fam_5, index_fam_6, index_fam_7;
    if (cg_open(cstr,CG_MODE_WRITE,&index_file)) cg_error_exit();
 /* create base (user can give any name) */
    strcpy(basename,"Base");
@@ -182,6 +182,10 @@ int main(int argc, char *argv[])
    ier = cg_family_write(index_file,index_base,"wall1",&index_fam_1);
    ier = cg_family_write(index_file,index_base,"wall2",&index_fam_2);
    ier = cg_family_write(index_file,index_base,"wall3",&index_fam_3);
+   ier = cg_family_write(index_file,index_base,"symp1",&index_fam_4);
+   ier = cg_family_write(index_file,index_base,"symp2",&index_fam_5);
+   ier = cg_family_write(index_file,index_base,"syms1",&index_fam_6);
+   ier = cg_family_write(index_file,index_base,"syms2",&index_fam_7);
 /* define zone name (user can give any name) */
    strcpy(zonename,"Zone  1");
 /* vertex size */
@@ -275,6 +279,8 @@ int main(int argc, char *argv[])
    ipnts[1][1]=jlo;
    ipnts[1][2]=khi;
    cg_boco_write(index_file,index_base,index_zone,"Jlo",BCSymmetryPlane,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Jlo/");
+   ier = cg_famname_write("syms1");
    //symmetry face 2
    ipnts[0][0]=ilo;
    ipnts[0][1]=jhi;
@@ -283,6 +289,8 @@ int main(int argc, char *argv[])
    ipnts[1][1]=jhi;
    ipnts[1][2]=khi;
    cg_boco_write(index_file,index_base,index_zone,"Jhi",BCSymmetryPlane,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Jhi/");
+   ier = cg_famname_write("syms2");
    //pre wall
    ipnts[0][0]=ilo;
    ipnts[0][1]=jlo;
@@ -290,7 +298,9 @@ int main(int argc, char *argv[])
    ipnts[1][0]=ihi0;
    ipnts[1][1]=jhi;
    ipnts[1][2]=klo;
-   cg_boco_write(index_file,index_base,index_zone,"Klo0",BCSymmetryPlane,PointRange,2,*ipnts,&index_bc);
+   cg_boco_write(index_file,index_base,index_zone,"Klo0",BCWallInviscid,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo0/");
+   ier = cg_famname_write("symp1");
    //wall face 1
    ipnts[0][0]=ihi0;
    ipnts[0][1]=jlo;
@@ -331,7 +341,9 @@ int main(int argc, char *argv[])
    ipnts[1][0]=ihi;
    ipnts[1][1]=jhi;
    ipnts[1][2]=klo;
-   cg_boco_write(index_file,index_base,index_zone,"Klo4",BCSymmetryPlane,PointRange,2,*ipnts,&index_bc);
+   cg_boco_write(index_file,index_base,index_zone,"Klo4",BCWallInviscid,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo4/");
+   ier = cg_famname_write("symp2");
    //upper face
    ipnts[0][0]=ilo;
    ipnts[0][1]=jlo;
