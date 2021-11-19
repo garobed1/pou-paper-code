@@ -66,9 +66,8 @@ class EulerBeamSolver():
 
         if(self.req_setup):
             Error("Must call setup(settings) at least once before attemping to solve")
-
         if(self.req_update):
-            self.assemble
+            self.assemble()
 
         # solve
         self.u = spsolve(self.A, self.b)
@@ -89,7 +88,7 @@ class EulerBeamSolver():
             Error("Must call setup(settings) at least once before attemping to solve")
 
         if(self.req_update):
-            self.assemble
+            self.assemble()
 
         # multiply through
         self.res = self.A*self.u - self.b
@@ -131,7 +130,6 @@ class EulerBeamSolver():
         self.b = asm.LoadAssemble(self.L, self.force, self.Nelem)
 
         # need to find a way to apply BCs
-
         # set flag when the system is assembled
         self.req_update = False
 
@@ -173,19 +171,27 @@ class EulerBeamSolver():
         return pts
 
 
-settings = {
-    "name":"hello",
-    "Nelem":10,
-    "L":4,
-    "E":300,
-    "force":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    "Iyy":None,
-    "th":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-}
+# settings = {
+#     # "name":"hello",
+#     # "Nelem":10,
+#     # "L":4,
+#     # "E":300,
+#     # "force":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+#     # "Iyy":None,
+#     # "th":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+#     "name":"hello",
+#     "Nelem":60,
+#     "L":0.254, #0.254, 
+#     "E":400000,
+#     "force":np.ones(61)*1.0,
+#     "Iyy":None,
+#     "th":np.ones(61)*0.01,
+#     "l_bound":2.0,
+#     "get_funcs":None
+# }
 
 # beamsolve = EulerBeamSolver(settings)
 
 # beamsolve.getResidual()
 
 # beamsolve()
-

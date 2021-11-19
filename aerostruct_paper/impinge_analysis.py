@@ -125,5 +125,6 @@ prob.run_model()
 
 prob.model.list_outputs()
 
-if MPI.COMM_WORLD.rank == 0:
-    print("cd =", prob["test.aero_post.cd"])
+# if MPI.COMM_WORLD.rank == 0:
+#     #print("cd = ", prob["test.aero_post.cd_def"])
+#     prob.model.
