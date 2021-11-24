@@ -33,46 +33,62 @@ double zDistFunc(int ind, int imax, double lX, double xs, double del);
 
 double transcend_approx(double y);
 
-void impinging_shock(double th_shock, double M0, double P0, double r0, double T0, 
-                        double &lZ, double &a_shock, double &M1, double &P1, double &r1, double &T1);
+void impinging_shock(double a_flow, double M0, double P0, double r0, double T0, 
+                     double &a_shock, double &M1, double &P1, double &r1, double &T1, double &lZ);
 
 int main(int argc, char *argv[])
 {
    // parse options
    if(argc != 5)
    {
-      printf("Incorrect number of arguments: Need -nx, -nz, -wall, name \n");
+      printf("Incorrect number of arguments: Need -nx, -nz, -shock, name \n");
       return 1;
    }
    std::stringstream cx{argv[1]};   
    std::stringstream cz{argv[2]};
-   std::stringstream walls{argv[3]};
+   std::stringstream shocks{argv[3]};
    std::stringstream name{argv[4]};
-   const std::string names = name.str() + "_" + cx.str() + "_" + cz.str() + "_" + walls.str() + ".cgns";
+   const std::string names = name.str() + "_" + cx.str() + "_" + cz.str() + "_" + shocks.str() + ".cgns";
    const char* cstr = names.c_str();
 
    cgsize_t isize[3][3];
    cgsize_t ipnts[3][3];
-   cgsize_t dim;
-   double data[1];
+   cgsize_t ids[1]; ids[0] = 1;
    int ni,nj,nk,i,j,k;
-   int wall;
+   double shocka;
    int index_file,icelldim,iphysdim,index_base;
    int index_zone,index_coord;
    char basename[33],zonename[33];
 
 /* create gridpoints: */
-   double lX = 2.5;
+   double lX = 2.5 + 0.35;
    double lY = 1.0;
-   double lZ;// = 0.15;
+   double lZ;
    // ni=96;
    nj=2;
    // nk=49;
    cx >> ni;
    cz >> nk;
-   walls >> wall;
+   shocks >> shocka;
 
-   double x[nk*nj*ni],y[nk*nj*ni],z[nk*nj*ni];
+   double *x = (double*)malloc(nk*nj*ni * sizeof(*x));
+   double *y = (double*)malloc(nk*nj*ni * sizeof(*y));
+   double *z = (double*)malloc(nk*nj*ni * sizeof(*z));
+
+/* hardcode boundary settings */
+   double Rs = 287.055; double gam = 1.4;
+   double M0, M1=2, P0, P1=4000, T0, T1=400, r0, r1=0.06;
+   double a_shock, a_flow = 10;
+   a_shock = shocka;//25.;
+   M0 = 3.;
+   P0 = 2919.;
+   T0 = 217.;
+   r0 = P0/(Rs*T0);
+   impinging_shock(a_shock, M0, P0, r0, T0, a_flow, M1, P1, r1, T1, lZ);
+   double a = sqrt(gam*P0/r0); //speed of sound
+
+   a_flow *= PI/180.;
+
 
 /* off-wall spacings */
 
@@ -96,20 +112,17 @@ int main(int argc, char *argv[])
 //    }
    double zs = 2e-5;
    double dz = transcend_approx(zs);
-   
+   // OVERRIDE
+   dz = 10;
 
 //x direction, 3 sections, middle section even
-   double lXpre = lX*4./5.;
-   double lXbum = lX*25.4/250.; // in centimeters
-   double lXpos = lX-lXbum-lXpre;
-   double fr[2] = {
+   double fr[4] = {
+      1./12.,
       5./12.,
-      10./12.};
+      10./12.,
+      23./24.};
    // double off1 = 3.*lX/(ni); 
-   double offm1 = lXbum/((fr[1]-fr[0])*ni);
-   double offm2 = lXbum/((fr[1]-fr[0])*ni);
-   offm1 *= (fr[0]-0.)*ni/lXpre;
-   offm2 *= (1.-fr[1])*ni/lXpos;
+   double offm = lX/((fr[2]-fr[1])*ni);
    // double off2 = 3.*lX/((1.-fr[1])*ni);
    // double xs[2][2] = {
    // {off1,offm}, 
@@ -156,7 +169,6 @@ int main(int argc, char *argv[])
    //    delx[nsec] = dx;
    // }
    
-
    for (k=0; k < nk; ++k)
    {
      for (j=0; j < nj; ++j)
@@ -173,12 +185,22 @@ int main(int argc, char *argv[])
 
 /* WRITE X, Y, Z GRID POINTS TO CGNS FILE */
 /* open CGNS file for write */
+   int ier;
+   int index_fam_1, index_fam_2, index_fam_3, index_fam_4, index_fam_5, index_fam_6, index_fam_7;
    if (cg_open(cstr,CG_MODE_WRITE,&index_file)) cg_error_exit();
 /* create base (user can give any name) */
    strcpy(basename,"Base");
    icelldim=3;
    iphysdim=3;
    cg_base_write(index_file,basename,icelldim,iphysdim,&index_base);
+/* define families */
+   ier = cg_family_write(index_file,index_base,"wall1",&index_fam_1);
+   ier = cg_family_write(index_file,index_base,"wall2",&index_fam_2);
+   ier = cg_family_write(index_file,index_base,"wall3",&index_fam_3);
+   ier = cg_family_write(index_file,index_base,"symp1",&index_fam_4);
+   ier = cg_family_write(index_file,index_base,"symp2",&index_fam_5);
+   ier = cg_family_write(index_file,index_base,"syms1",&index_fam_6);
+   ier = cg_family_write(index_file,index_base,"syms2",&index_fam_7);
 /* define zone name (user can give any name) */
    strcpy(zonename,"Zone  1");
 /* vertex size */
@@ -211,25 +233,23 @@ int main(int argc, char *argv[])
    index_base=1;
    index_zone=1;
    cg_zone_read(index_file,index_base,index_zone,zonename,*isize);
-   int ilo, ihi, jlo, jhi, ihi1, ihi2, klo, khi;
-   int index_bc, index_ds;
-   int ier;
+   int ilo, ihi, jlo, jhi, ihi0, ihi1, ihi2, ihi3, klo, khi;
+   int index_bc;
    ilo=1;
    ihi=isize[0][0];
    jlo=1;
    jhi=isize[0][1];
    klo=1;
    khi=isize[0][2];
-   double fr1 = 0.0;
-   double fr5 = 1.0;
-   if (wall == 2)
-   {
-      fr1 = fr[0];
-      fr5 = fr[1];
-   }
-   ihi1 = (int)(fr1*ihi);
-   ihi2 = (int)(fr5*ihi);
-
+   // double fr1 = fr[0];
+   // double fr5 = 1.0;
+   ihi0 = (int)(fr[0]*ihi+1);
+   ihi1 = (int)(fr[1]*ihi+1);
+   ihi2 = (int)(fr[2]*ihi+1);
+   ihi3 = (int)(fr[3]*ihi+1);
+   int bcind;
+   int dsind;
+   double data[1];
    //inlet face
    ipnts[0][0]=ilo;
    ipnts[0][1]=jlo;
@@ -237,21 +257,27 @@ int main(int argc, char *argv[])
    ipnts[1][0]=ilo;
    ipnts[1][1]=jhi;
    ipnts[1][2]=khi;
-   index_bc = 1;
-   index_ds = 1;
-   dim = 1;
-   data[0] = 1.0;
    cg_boco_write(index_file,index_base,index_zone,"Ilo",BCInflowSupersonic,PointRange,2,*ipnts,&index_bc);
-   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Ilo");
-   ier = cg_dataset_write(index_file,index_base,index_zone,index_bc,"inflow",BCDirichlet,&index_ds);
-   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Ilo/inflow");
-   ier = cg_bcdata_write(index_file,index_base,index_zone,index_bc,index_ds,Dirichlet);
-   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Ilo/inflow/DirichletData");
-   data[0] = P0; ier = cg_array_write("Pressure",RealDouble,1,&dim,data);
-   data[0] = r0; ier = cg_array_write("Density",RealDouble,1,&dim,data);
-   data[0] = M0*c; ier = cg_array_write("VelocityX",RealDouble,1,&dim,data);
-   data[0] = 0.; ier = cg_array_write("VelocityY",RealDouble,1,&dim,data);
-   data[0] = 0.; ier = cg_array_write("VelocityZ",RealDouble,1,&dim,data);
+   //write inlet conditions
+   bcind = 1;
+   dsind = 1;
+   ier = cg_dataset_write(index_file,index_base,index_zone,bcind,"BCDataSet",BCInflowSupersonic,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Ilo/BCDataSet/");
+   ier = cg_bcdata_write(index_file,index_base,index_zone,bcind,dsind,Dirichlet);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Ilo/BCDataSet/DirichletData");
+   data[0] = P0; 
+   ier = cg_array_write("Pressure",RealDouble,1,ids,data);
+   data[0] = r0; 
+   ier = cg_array_write("Density",RealDouble,1,ids,data);
+   data[0] = M0*a; 
+   ier = cg_array_write("VelocityX",RealDouble,1,ids,data);
+   data[0] = 0.; 
+   ier = cg_array_write("VelocityY",RealDouble,1,ids,data);
+   data[0] = 0.; 
+   ier = cg_array_write("VelocityZ",RealDouble,1,ids,data);
+
+
+   
    //outlet face
    ipnts[0][0]=ihi;
    ipnts[0][1]=jlo;
@@ -268,6 +294,8 @@ int main(int argc, char *argv[])
    ipnts[1][1]=jlo;
    ipnts[1][2]=khi;
    cg_boco_write(index_file,index_base,index_zone,"Jlo",BCSymmetryPlane,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Jlo/");
+   ier = cg_famname_write("syms1");
    //symmetry face 2
    ipnts[0][0]=ilo;
    ipnts[0][1]=jhi;
@@ -276,14 +304,29 @@ int main(int argc, char *argv[])
    ipnts[1][1]=jhi;
    ipnts[1][2]=khi;
    cg_boco_write(index_file,index_base,index_zone,"Jhi",BCSymmetryPlane,PointRange,2,*ipnts,&index_bc);
-   //wall face 1
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Jhi/");
+   ier = cg_famname_write("syms2");
+   //pre wall
    ipnts[0][0]=ilo;
+   ipnts[0][1]=jlo;
+   ipnts[0][2]=klo;
+   ipnts[1][0]=ihi0;
+   ipnts[1][1]=jhi;
+   ipnts[1][2]=klo;
+   cg_boco_write(index_file,index_base,index_zone,"Klo0",BCWallInviscid,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo0/");
+   ier = cg_famname_write("symp1");
+   //wall face 1
+   ipnts[0][0]=ihi0;
    ipnts[0][1]=jlo;
    ipnts[0][2]=klo;
    ipnts[1][0]=ihi1;
    ipnts[1][1]=jhi;
    ipnts[1][2]=klo;
-   cg_boco_write(index_file,index_base,index_zone,"Klo1",BCWallInviscid,PointRange,2,*ipnts,&index_bc);
+   //cg_fambc_write(index_file,index_base,index_fam_1,"fambc",BCWallViscousHeatFlux,&index_bc);
+   cg_boco_write(index_file,index_base,index_zone,"Klo1",BCWallViscousHeatFlux,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo1/");
+   ier = cg_famname_write("wall1");
    //wall face 2
    ipnts[0][0]=ihi1;
    ipnts[0][1]=jlo;
@@ -291,15 +334,31 @@ int main(int argc, char *argv[])
    ipnts[1][0]=ihi2;
    ipnts[1][1]=jhi;
    ipnts[1][2]=klo;
-   cg_boco_write(index_file,index_base,index_zone,"Klo2",BCWallInviscid,PointRange,2,*ipnts,&index_bc);
+   //cg_fambc_write(index_file,index_base,index_fam_2,"fambc",BCWallViscousHeatFlux,&index_bc);
+   cg_boco_write(index_file,index_base,index_zone,"Klo2",BCWallViscousHeatFlux,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo2/");
+   ier = cg_famname_write("wall2");
    //wall face 3
    ipnts[0][0]=ihi2;
+   ipnts[0][1]=jlo;
+   ipnts[0][2]=klo;
+   ipnts[1][0]=ihi3;
+   ipnts[1][1]=jhi;
+   ipnts[1][2]=klo;
+   //cg_fambc_write(index_file,index_base,index_fam_3,"fambc",BCWallViscousHeatFlux,&index_bc);
+   cg_boco_write(index_file,index_base,index_zone,"Klo3",BCWallViscousHeatFlux,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo3/");
+   ier = cg_famname_write("wall3");
+   //post wall
+   ipnts[0][0]=ihi3;
    ipnts[0][1]=jlo;
    ipnts[0][2]=klo;
    ipnts[1][0]=ihi;
    ipnts[1][1]=jhi;
    ipnts[1][2]=klo;
-   cg_boco_write(index_file,index_base,index_zone,"Klo3",BCWallInviscid,PointRange,2,*ipnts,&index_bc);
+   cg_boco_write(index_file,index_base,index_zone,"Klo4",BCWallInviscid,PointRange,2,*ipnts,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Klo4/");
+   ier = cg_famname_write("symp2");
    //upper face
    ipnts[0][0]=ilo;
    ipnts[0][1]=jlo;
@@ -307,21 +366,39 @@ int main(int argc, char *argv[])
    ipnts[1][0]=ihi;
    ipnts[1][1]=jhi;
    ipnts[1][2]=khi;
-   index_bc = 6;
-   index_ds = 2;
-   dim = 1;
-   data[0] = 1.0;
-   cg_boco_write(index_file,index_base,index_zone,"Khi",BCWallInviscid,PointRange,2,*ipnts,&index_bc);
-   //cg_goto(index_file,index_base,"Zone  1",0,"ZoneBC",0,"Khi",0,NULL);
-   // ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Khi");
-   // ier = cg_dataset_write(index_file,index_base,index_zone,index_bc,"top_shock",BCDirichlet,&index_ds);
-   // ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Khi/top_shock");
-   // ier = cg_bcdata_write(index_file,index_base,index_zone,index_bc,index_ds,Dirichlet);
-   // ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Khi/top_shock/DirichletData");
-   // ier = cg_array_write("PressureStagnation",RealDouble,1,&dim,data);
-
+   //index_bc = 8;
+   cg_boco_write(index_file,index_base,index_zone,"Khi",BCFarfield,PointRange,2,*ipnts,&index_bc);
+   bcind = 10;
+   dsind = 1;
+   ier = cg_dataset_write(index_file,index_base,index_zone,bcind,"BCDataSet",BCFarfield,&index_bc);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Khi/BCDataSet/");
+   ier = cg_bcdata_write(index_file,index_base,index_zone,bcind,dsind,Dirichlet);
+   ier = cg_gopath(index_file,"/Base/Zone  1/ZoneBC/Khi/BCDataSet/DirichletData");
+   // data[0] = P1; 
+   // ier = cg_array_write("PressureStagnation",RealDouble,1,ids,data);
+   // data[0] = r1; 
+   // ier = cg_array_write("DensityStagnation",RealDouble,1,ids,data);
+   // data[0] = cos(a_flow); 
+   // ier = cg_array_write("VelocityUnitVectorX",RealDouble,1,ids,data);
+   // data[0] = 0.; 
+   // ier = cg_array_write("VelocityUnitVectorY",RealDouble,1,ids,data);
+   // data[0] = -sin(a_flow); 
+   // ier = cg_array_write("VelocityUnitVectorZ",RealDouble,1,ids,data);
+   // data[0] = P1; 
+   // ier = cg_array_write("Pressure",RealDouble,1,ids,data);
+   // data[0] = r1; 
+   // ier = cg_array_write("Density",RealDouble,1,ids,data);
+   // data[0] = cos(a_flow)*M1*a; 
+   // ier = cg_array_write("VelocityX",RealDouble,1,ids,data);
+   // data[0] = 0.; 
+   // ier = cg_array_write("VelocityY",RealDouble,1,ids,data);
+   // data[0] = -sin(a_flow)*M1*a; 
+   // ier = cg_array_write("VelocityZ",RealDouble,1,ids,data);
    cg_close(index_file);
    printf("\nSuccessfully wrote BCs to file\n");
+   free(x);
+   free(y);
+   free(z);
    return 0;
 }
 
@@ -329,46 +406,73 @@ int main(int argc, char *argv[])
 double xDistFunc(int ind, int imax, double lX, double del1, double del2, double *fr)
 {
    // just do three sections
-   double lXpre = lX*4./5.;
-   double lXbum = lX*25.4/250.; // in centimeters
-   double lXpos = lX-lXbum-lXpre;
+   double lXpre1 = 1.0;
+   double lXpre2 = 1.0;
+   double lXbum = 0.254; // in centimeters
+   double lXpos = 2.5-lXbum-lXpre2-lXpre1;
+   double lXpos2 = 2.85-2.5;
 
    double t, X;
    //points up to leading edge
    double frac = ind/(double)imax;
    if((frac - fr[0]) < 0.0)
    {
+      double mid = fr[0];
+      X = lXpre1*frac/mid;
+   }
+   if((frac - fr[0]) == 0.0)
+   {
+      X = lXpre1;
+   }
+   if((frac - fr[0]) > 0.0  && (frac - fr[1]) < 0.0)
+   {
+      double mid = fr[1]-fr[0];
       // A = sqrt(xs[0][1]/xs[0][0]);
       // u = 0.5*(1+tanh(del[0]*((frac/fr[0])-0.5))/tanh(del[0]/2.));
       // X = lXpre*(u/(A+(1.-A)*u));
       // double t = 1. + tan(del*(frac - 1.))/tan(del);
-      t = (1./del1)*asinh((frac/fr[0])*sinh(del1));
-      X = lXpre*t;
-   }
-   if((frac - fr[0]) == 0.0)
-   {
-      X = lXpre;
-   }
-   if((frac - fr[0]) > 0.0 && (frac - fr[1]) < 0.0)
-   {
-      double mid = fr[1]-fr[0];
-      X = lXbum*(frac - fr[0])/mid + lXpre;
+      t = (1./del)*asinh(((frac-fr[0])/mid)*sinh(del));
+      X = lXpre2*t + lXpre1;
    }
    if((frac - fr[1]) == 0.0)
    {
-      X = lXbum + lXpre;
+      X = lXpre1 + lXpre2;
    }
-   if((frac - fr[1]) > 0.0)
+   if((frac - fr[1]) > 0.0 && (frac - fr[2]) < 0.0)
    {
-      double mid = 1.0-fr[1];
+      double mid = fr[2]-fr[1];
+      X = lXbum*(frac - fr[1])/mid + lXpre1 + lXpre2;
+   }
+   if((frac - fr[2]) == 0.0)
+   {
+      X = lXbum + lXpre1 + lXpre2;
+   }
+   if((frac - fr[2]) > 0.0 && (frac - fr[3]) < 0.0) 
+   {
+      double mid = fr[3]-fr[2];
       // A = 1.0;
       // u = 0.5*(1+tanh(del[1]*((frac-fr[1])/mid-0.5))/tanh(del[1]/2.));
       // X = lXpos*(u/(A+(1.-A)*u)) + lXbum + lXpre;
       //X = lXbum*((frac-fr[2])/mid) + 2*lXsec + lXpre;
 
       //double t = 1. + tan(del*((frac-fr[1])/mid - 1.))/tan(del);
-      t = sinh(del2*((frac-fr[1])/mid))/sinh(del2);
-      X = lXpos*t + lXbum + lXpre;
+      t = sinh(del*((frac-fr[2])/mid))/sinh(del);
+      X = lXpos*t + lXbum + lXpre1 + lXpre2;
+   }
+   if((frac - fr[3]) == 0.0)
+   {
+      X = lXpos + lXbum + lXpre1 + lXpre2;
+   }
+   if((frac - fr[3]) > 0.0) 
+   {
+      double mid = 1.0 - fr[3];
+      // A = 1.0;
+      // u = 0.5*(1+tanh(del[1]*((frac-fr[1])/mid-0.5))/tanh(del[1]/2.));
+      // X = lXpos*(u/(A+(1.-A)*u)) + lXbum + lXpre;
+      //X = lXbum*((frac-fr[2])/mid) + 2*lXsec + lXpre;
+
+      //double t = 1. + tan(del*((frac-fr[1])/mid - 1.))/tan(del);
+      X = lXpos2*(frac - fr[3])/mid  + lXpos + lXbum + lXpre1 + lXpre2;
    }
 
    // printf("f = %f\n", frac);
@@ -421,41 +525,41 @@ double transcend_approx(double y)
    return x;
 }
 
-void impinging_shock(double th_shock, double M0, double P0, double r0, double T0, 
-                        double &lZ, double &a_shock, double &M1, double &P1, double &r1, double &T1)
+void impinging_shock(double a_shock, double M0, double P0, double r0, double T0, 
+                     double &a_flow, double &M1, double &P1, double &r1, double &T1, double &lZ)
 {
-   // compute downstream flow properties and location of shock on the top boundary
+   double s = a_shock*PI/180.;
+   double ss = sin(s);
    double gam = 1.4;
-   double s = th_shock*PI/180.;
+   double work;
 
-   // determine shock transition point at top boundary
-   // scratch that, determine mesh height that places shock in top left corner
-   // shock impinges at x = 0.254/2
-   double x_i = 0.254/2.;
-   //x_shock = x_i - lZ/tan(s);
-   lZ = (2 + x_i)*tan(s);
+   //determine lZ that puts shock in top left corner
+   lZ = (2. + (0.254/2.))*tan(s);
 
-   // determine flow angle (weak)
-   double a = tan(s)*(((gam + 1.)*M0*M0)/(2*(M0*M0*sin(s)*sin(s) - 1.)) - 1.);
-   a = atan(1./a);
-   a_shock = a*180./PI;
+   //determine flow angle
+   work = (gam + 1)*M0*M0/(2*(M0*M0*ss*ss - 1)) - 1;
+   work *= tan(s);
+   double a = atan(1./work);
+   a_flow = a*180./PI;
 
-   // downstream mach number
-   M1 = (gam - 1.)*M0*M0*sin(s)*sin(s) + 2.;
-   M1 /= (2*gam*M0*M0*sin(s)*sin(s) - (gam - 1.));
-   M1 /= (sin(s-a)*sin(s-a));
-   M1 = sqrt(M1);
+   //determine downstream mach number
+   work = ((gam-1)*M0*M0*ss*ss + 2)/(2*gam*M0*M0*ss*ss - (gam - 1));
+   work /= (sin(s-a)*sin(s-a));
+   M1 = sqrt(work);
 
-   // downstream pressure
-   P1 = P0*2*gam*M0*M0*sin(s)*sin(s) - (gam - 1.);
-   P1 /= (gam + 1.);
+   //downstream pressure
+   work = P0*(2*gam*M0*M0*ss*ss - (gam - 1));
+   work /= (gam + 1);
+   P1 = work;
 
-   // downstream density
-   r1 = r0*(gam + 1.)*M0*M0*sin(s)*sin(s);
-   r1 /= ((gam - 1.)*M0*M0*sin(s)*sin(s) + 2.);
+   //downstream density
+   work = r0*(gam + 1)*M0*M0*ss*ss;
+   work /= ((gam-1)*M0*M0*ss*ss + 2);
+   r1 = work;
 
-   // downstream temperature
-   T1 = T0*(2*gam*M0*M0*sin(s)*sin(s) - (gam - 1.));
-   T1 *= ((gam - 1.)*M0*M0*sin(s)*sin(s) + 2.);
-   T1 /= ((gam + 1.)*(gam + 1.)*M0*M0*sin(s)*sin(s));
+   //downstream temperature (in case)
+   work = T0*(2*gam*M0*M0*ss*ss - (gam - 1))*((gam-1)*M0*M0*ss*ss + 2);
+   work /= ((gam+1)*(gam+1)*M0*M0*ss*ss);
+   T1 = work;
+
 }
