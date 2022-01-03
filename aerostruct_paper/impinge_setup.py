@@ -100,7 +100,7 @@ aeroOptions = { #ADflow aero solver options
     "forcesAsTractions": False,
     
     # Design options
-    'meshSurfaceFamily':'totalSurface',
+    'meshSurfaceFamily':'customSurface',
     #'designSurfaceFamily':'wall2',
     # Adjoint options
     'adjointL2Convergence': 1e-06,

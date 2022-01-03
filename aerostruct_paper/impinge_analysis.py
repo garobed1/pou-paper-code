@@ -37,8 +37,10 @@ class Top(Multipoint):
         ################################################################################
         aero_options = impinge_setup.aeroOptions
         warp_options = impinge_setup.warpOptions
+        def_surf = ['symp1','symp2','wall1','wall2','wall3','inflow','far','outflow']
+        struct_surf = 'wall2'
 
-        aero_builder = ADflowBuilder(options=aero_options,  scenario="aerostructural") #mesh_options=warp_options,
+        aero_builder = ADflowBuilder(options=aero_options,  scenario="aerostructural", def_surf=def_surf, struct_surf=struct_surf) #mesh_options=warp_options,
         aero_builder.initialize(self.comm)
         aero_builder.solver.addFunction('cdv','wall2','cd_def')
 
