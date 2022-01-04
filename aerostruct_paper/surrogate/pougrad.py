@@ -29,7 +29,7 @@ class POUSurrogate():
     """
     def __init__(self, xcenter, func, grad, rho, delta=1e-10):
         # initialize data and parameters
-        self.dim = len(xcenter(0)) # take the size of the first data point
+        self.dim = len(xcenter[0]) # take the size of the first data point
         self.numsample = len(xcenter)
 
         self.xc = xcenter
@@ -77,7 +77,7 @@ class POUSurrogate():
 
         # exhaustive search for closest sample point, for regularization
         for i in range(self.numsample):
-            dist = np.sqrt(np.dot(x-xc(i),x-xc(i)) + self.delta)
+            dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + self.delta)
             mindist = min(mindist,dist)
 
         numer = 0
@@ -85,8 +85,8 @@ class POUSurrogate():
 
         # evaluate the surrogate, requiring the distance from every point
         for i in range(self.numsample):
-            dist = np.sqrt(np.dot(x-xc(i),x-xc(i)) + self.delta)
-            local = f(i) + np.dot(g(i, x-xc(i))) # locally linear approximation
+            dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + self.delta)
+            local = f[i] + np.dot(g[i], x-xc[i]) # locally linear approximation
             expfac = np.exp(-self.rho*(dist-mindist))
             numer += local*expfac
             denom += expfac
