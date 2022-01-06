@@ -4,7 +4,7 @@ import numpy as np
 #from tacs import TACS, elements, constitutive, functions
 
 outputDirectory = './results'
-aeroGridFile = f'imp_conv_2_145_145_25.cgns'
+aeroGridFile = f'imp_mphys_73_73_25.cgns'
 alpha = 0. #
 beta = 7.2833969362749187
 mach = 2.6381157549933598 #3.0
@@ -12,7 +12,7 @@ areaRef = 1.0
 chordRef = 1.0
 T = 254.02071103827234 #217.
 P = 4987.6905797938707 #2919.
-probName = 'impinge_test_4'
+probName = 'impinge_mphys'
 
 astar = [ 0.0,0.0]
 dist = []
@@ -114,14 +114,15 @@ aeroOptions = { #ADflow aero solver options
     }
 
 # Euler Bernoulli Structural Solver Options
+nelem = 30
 structOptions = {
     "name":probName,
-    "Nelem":60,
+    "Nelem":nelem,
     "L":0.254, #0.254, 
     "E":100000,
-    "force":np.ones(61)*1.0,
+    "force":np.ones(nelem+1)*1.0,
     "Iyy":None,
-    "th":np.ones(61)*0.001,
+    "th":np.ones(nelem+1)*0.001,
     "l_bound":2.0,
     "get_funcs":None
     }

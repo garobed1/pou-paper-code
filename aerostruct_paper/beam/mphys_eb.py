@@ -188,6 +188,30 @@ class EBGroup(om.Group):
                 promotes_outputs=["u_struct"],
             )
 
+class EBFuncsGroup(om.Group):
+    def initialize(self):
+        self.options.declare('solver_objects', recordable=False)
+        self.options.declare('check_partials')
+
+    def setup(self):
+        self.struct_objects = self.options['solver_objects']
+        self.check_partials = self.options['check_partials']
+
+        self.add_subsystem('funcs', EBFunctions(
+            tacs_assembler=self.tacs_assembler,
+            struct_objects=self.struct_objects,
+            check_partials=self.check_partials),
+            promotes_inputs=['x_struct0', 'u_struct','dv_struct'],
+            promotes_outputs=['func_struct']
+        )
+
+        self.add_subsystem('mass', EBMass(
+            tacs_assembler=self.tacs_assembler,
+            struct_objects=self.struct_objects,
+            check_partials=self.check_partials),
+            promotes_inputs=['x_struct0', 'dv_struct'],
+            promotes_outputs=['mass'],
+        )
         
 
 class EBBuilder(Builder):

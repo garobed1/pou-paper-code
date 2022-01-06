@@ -19,14 +19,15 @@ def trueFunctionGrad(x):
     return g
 
 # generate "training" and "test" data
+dim = 2
 ntr = 10
 nte = 50
 
-tr = np.random.rand(ntr, 2)
+tr = np.random.rand(ntr, dim)
 fr = np.zeros(ntr)
-gr = np.zeros((ntr,2))
+gr = np.zeros((ntr,dim))
 
-te = np.random.rand(nte, 2)
+te = np.random.rand(nte, dim)
 fe = np.zeros(nte)
 
 for i in range(ntr):
@@ -45,4 +46,18 @@ for i in range(nte):
     fes[i] = pou.eval(te[i])
 
 err = fes - fe
+
+# check x gradient
+
+step = 1e-6
+
+festep = np.zeros(dim)
+for k in range(dim):
+    stepvec = np.zeros(dim)
+    stepvec[k] = step
+    festep[k] = pou.eval(te[0] + stepvec)
+
+xgradfd = (festep - fes[0])/step
+xgradad = pou.evalGrad(te[0])
+
 import pdb; pdb.set_trace()

@@ -123,7 +123,8 @@ prob.model = Top()
 model = prob.model
 prob.setup()
 om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
-prob.run_model()
+#prob.run_model()
+prob.check_partials()
 
 prob.model.list_outputs()
 

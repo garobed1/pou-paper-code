@@ -76,9 +76,15 @@ class POUSurrogate():
         g = self.g
 
         # exhaustive search for closest sample point, for regularization
+        dists = np.zeros(self.numsample)
         for i in range(self.numsample):
-            dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + self.delta)
-            mindist = min(mindist,dist)
+            dists[i] = np.sqrt(np.dot(x-xc[i],x-xc[i]) + self.delta)
+            
+        mindist = min(dists)
+        
+        # for i in range(self.numsample):
+        #     dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + self.delta)
+        #     mindist = min(mindist,dist)
 
         numer = 0
         denom = 0
@@ -91,7 +97,7 @@ class POUSurrogate():
             numer += local*expfac
             denom += expfac
 
-        return numer/denom
+        return 1/denom # numer/denom
 
     """
     Evaluate the gradient of the surrogate at the point x, with respect to x
@@ -102,9 +108,51 @@ class POUSurrogate():
     x : numpy array(dim)
         Query location
 
-    sgrad : numpy array(dim)
-        Gradient output
     """
-    def evalGrad(self, x, sgrad):
+    def evalGrad(self, x):
         sgrad = np.zeros(self.dim)
-        return
+
+        mindist = 1e100
+        xc = self.xc
+        f = self.f
+        g = self.g
+        imindist = 1e100
+        
+
+        # exhaustive search for closest sample point, for regularization
+        dists = np.zeros(self.numsample)
+        for i in range(self.numsample):
+            dists[i] = np.sqrt(np.dot(x-xc[i],x-xc[i]) + self.delta)
+            
+        mindist = min(dists)
+        imindist = np.argmin(dists)
+
+        dmindist = (1.0/mindist)*(x-xc[imindist])
+
+        numer = 0
+        denom = 0
+
+        dnumer = np.zeros(self.dim)
+        ddenom = np.zeros(self.dim)
+
+        sum = 0
+
+        for i in range(self.numsample):
+            dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + self.delta)
+            local = f[i] + np.dot(g[i], x-xc[i]) # locally linear approximation
+            expfac = np.exp(-self.rho*(dist-mindist))
+            numer += local*expfac
+            denom += expfac        
+
+            ddist = (1.0/np.sqrt(np.dot(x-xc[i],x-xc[i])+self.delta))*(x-xc[i])
+            dlocal = g[i]
+            dexp1 = -self.rho*expfac
+            dexp2 = self.rho*expfac
+
+            dnumer += expfac*dlocal + local*(dexp1*ddist + dexp2*dmindist)
+            ddenom += -(1./(expfac*expfac))*(dexp1*ddist + dexp2*dmindist)
+
+            sum += (dexp1*ddist + dexp2*dmindist)
+
+        xgrad = (1./denom)*dnumer + numer*ddenom
+        return ddenom # xgrad

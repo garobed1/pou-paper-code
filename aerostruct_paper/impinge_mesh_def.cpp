@@ -27,7 +27,7 @@ g++ impinge_mesh_def.cpp -L $CGNS_HOME/lib -lcgns -I $CGNS_HOME/include -o impin
 # endif
 #endif
 
-double xDistFunc(int ind, int imax, double lX, double del1, double del2, double *fr);
+double xDistFunc(int ind, int imax, double lX, double xs, double del, double *fr);
 
 double zDistFunc(int ind, int imax, double lX, double xs, double del);
 
@@ -132,23 +132,8 @@ int main(int argc, char *argv[])
    // //1./((fr[1]-fr[0])*(ni-1)*sqrt(xs[1][1]*xs[1][0])),
    // 1./((1.-fr[1])*(ni-1)*sqrt(xs[1][1]*xs[1][0]))};
    
-   double dx1 = transcend_approx(offm1);
-   double dx2 = transcend_approx(offm2);
+   double dx = transcend_approx(offm);
    
-
-   // Hard-code inlet boundary conditions, compute downstream properties
-   double gam = 1.4;
-   double Rs = 287.058;
-   double M0 = 3.;//5.;
-   double P0 = 2919;//2120000; //Pa
-   double T0 = 217;//410; //Kelvin
-   double r0 = P0/(Rs*T0); //kg/m3
-   double ts = 10.; //degrees
-   double M1, P1, T1, r1, tf;
-   impinging_shock(ts, M0, P0, r0, T0, lZ, tf, M1, P1, r1, T1);
-   // speed of sound
-   double c = sqrt(gam*P0/r0);
-
    // double delx[2];
 
    // double drx = 0.;
@@ -175,7 +160,7 @@ int main(int argc, char *argv[])
      {
        for (i=0; i < ni; ++i)
        {
-         x[k*nj*ni + j*ni + i]=xDistFunc(i, ni-1, lX, dx1, dx2, fr);
+         x[k*nj*ni + j*ni + i]=xDistFunc(i, ni-1, lX, offm, dx, fr);
          y[k*nj*ni + j*ni + i]=(j/((double)nj-1.))*lY;
          z[k*nj*ni + j*ni + i]=zDistFunc(k, nk-1, lZ, zs, dz);
        }
@@ -403,7 +388,7 @@ int main(int argc, char *argv[])
 }
 
 // distribute close to the center
-double xDistFunc(int ind, int imax, double lX, double del1, double del2, double *fr)
+double xDistFunc(int ind, int imax, double lX, double xs, double del, double *fr)
 {
    // just do three sections
    double lXpre1 = 1.0;
@@ -502,7 +487,7 @@ double zDistFunc(int ind, int imax, double lX, double xs, double del)
    // printf("f = %f\n", frac);
    // printf("u = %f\n", u);
    // printf("x = %f\n", X);
-   return X - 2.;
+   return X;
 }
 
 double transcend_approx(double y)
