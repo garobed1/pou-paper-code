@@ -97,7 +97,7 @@ class POUSurrogate():
             numer += local*expfac
             denom += expfac
 
-        return 1/denom # numer/denom
+        return numer/denom
 
     """
     Evaluate the gradient of the surrogate at the point x, with respect to x
@@ -150,9 +150,10 @@ class POUSurrogate():
             dexp2 = self.rho*expfac
 
             dnumer += expfac*dlocal + local*(dexp1*ddist + dexp2*dmindist)
-            ddenom += -(1./(expfac*expfac))*(dexp1*ddist + dexp2*dmindist)
+            ddenom += (dexp1*ddist + dexp2*dmindist)
 
             sum += (dexp1*ddist + dexp2*dmindist)
+            #import pdb; pdb.set_trace()
 
-        xgrad = (1./denom)*dnumer + numer*ddenom
-        return ddenom # xgrad
+        xgrad = (denom*dnumer - numer*ddenom)/(denom*denom)
+        return xgrad
