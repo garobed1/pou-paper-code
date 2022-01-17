@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import linalg
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 def PCA(data):
     m, n = data.shape
