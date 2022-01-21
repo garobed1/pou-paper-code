@@ -8,26 +8,26 @@ import pougrad
 # x: array of 2
 # returns f: single value
 def trueFunction(x):
-    f = x[0]*x[0] + 2*x[1] + 1
+    f = x[0]*x[0] + x[1]*x[1] #+ 2*x[1] + 1
     return f 
 
 # function gradient
 def trueFunctionGrad(x):
     g = np.zeros(2)
     g[0] = 2*x[0]
-    g[1] = 2
+    g[1] = 2*x[1]
     return g
 
 # generate "training" and "test" data
 dim = 2
-ntr = 10
-nte = 50
+ntr = 25
+nte = 10
 
-tr = np.random.rand(ntr, dim)
+tr = np.random.rand(ntr, dim)*20 - 10
 fr = np.zeros(ntr)
 gr = np.zeros((ntr,dim))
 
-te = np.random.rand(nte, dim)
+te = np.random.rand(nte, dim)*20 - 10
 fe = np.zeros(nte)
 
 for i in range(ntr):
@@ -37,7 +37,7 @@ for i in range(ntr):
 for i in range(nte):
     fe[i] = trueFunction(te[i])
 
-pou = pougrad.POUSurrogate(tr,fr,gr,10)
+pou = pougrad.POUSurrogate(tr,fr,gr,1000)
 
 # test the surrogate
 fes = np.zeros(nte)
