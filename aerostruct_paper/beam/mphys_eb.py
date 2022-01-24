@@ -90,7 +90,7 @@ class EBSolver(om.ImplicitComponent):
         self.add_output('struct_states', distributed=True, shape=state_size, val = np.zeros(state_size), desc='structural state vector', tags=['mphys_coupling'])
 
         # partials
-        #self.declare_partials('u_struct',['dv_struct','x_struct0','f_struct'])
+        self.declare_partials('u_struct',['dv_struct','x_struct0','f_struct'], method='cs')
 
     def _need_update(self,inputs):
 
@@ -198,7 +198,6 @@ class EBFuncsGroup(om.Group):
         self.check_partials = self.options['check_partials']
 
         self.add_subsystem('funcs', EBFunctions(
-            tacs_assembler=self.tacs_assembler,
             struct_objects=self.struct_objects,
             check_partials=self.check_partials),
             promotes_inputs=['x_struct0', 'u_struct','dv_struct'],
@@ -206,7 +205,6 @@ class EBFuncsGroup(om.Group):
         )
 
         self.add_subsystem('mass', EBMass(
-            tacs_assembler=self.tacs_assembler,
             struct_objects=self.struct_objects,
             check_partials=self.check_partials),
             promotes_inputs=['x_struct0', 'dv_struct'],
@@ -256,8 +254,8 @@ class EBBuilder(Builder):
         return EBMesh(eb_solver=self.solver_objects[1])
 
     def get_post_coupling_subsystem(self):
-        return None #EBFuncsGroup(solver_objects=self.solver_objects,
-                            #check_partials=self.check_partials)
+        return EBFuncsGroup(solver_objects=self.solver_objects,
+                            check_partials=self.check_partials)
 
     def get_ndof(self):
         return self.solver_objects[0]['ndof']
@@ -360,3 +358,192 @@ class EBDisp(om.ExplicitComponent):
     # def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
 
     #     solver = self.solver
+
+
+
+class EBFunctions(om.ExplicitComponent):
+    """
+    Component to compute functions of the Euler-Bernoulli solver
+    """
+    def initialize(self):
+        self.options.declare('struct_objects', recordable=False)
+        self.options.declare('check_partials')
+        
+        self.check_partials = False
+
+    def setup(self):
+
+        self.struct_objects = self.options['struct_objects']
+        self.check_partials = self.options['check_partials']
+
+        self.ndv = self.struct_objects[0]['ndv']
+        self.func_list = self.struct_objects[0]['get_funcs']
+
+        self.beam_solver = self.struct_objects[1]
+
+        # OpenMDAO part of setup
+        # TODO move the dv_struct to an external call where we add the DVs
+        self.add_input('dv_struct', distributed=False, shape = self.ndv, desc='design variables', tags=['mphys_input'])
+        self.add_input('x_struct0', distributed=True, shape_by_conn=True, desc='structural node coordinates',tags=['mphys_coordinates'])
+        self.add_input('u_struct', distributed=True, shape_by_conn=True, desc='structural state vector', tags=['mphys_coupling'])
+
+        # Remove the mass function from the func list if it is there
+        # since it is not dependent on the structural state
+        func_no_mass = []
+        for func in enumerate(self.func_list):
+            if func not in ['beam_mass']:
+                func_no_mass.append(func)
+
+        self.func_list = func_no_mass
+        if len(self.func_list) > 0:
+            self.add_output('func_struct', distributed=False, shape=len(self.func_list), desc='structural function values', tags=['mphys_result'])
+
+            # declare the partials
+            #self.declare_partials('f_struct',['dv_struct','x_struct0','u_struct'])
+
+    def _update_internal(self,inputs):
+        # update Iyy
+        self.beam_solver.computeRectMoment(np.array(inputs['dv_struct']))
+        # have this function call setIyy internally
+
+        self.beam_solver.setLoad(np.array(inputs['struct_force']))
+
+    def compute(self,inputs,outputs):
+        if self.check_partials:
+            self._update_internal(inputs)
+
+        if 'func_struct' in outputs:
+            outputs['func_struct'] = self.beam_solver.evalFunctions(self.func_list)
+
+    def compute_jacvec_product(self,inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if not self.check_partials:
+                raise ValueError('EB forward mode requested but not implemented')
+        if mode == 'rev':
+            # always update internal because same tacs object could be used by multiple scenarios
+            # and we need to load this scenario's state back into TACS before doing derivatives
+            self._update_internal(inputs)
+
+            if 'func_struct' in d_outputs:
+                proc_contribution = d_outputs['func_struct'][:]
+            else: # not sure why OM would call this method without func_struct, but here for safety
+                proc_contribution = np.zeros(len(self.func_list))
+            d_func = self.comm.allreduce(proc_contribution) / self.comm.size
+
+            for ifunc, func in enumerate(self.func_list):
+                self.beam_solver.evalFunctions(self.func_list)
+                if 'dv_struct' in d_inputs:
+                    dvsens = np.zeros(d_inputs['dv_struct'].size)
+                    self.beam_solver.evalDVSens(func, dvsens)
+                    d_inputs['dv_struct'][:] += np.array(dvsens,dtype=float) * d_func[ifunc]
+
+                # if 'x_struct0' in d_inputs:
+                #     xpt_sens = self.xpt_sens
+                #     xpt_sens_array = xpt_sens.getArray()
+                #     self.tacs_assembler.evalXptSens(func, xpt_sens)
+
+                #     d_inputs['x_struct0'][:] += np.array(xpt_sens_array,dtype=float) * d_func[ifunc]
+
+                if 'u_struct' in d_inputs:
+                    usens = np.zeros(d_inputs['u_struct'].size)
+                    self.beam_solver.evalSVSens(func, usens)
+                    d_inputs['u_struct'][:] += np.array(usens,dtype=float) * d_func[ifunc]
+
+class TacsMass(om.ExplicitComponent):
+    """
+    Component to compute TACS mass
+    """
+    def initialize(self):
+        self.options.declare('struct_objects', recordable=False)
+        self.options.declare('check_partials')
+
+        self.mass = False
+
+        self.check_partials = False
+
+    def setup(self):
+
+        self.struct_objects = self.options['struct_objects']
+        self.check_partials = self.options['check_partials']
+
+        #self.set_check_partial_options(wrt='*',directional=True)
+
+        self.beam_solver = self.struct_objects[1]
+
+        self.ndv  = self.struct_objects[0]['ndv']
+
+        # OpenMDAO part of setup
+        self.add_input('dv_struct', distributed=False, shape=self.ndv, desc='design variables', tags=['mphys_input'])
+        self.add_input('x_struct0', distributed=True, shape_by_conn=True, desc='structural node coordinates', tags=['mphys_coordinates'])
+        self.add_output('mass', val=0.0, distributed=False, desc = 'structural mass', tags=['mphys_result'])
+        #self.declare_partials('mass',['dv_struct','x_struct0'])
+
+    def _update_internal(self,inputs):
+        # update Iyy
+        self.beam_solver.computeRectMoment(np.array(inputs['dv_struct']))
+        # have this function call setIyy internally
+
+        self.beam_solver.setLoad(np.array(inputs['struct_force']))
+
+    def compute(self,inputs,outputs):
+        if self.check_partials:
+            self._update_internal(inputs)
+
+        if 'mass' in outputs:
+            outputs['mass'] = self.beam_solver.evalFunctions(['beam_mass'])
+
+    def compute_jacvec_product(self,inputs, d_inputs, d_outputs, mode):
+        if mode == 'fwd':
+            if not self.check_partials:
+                raise ValueError('EB forward mode requested but not implemented')
+        if mode == 'rev':
+            self._update_internal(inputs)
+            if 'mass' in d_outputs:
+                func = self.beam_solver.evalFunctions(['beam_mass'])
+                if 'dv_struct' in d_inputs:
+                    dvsens = np.zeros(d_inputs['dv_struct'].size)
+                    self.beam_solver.evalDVSens(func, dvsens)
+
+                    d_inputs['dv_struct'] += np.array(dvsens,dtype=float) * d_outputs['mass']
+
+                # if 'x_struct0' in d_inputs:
+                #     xpt_sens = self.xpt_sens
+                #     xpt_sens_array = xpt_sens.getArray()
+                #     self.tacs_assembler.evalXptSens(func, xpt_sens)
+                #     d_inputs['x_struct0'] += np.array(xpt_sens_array,dtype=float) * d_outputs['mass']
+
+
+class PrescribedLoad(om.ExplicitComponent):
+    """
+    Prescribe a load to tacs
+    """
+    def initialize(self):
+        self.options.declare('load_function', default = None, desc='function that prescribes the loads', recordable=False)
+        self.options.declare('tacs_assembler', recordable=False)
+
+        self.ndof = 0
+
+    def setup(self):
+#        self.set_check_partial_options(wrt='*',directional=True)
+
+        # TACS assembler setup
+        tacs_assembler = self.options['tacs_assembler']
+
+        # create some TACS vectors so we can see what size they are
+        # TODO getting the node sizes should be easier than this...
+        xpts  = tacs_assembler.createNodeVec()
+        node_size = xpts.getArray().size
+
+        tmp   = tacs_assembler.createVec()
+        state_size = tmp.getArray().size
+        self.ndof = int(state_size / ( node_size / 3 ))
+
+        # OpenMDAO setup
+        self.add_input('x_struct0', distributed=True, shape_by_conn=True, desc='structural node coordinates', tags=['mphys_coordinates'])
+        self.add_output('f_struct', distributed=True, shape=state_size,   desc='structural load', tags=['mphys_coupling'])
+
+        #self.declare_partials('f_struct','x_struct0')
+
+    def compute(self,inputs,outputs):
+        load_function = self.options['load_function']
+        outputs['f_struct'] = load_function(inputs['x_struct0'],self.ndof)

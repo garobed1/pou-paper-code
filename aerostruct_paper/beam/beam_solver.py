@@ -171,6 +171,12 @@ class EulerBeamSolver():
         return pts
 
 
+    def evalFunctions(self, func_list):
+        return
+
+    def evalDVSens(self, func, sens):
+        return
+
 # settings = {
 #     # "name":"hello",
 #     # "Nelem":10,
