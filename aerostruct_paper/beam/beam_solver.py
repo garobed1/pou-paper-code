@@ -1,6 +1,7 @@
 from scipy.sparse.linalg.dsolve import spsolve
 import numpy as np
 from scipy.sparse.linalg.dsolve.linsolve import spsolve_triangular
+from hermite_basis import cubicHermite, cubicHermiteD, cubicHermiteD2
 import assembly as asm
 from utils import Error
 
@@ -170,9 +171,18 @@ class EulerBeamSolver():
 
         return pts
 
-
     def evalFunctions(self, func_list):
+
+        # element-wise stress
+        dx = self.L/self.Nelem 
+        sigma = np.zeros(self.Nelem+1)
+        for i in range(self.Nelem + 1):
+            xi = [-1,1]
+            d2N = cubicHermiteD2(xi, dx)
+            sigma[i:i+1] = E*zmax(i:i+1).*(d2N*u((i-1)*2+1:(i+1)*2))
         return
+
+
 
     def evalDVSens(self, func, sens):
         return

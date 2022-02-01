@@ -8,12 +8,12 @@ from smt.surrogate_models.surrogate_model import SurrogateModel
 class ASCriteria():
     def __init__(self, model, **kwargs):
         """
-        Constructor where a trained surrogate model is 
+        Constructor for a class encompassing a refinement criteria function for adaptive sampling or cross-validation
 
         Parameters
         ----------
         model : smt SurrogateModel object
-            Surrogate model to perform the cross validation
+            Surrogate model as needed to evaluate the criteria
 
         **kwargs : named arguments
             Set of options that can be optionally set; each option must have been declared.
@@ -36,6 +36,12 @@ class ASCriteria():
         pass
 
     def evaluate(self, x):
+        pass
+
+    def pre_asopt(self):
+        pass
+
+    def post_asopt(self):
         pass
 
     
@@ -62,8 +68,7 @@ class looCV(ASCriteria):
             trf = self.loosm[i].training_points[None][kx][1]
             trg = []
             for j in range(self.dim):
-                trg.append(self.loosm[i].training_points[None][j+1][1])
-            #trg = self.loosm[i].training_points[None][kx+1][1] #TODO:make this optional
+                trg.append(self.loosm[i].training_points[None][j+1][1]) #TODO:make this optional
             trx = np.delete(trx, i, 0)
             trf = np.delete(trf, i, 0)
             for j in range(self.dim):
@@ -89,5 +94,10 @@ class looCV(ASCriteria):
             y += (1/self.ntr)*((M-Mm)**2)
 
         return np.sqrt(y)
+
+    def post_asopt(self, x):
+
+        return x
+        
 
 
