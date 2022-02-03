@@ -104,6 +104,7 @@ class EulerBeamSolver():
         self.E = settings["E"]
         self.force = settings["force"]
         self.Iyy = settings["Iyy"]
+        self.th = settings["th"]
         
         #set left bound of beam in x just for mesh transfer purposes
         if "l_bound" in settings:
@@ -148,6 +149,13 @@ class EulerBeamSolver():
         self.req_update = True
         self.req_solve = True
 
+    def setThickness(self, th):
+
+        self.th = th
+        self.computeRectMoment(self.th)
+        self.req_update = True
+        self.req_solve = True
+
     def computeRectMoment(self, th):
 
         # Compute moment of an (infinitely) rectangular beam, given thickness
@@ -173,16 +181,40 @@ class EulerBeamSolver():
 
     def evalFunctions(self, func_list):
 
+        # compute all functions
+
         # element-wise stress
         dx = self.L/self.Nelem 
         sigma = np.zeros(self.Nelem+1)
-        for i in range(self.Nelem + 1):
+        for i in range(self.Nelem):
             xi = [-1,1]
-            d2N = cubicHermiteD2(xi, dx)
-            sigma[i:i+1] = E*zmax(i:i+1).*(d2N*u((i-1)*2+1:(i+1)*2))
-        return
+            d2Nl = cubicHermiteD2(xi[0], dx)
+            d2Nr = cubicHermiteD2(xi[1], dx)
+            sigma[i] = 0.5*self.E*self.th[i]*(d2Nl*self.u[i*2:(i+1)*2+1])
+            sigma[i+1] = 0.5*self.E*self.th[i+1]*(d2Nr*self.u[i*2:(i+1)*2+1])
 
+        # mass
 
+        mass = self.evalMass()
+        
+        dict = {}
+
+        for key in func_list:
+            if(key == "mass"):
+                dict["mass"] = mass
+            if(key == "stress"):
+                dict["stress"] = sigma
+
+        return dict
+
+    def evalMass(self):
+
+        mass = 0
+        dx = self.L/self.Nelem 
+        for i in range(self.Nelem):
+            mass += 0.5*(self.th[i]+self.th[i+1])*dx
+
+        return mass
 
     def evalDVSens(self, func, sens):
         return

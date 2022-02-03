@@ -2,7 +2,7 @@ import numpy as np
 import copy
 
 from smt.utils.options_dictionary import OptionsDictionary
-from smt.surrogate_models.surrogate_model import SurrogateModel
+from smt.surrogate_models import GEKPLS
 
 """Base Class for Adaptive Sampling Criteria Functions"""
 class ASCriteria():
@@ -67,16 +67,19 @@ class looCV(ASCriteria):
             trx = self.loosm[i].training_points[None][kx][0]
             trf = self.loosm[i].training_points[None][kx][1]
             trg = []
-            for j in range(self.dim):
-                trg.append(self.loosm[i].training_points[None][j+1][1]) #TODO:make this optional
+                
             trx = np.delete(trx, i, 0)
             trf = np.delete(trf, i, 0)
-            for j in range(self.dim):
-                trg[j] = np.delete(trg[j], i, 0)
+            
 
             self.loosm[i].set_training_values(trx, trf)
-            for j in range(self.dim):
-                self.loosm[i].set_training_derivatives(trx, trg[j][:], j)
+            if(isinstance(self.model, GEKPLS)):
+                for j in range(self.dim):
+                    trg.append(self.loosm[i].training_points[None][j+1][1]) #TODO:make this optional
+                for j in range(self.dim):
+                    trg[j] = np.delete(trg[j], i, 0)
+                for j in range(self.dim):
+                    self.loosm[i].set_training_derivatives(trx, trg[j][:], j)
 
             if(self.options["approx"] == False):
                 self.loosm[i].train()
@@ -85,15 +88,31 @@ class looCV(ASCriteria):
     def evaluate(self, x):
         
         # evaluate the point for the original model
-        M = self.model.predict_values(x)
+        M = self.model.predict_values(x).flatten()
 
         # now evaluate the point for each LOO model and sum
         y = 0
         for i in range(self.ntr):
-            Mm = self.loosm[i].predict_values(x)
+            Mm = self.loosm[i].predict_values(x).flatten()
             y += (1/self.ntr)*((M-Mm)**2)
+        
+        ans = -np.sqrt(y)
 
-        return np.sqrt(y)
+        return ans # to work with optimizers
+
+    # if only using local optimization, start the optimizer at the worst LOO point
+    def pre_asopt(self):
+        t0 = self.model.training_points[None][0][0]
+        diff = np.zeros(self.ntr)
+
+        for i in range(self.ntr):
+            M = self.model.predict_values(t0[i]).flatten()
+            Mm = self.loosm[i].predict_values(t0[i]).flatten()
+            diff[i] = abs(M - Mm)
+
+        ind = np.argmax(diff)
+
+        return t0[ind]
 
     def post_asopt(self, x):
 

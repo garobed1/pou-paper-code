@@ -4,7 +4,7 @@ from defaults import DefaultOptOptions
 """
 Wrapper for scipy optimizers
 """
-def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, constraints=None, options=None):
+def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, constraints=(), options=None):
     
     # if no options are provided
     if(options == None):
@@ -28,6 +28,6 @@ def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, co
 
     # if local, use minimize
     else:
-        results = minimize(func, x0, args, maxiter=liter, method=lmethod, jac=jac, hess=hess, bounds=bounds, constraints=constraints, tol=ltol)
+        results = minimize(func, x0, args, method=lmethod, jac=jac, hess=hess, bounds=bounds, constraints=constraints, tol=ltol, options={"maxiter":liter})
 
     return results
