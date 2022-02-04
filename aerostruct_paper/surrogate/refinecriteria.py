@@ -3,6 +3,7 @@ import copy
 
 from smt.utils.options_dictionary import OptionsDictionary
 from smt.surrogate_models import GEKPLS
+from pougrad import POUSurrogate
 
 """Base Class for Adaptive Sampling Criteria Functions"""
 class ASCriteria():
@@ -73,7 +74,7 @@ class looCV(ASCriteria):
             
 
             self.loosm[i].set_training_values(trx, trf)
-            if(isinstance(self.model, GEKPLS)):
+            if(isinstance(self.model, GEKPLS) or isinstance(self.model, POUSurrogate)):
                 for j in range(self.dim):
                     trg.append(self.loosm[i].training_points[None][j+1][1]) #TODO:make this optional
                 for j in range(self.dim):
@@ -87,7 +88,11 @@ class looCV(ASCriteria):
     #TODO: This could be a variety of possible LOO-averaging functions
     def evaluate(self, x):
         
+        # if(len(x.shape) != 2):
+        #     x = np.array([x])
+
         # evaluate the point for the original model
+        #import pdb; pdb.set_trace()
         M = self.model.predict_values(x).flatten()
 
         # now evaluate the point for each LOO model and sum
@@ -103,11 +108,12 @@ class looCV(ASCriteria):
     # if only using local optimization, start the optimizer at the worst LOO point
     def pre_asopt(self):
         t0 = self.model.training_points[None][0][0]
+        #import pdb; pdb.set_trace()
         diff = np.zeros(self.ntr)
 
         for i in range(self.ntr):
-            M = self.model.predict_values(t0[i]).flatten()
-            Mm = self.loosm[i].predict_values(t0[i]).flatten()
+            M = self.model.predict_values(t0[[i]]).flatten()
+            Mm = self.loosm[i].predict_values(t0[[i]]).flatten()
             diff[i] = abs(M - Mm)
 
         ind = np.argmax(diff)
