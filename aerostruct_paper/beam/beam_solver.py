@@ -161,7 +161,7 @@ class EulerBeamSolver():
         # Compute moment of an (infinitely) rectangular beam, given thickness
 
         # technically moment per unit length, since Iyy = w*h^3/12, and width goes "into page"
-        Iyy = np.zeros(self.Nelem + 1)
+        Iyy = np.zeros(self.Nelem + 1, dtype='complex_')
 
         for i in range(self.Nelem + 1):
             Iyy[i] = th[i]*th[i]*th[i]/12.
@@ -185,18 +185,18 @@ class EulerBeamSolver():
 
         # element-wise stress, don't compute if we only want mass
         #if(not all((func_list, ["mass"]))):
-        # dx = self.L/self.Nelem 
-        # sigma = np.zeros(self.Nelem+1)
-        # for i in range(self.Nelem):
-        #     xi = [-1,1]
-        #     d2Nl = cubicHermiteD2(xi[0], dx)
-        #     d2Nr = cubicHermiteD2(xi[1], dx)
-        #     if(i == self.Nelem-2):
-        #         import pdb; pdb.set_trace()
-        #     sigma[i] = 0.5*self.E*self.th[i]*np.dot(d2Nl,self.u[i*2:(i+1)*2+2])
-        #     sigma[i+1] = 0.5*self.E*self.th[i+1]*np.dot(d2Nr,self.u[i*2:(i+1)*2+2])
+        dx = self.L/self.Nelem 
+        sigma = np.zeros(self.Nelem+1, dtype='complex_')
+        zero = np.array([0])
+        utrue = np.concatenate((zero,zero,self.u,zero,zero))
+        for i in range(self.Nelem):
+            xi = [-1,1]
+            d2Nl = cubicHermiteD2(xi[0], dx)
+            d2Nr = cubicHermiteD2(xi[1], dx)
+            sigma[i] = 0.5*self.E*self.th[i]*np.dot(d2Nl,utrue[i*2:(i+1)*2+2])
+            sigma[i+1] = 0.5*self.E*self.th[i+1]*np.dot(d2Nr,utrue[i*2:(i+1)*2+2])
 
-        # sigma = sum(sigma)
+        sigma = sum(sigma)
         # mass
 
         mass = self.evalMass()
@@ -206,8 +206,8 @@ class EulerBeamSolver():
         for key in func_list:
             if(key == "mass"):
                 dict["mass"] = mass
-            # if(key == "stress"):
-            #     dict["stress"] = sigma
+            if(key == "stress"):
+                dict["stress"] = sigma
 
         return dict
 
@@ -241,7 +241,9 @@ class EulerBeamSolver():
 
             for key in func:
                 gdict[key][i] = np.imag(sol[key])/h
-        import pdb; pdb.set_trace()
+        
+        # reset
+        self.setThickness(self.th)
         return gdict
 
     def evalforceSens(self, func):
@@ -252,45 +254,69 @@ class EulerBeamSolver():
         gdict = {} 
 
         for key in func:
-            gdict[key] = np.zeros(len(self.th))
+            gdict[key] = np.zeros(len(self.force))
         
-        for i in range(len(self.th)):
-            fc = self.force
+        fc = np.zeros(len(self.force), dtype='complex_')
+        for i in range(len(self.force)):
+            fc.real = self.force
+            fc.imag = np.zeros(len(self.force))
             fc[i] = fc[i] + h*1j
-            self.setThickness(fc)
+            self.setLoad(fc)
             self.__call__()
             sol = self.evalFunctions(func)
 
             for key in func:
                 gdict[key][i] = np.imag(sol[key])/h
+
+        # reset
+        self.setLoad(self.force)
         return gdict
 
-Nelem = 20
+# Nelem = 20
 
-settings = {
-    # "name":"hello",
-    # "Nelem":10,
-    # "L":4,
-    # "E":300,
-    # "force":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    # "Iyy":None,
-    # "th":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    "name":"hello",
-    "Nelem":Nelem,
-    "L":0.254, #0.254, 
-    "E":400000,
-    "force":np.ones(Nelem+1)*1.0,
-    "Iyy":None,
-    "th":np.ones(Nelem+1)*0.01,
-    "l_bound":2.0,
-}
+# settings = {
+#     # "name":"hello",
+#     # "Nelem":10,
+#     # "L":4,
+#     # "E":300,
+#     # "force":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+#     # "Iyy":None,
+#     # "th":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+#     "name":"hello",
+#     "Nelem":Nelem,
+#     "L":0.254, #0.254, 
+#     "E":400000,
+#     "force":np.ones(Nelem+1)*1.0,
+#     "Iyy":None,
+#     "th":np.ones(Nelem+1)*0.01,
+#     "l_bound":2.0,
+# }
 
-beamsolve = EulerBeamSolver(settings)
+# beamsolve = EulerBeamSolver(settings)
 
 
-func_list = ["mass"]
+# func_list = ["mass","stress"]
 
-dict = beamsolve.evalthSens(func_list)
+# csdict = beamsolve.evalthSens(func_list)
 
-import pdb; pdb.set_trace()
+# h = 1e-7
+
+# #finite difference
+# fddict = {} 
+
+# th = settings["th"]
+# beamsolve.setThickness(th)
+# beamsolve()
+# dict = beamsolve.evalFunctions(func_list)
+# s0 = dict["stress"]
+# fd = np.zeros(len(settings["th"]))
+# for i in range(len(settings["th"])):
+#     thc = np.array(th)
+#     thc[i] = thc[i] + h
+#     beamsolve.setThickness(thc)
+#     beamsolve()
+#     dict = beamsolve.evalFunctions(func_list)
+#     fd[i] = (dict["stress"]-s0)/h
+
+# import pdb; pdb.set_trace()
 

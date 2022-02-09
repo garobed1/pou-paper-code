@@ -385,6 +385,7 @@ class EBFunctions(om.ExplicitComponent):
         # TODO move the dv_struct to an external call where we add the DVs
         self.add_input('dv_struct', distributed=False, shape = self.ndv, desc='design variables', tags=['mphys_input'])
         self.add_input('x_struct0', distributed=True, shape_by_conn=True, desc='structural node coordinates',tags=['mphys_coordinates'])
+        self.add_input('struct_force', distributed=True, shape_by_conn=True, desc='asdf',tags=['mphys_input'])
         self.add_input('u_struct', distributed=True, shape_by_conn=True, desc='structural state vector', tags=['mphys_coupling'])
 
         # Remove the mass function from the func list if it is there
@@ -434,7 +435,7 @@ class EBFunctions(om.ExplicitComponent):
                 self.beam_solver.evalFunctions(self.func_list)
                 if 'dv_struct' in d_inputs:
                     dvsens = np.zeros(d_inputs['dv_struct'].size)
-                    self.beam_solver.evalDVSens(func, dvsens)
+                    dvsens = self.beam_solver.evalthSens(func)
                     d_inputs['dv_struct'][:] += np.array(dvsens,dtype=float) * d_func[ifunc]
 
                 # if 'x_struct0' in d_inputs:
@@ -446,7 +447,7 @@ class EBFunctions(om.ExplicitComponent):
 
                 if 'u_struct' in d_inputs:
                     usens = np.zeros(d_inputs['u_struct'].size)
-                    self.beam_solver.evalSVSens(func, usens)
+                    self.beam_solver.evalforceSens(func, usens)
                     d_inputs['u_struct'][:] += np.array(usens,dtype=float) * d_func[ifunc]
 
 class TacsMass(om.ExplicitComponent):

@@ -18,7 +18,7 @@ def CalcElemStiff(E, IL, IR, dx):
     if (IL <= 0.0) | (IR <= 0.0) | (E <= 0.0) | (dx <= 0.0):
         Error('Inputs must all be strictly positive')
 
-    Aelem = np.zeros([4,4])
+    Aelem = np.zeros([4,4], dtype='complex_')
 
     # get quadrature points
     xi, w = GaussQuad(2)
@@ -29,7 +29,7 @@ def CalcElemStiff(E, IL, IR, dx):
         B = cubicHermiteD2(xi[i], dx)
         MI = (IL*(1-xi[i]) + IR*(1+xi[i]))*0.5
         Int = (0.5*E*dx)*MI*np.outer(B,B)
-        Aelem += w[i]*Int
+        Aelem = Aelem + (w[i]*Int)
 
     return Aelem
 
@@ -48,7 +48,7 @@ def CalcElemLoad(qL, qR, dx):
     if (dx <= 0.0):
         Error('Element length must be strictly positive')
 
-    belem = np.zeros(4)
+    belem = np.zeros(4, dtype='complex_')
 
     # get quadrature points
     xi, w = GaussQuad(3)
@@ -60,7 +60,7 @@ def CalcElemLoad(qL, qR, dx):
         N = cubicHermite(xi[i], dx)
         F = (qL*(1-xi[i]) + qR*(1+xi[i]))*0.5 # linear moment of inertia
         Int = 0.5*dx*F*N
-        belem += w[i]*Int
+        belem = belem + (w[i]*Int)
 
     return belem
 
