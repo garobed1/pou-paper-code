@@ -15,6 +15,7 @@
 *.bak1
 *.bak2
 *Zone.Identifier
+*.png
 
 # other files
 ffd_def.py
