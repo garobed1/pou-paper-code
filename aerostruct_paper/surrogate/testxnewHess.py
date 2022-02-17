@@ -14,11 +14,11 @@ from smt.sampling_methods import LHS
 dim = 2
 rho = 100
 
-trueFunc = Heaviside(ndim=dim)
+trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits)
 
-nt0  = 4
+nt0  = 10
 dist = 0.01
 ntr = 10
 nte = 20
@@ -39,7 +39,6 @@ f0 = trueFunc(t0)
 
 for i in range(dim):
     g0[:,i:i+1] = trueFunc(t0,i)
-
 # fe = trueFunc(te)
 
 # for "fake" gradient enhanced kriging in 1 dim
@@ -65,13 +64,34 @@ if(isinstance(gek, gekpls.GEKPLS) or isinstance(gek, POUSurrogate)):
         gek.set_training_derivatives(t0, g0[:,i:i+1], i)
 gek.train()
 
-ndir = 100
 
-x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
-xz = np.zeros([ndir,dim])
-xz[:,0] = x
-zt = trueFunc(xz)
-zs = gek.predict_values(xz)
+# x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+# xz = np.zeros([ndir,dim])
+# xz[:,0] = x
+# zt = trueFunc(xz)
+# zs = gek.predict_values(xz)
+
+# Contour
+# plt.figure(2)
+# ndir = 100
+# x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+# y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
+
+# X, Y = np.meshgrid(x, y)
+# Z = np.zeros([ndir, ndir])
+
+# for i in range(ndir):
+#     for j in range(ndir):
+#         xi = np.zeros([1,2])
+#         xi[0,0] = x[i]
+#         xi[0,1] = y[j]
+#         Z[i,j] = gek.predict_values(xi)#trueFunc(xi)
+
+# plt.contour(X, Y, Z, levels = 15)
+# plt.savefig('quadcontour.png')
+# import pdb; pdb.set_trace()
+
+
 
 criteria = HessianFit(gek, improve=0.5) #looCV(gek, approx=False)
 
@@ -85,10 +105,11 @@ bad_dirs = criteria.bad_dirs
 #import pdb; pdb.set_trace()
 plt.figure(0)
 plt.plot(t0[:,0], t0[:,1], "o")
+lined = (xlimits[0][1] - xlimits[0][0])/8
 for i in range(bads.shape[0]):
     plt.plot(bads[i,0], bads[i,1], "ro")
-    plt.plot([bads[i,0] - bad_dirs[i][0], bads[i,0] + bad_dirs[i][0]], \
-                [bads[i,1] - bad_dirs[i][1], bads[i,1] + bad_dirs[i][1]], '--')
+    plt.plot([bads[i,0] - lined*bad_dirs[i][0], bads[i,0] + lined*bad_dirs[i][0]], \
+                [bads[i,1] - lined*bad_dirs[i][1], bads[i,1] + lined*bad_dirs[i][1]], '--')
 plt.savefig("funcplotHessinit.png")
 plt.figure(1)
 

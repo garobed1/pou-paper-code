@@ -6,6 +6,7 @@ from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
 from scipy.linalg import lstsq, eig
 from scipy.spatial.distance import pdist, squareform
+from utils import quadratic, quadraticSolve
 
 """Base Class for Adaptive Sampling Criteria Functions"""
 class ASCriteria():
@@ -190,6 +191,15 @@ class HessianFit(ASCriteria):
                 indn.append(ind)
 
             # 1b. Fit a Hessian over the points using least squares
+
+            # solve : fh_i(x_j) = f_j = f_i + g_i(x_j-x_i) + (x_j-x_i)^T H_i (x_j-x_i)
+            # 
+            # and   : gh_i(x_j) = g_j = g_i + H_i(x_j-x_i)
+            #
+            # unknown : {f_i, g_i, H_i} or if we use data, {H_i}
+
+            # H_i converted to compressed symmetric part
+
             for i in range(self.ntr):
                 hess.append(np.zeros((self.dim, self.dim)))
 
@@ -221,7 +231,6 @@ class HessianFit(ASCriteria):
                     hj = np.zeros(self.dim)
                     hj = self.model.predict_derivatives(xsp, k)
                     hj -= self.model.predict_derivatives(xsm, k)
-                    
                     for l in range(len(hess)):
                         hess[l][j,k] = hj[l]/h
 
@@ -255,7 +264,7 @@ class HessianFit(ASCriteria):
             H = hess[i]
             eigvals, eigvecs = eig(H)
             o = np.argsort(eigvals)
-            opt_dir.append(eigvecs[o[-1]])
+            opt_dir.append(eigvecs[:,o[-1]])
 
         import pdb; pdb.set_trace()
         # we have what we need
@@ -313,43 +322,6 @@ class HessianFit(ASCriteria):
 
 
 
-def neighborhood(i, trx):
-    """
-    Determine an "optimal" neighborhood around a data point for estimating the 
-    Hessian, based on the closest points that best surround the point
-    
-    Inputs:
-        i - index of point to determine neighborhood of
-        trx - full list of data points
-    Outputs:
-        ind - indices of points to include in the neighborhood
-    """
-    ind = []
-    return ind
 
 
-def quadratic(x, x0, f0, g, h):
-    """
-    Given the gradient and Hessian about a nearby point, return the quadratic
-    Taylor series approximation of the function
-    
-    f(x) = f(x0) + g(x0)^T*(x-x0) + (1/2)*(x-x0)^T*h(x0)*(x-x0) + O((x-x0)^3)
-
-    Inputs:
-        x - point to evaluate the approximation
-        x0 - center point of the Taylor series
-        f0 - function value at the center
-        g - gradient at the center
-        h - Hessian at the center
-    Outputs:
-        f - quadratic Taylor series approximation at x
-    """
-
-    dx = x - x0
-
-    Hdx = np.matmul(h,dx.T)
-    dHd = np.dot(dx,Hdx)
-    f = f0 + np.dot(g,dx) + 0.5*dHd
-
-    return f
 
