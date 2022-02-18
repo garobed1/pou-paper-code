@@ -1,5 +1,9 @@
 import numpy as np
 from scipy.linalg import lstsq, lu_factor, lu_solve, solve
+from heaviside import Heaviside, Quad2D
+from smt.sampling_methods import LHS
+
+
 
 
 
@@ -43,6 +47,7 @@ def quadraticSolve(x, xn, f, fn, g, gn):
     rhs = np.zeros(rsize)
     dx = xn
     for i in range(M-1):
+
         dx[i,:] -= x
 
     # assemble rhs
@@ -66,7 +71,7 @@ def quadraticSolve(x, xn, f, fn, g, gn):
         for i in range(N):
             for j in range(N):
                 ind = symMatfromVec(i,j,N)
-                mat[k, 1+N+ind] += dx[k-1,i]*dx[k-1,j]
+                mat[k, 1+N+ind] += 0.5*dx[k-1,i]*dx[k-1,j]
 
     # gradient fitting
     for j in range(N):
@@ -80,7 +85,7 @@ def quadraticSolve(x, xn, f, fn, g, gn):
 
     # now solve the system in a least squares sense
     # rhs[0] *= 100
-    # mat[0,0] *=100
+    # mat[0,0] *= 100
     import pdb; pdb.set_trace()
 
     sol = lstsq(mat, rhs)
@@ -165,6 +170,24 @@ def symMatfromVec(i, j, N):
     else:
         return int(j*N - (j - 1) * j/2 + i - j)
     
+dim = 2
+trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
+xlimits = trueFunc.xlimits
+sampling = LHS(xlimits=xlimits)
+
+nt0  = 2
+
+t0 = np.array([[0.25, 0.4],[0.75, 0.6]])# sampling(nt0)[0.5, 0.5],
+f0 = trueFunc(t0)
+g0 = np.zeros([nt0,dim])
+for i in range(dim):
+    g0[:,i:i+1] = trueFunc(t0,i)
+
+quadraticSolve(t0[0,:], t0[1:2,:], f0[0], f0[1:2], g0[0,:], g0[1:2,:])
+
+
+
+
 
 # x = np.array([1, 2, 3, 4])
 # xn = np.zeros([6, 4])

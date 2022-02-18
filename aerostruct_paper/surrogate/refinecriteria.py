@@ -244,6 +244,7 @@ class HessianFit(ASCriteria):
                     for l in range(len(hess)):
                         hess[l][j,k] = hj[l]/h
 
+
         # 2. For every point, sum the discrepancies between the quadratic 
         # prediction in the neighborhood and the observation value
         
