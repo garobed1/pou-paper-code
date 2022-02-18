@@ -18,13 +18,13 @@ trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits)
 
-nt0  = 10
+nt0  = 3
 dist = 0.01
 ntr = 10
 nte = 20
 
 t0 = np.zeros([nt0,dim])
-t0 = sampling(nt0)
+t0 = np.array([[0.25, 0.75],[0.5, 0.5],[0.75, 0.25]])# sampling(nt0)
 
 
 
@@ -93,7 +93,7 @@ gek.train()
 
 
 
-criteria = HessianFit(gek, improve=0.5) #looCV(gek, approx=False)
+criteria = HessianFit(gek, improve=0.5, neval=1) #looCV(gek, approx=False)
 
 xzt = np.linspace(-1, 1, 50)
 zlv = np.zeros(50)

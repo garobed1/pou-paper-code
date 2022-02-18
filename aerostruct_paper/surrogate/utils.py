@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.linalg import lstsq
+from scipy.linalg import lstsq, lu_factor, lu_solve, solve
 
 
 
@@ -15,7 +15,7 @@ def quadraticSolve(x, xn, f, fn, g, gn):
     and   : gh_i(x_j) = g_j = g_i + H_i(x_j-x_i)
     unknown : {f_i, g_i, H_i} or if we use data, {H_i}
 
-    in a least squares sense.
+    in a minimum norm least squares sense.
 
     Inputs: 
         x - point to center the approximation
@@ -41,6 +41,9 @@ def quadraticSolve(x, xn, f, fn, g, gn):
 
     mat = np.zeros([rsize, csize])
     rhs = np.zeros(rsize)
+    dx = xn
+    for i in range(M-1):
+        dx[i,:] -= x
 
     # assemble rhs
     rhs[0:M] = np.append(f, fn)
@@ -51,10 +54,47 @@ def quadraticSolve(x, xn, f, fn, g, gn):
             gvec = gn[i-1,:]
 
         rhs[(M + i*N):(M + i*N + N)] = gvec
+
+    # assemble mat
+
+    # function fitting
+    mat[0:M,0] = 1
+    for j in range(N):
+        mat[1:M, j+1] = dx[:,j]
+
+    for k in range(1,M):
+        for i in range(N):
+            for j in range(N):
+                ind = symMatfromVec(i,j,N)
+                mat[k, 1+N+ind] += dx[k-1,i]*dx[k-1,j]
+
+    # gradient fitting
+    for j in range(N):
+        mat[M+j::N, j+1] = 1
+
+    for k in range(1,M):
+        for i in range(N):
+            for j in range(N):
+                ind = symMatfromVec(i,j,N)
+                mat[M+k*N+i, 1+N+ind] += dx[k-1,j]
+
+    # now solve the system in a least squares sense
+    # rhs[0] *= 100
+    # mat[0,0] *=100
     import pdb; pdb.set_trace()
 
-    
+    sol = lstsq(mat, rhs)
+    # LU, PIV = lu_factor(mat)
+    sol = solve(mat, rhs)
 
+    import pdb; pdb.set_trace()
+
+    fh = sol[0][0]
+    gh = sol[0][1:N+1]
+    Hh = sol[0][N+1:N+1+vN]
+
+    #import pdb; pdb.set_trace()
+    return fh, gh, Hh
 
 
 
@@ -121,22 +161,24 @@ def symMatfromVec(i, j, N):
     vector: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
     """
     if(i <= j):
-        return i*N - (i - 1) * i/2 + j - i
+        return int(i*N - (i - 1) * i/2 + j - i)
     else:
-        return j*N - (j - 1) * j/2 + i - j
+        return int(j*N - (j - 1) * j/2 + i - j)
     
 
-x = np.array([1, 2, 3, 4])
-xn = np.zeros([6, 4])
+# x = np.array([1, 2, 3, 4])
+# xn = np.zeros([6, 4])
+# for i in range(6):
+#     xn[i,:] = 0.5*i
 
-f = 10
-fn = np.zeros(6)
-for i in range(6):
-    fn[i] = i
+# f = 10
+# fn = np.zeros(6)
+# for i in range(6):
+#     fn[i] = i
 
-g = x
-gn = xn
-for i in range(6):
-    gn[i,:] = i
+# g = x
+# gn = xn
+# for i in range(6):
+#     gn[i,:] = i
 
-quadraticSolve(x, xn, f, fn, g, gn)
+# quadraticSolve(x, xn, f, fn, g, gn)

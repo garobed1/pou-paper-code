@@ -154,7 +154,7 @@ class HessianFit(ASCriteria):
         
     def _init_options(self):
         #options: neighborhood, surrogate, exact
-        self.options.declare("hessian", "surrogate", types=str)
+        self.options.declare("hessian", "neighborhood", types=str)
 
         #options: distance, variance, random
         self.options.declare("criteria", "distance", types=str)
@@ -165,8 +165,6 @@ class HessianFit(ASCriteria):
         
     def initialize(self):
         
-
-
         self.nnew = int(self.ntr*self.options["improve"])
         if(self.nnew == 0):
             self.nnew = 1
@@ -177,6 +175,9 @@ class HessianFit(ASCriteria):
         for j in range(self.dim):
             trg[:,j] = self.model.training_points[None][j+1][1].flatten()
 
+        dists = pdist(trx)
+        dists = squareform(dists)
+
         # 1. Estimate the Hessian about each point
         hess = []
 
@@ -186,10 +187,19 @@ class HessianFit(ASCriteria):
 
             # 1a. Determine the neighborhood to fit the Hessian for each point
             for i in range(self.ntr):
-                ind = neighborhood(i, trx)
+                ind = dists[i,:]
+                ind = np.argsort(ind)
                 pts.append(np.array(trx[ind,:]))
                 indn.append(ind)
+                #for key in ind[1:self.options["neval"]]:
 
+                    
+            for i in range(self.ntr):
+                fh, gh, Hh = quadraticSolve(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
+                                            trf[i], trf[indn[i][1:self.options["neval"]+1]], \
+                                            trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
+
+                import pdb; pdb.set_trace()
             # 1b. Fit a Hessian over the points using least squares
 
             # solve : fh_i(x_j) = f_j = f_i + g_i(x_j-x_i) + (x_j-x_i)^T H_i (x_j-x_i)
@@ -200,18 +210,18 @@ class HessianFit(ASCriteria):
 
             # H_i converted to compressed symmetric part
 
-            for i in range(self.ntr):
-                hess.append(np.zeros((self.dim, self.dim)))
+            # for i in range(self.ntr):
+            #     hess.append(np.zeros((self.dim, self.dim)))
 
-                # Solve P*h_j = g_j for each direction in a least-squares sense
-                P = pts[i] - trx[i]
-                for j in range(self.dim):
-                    hj = np.zeros(self.dim)
-                    gj = trg[j]
+            #     # Solve P*h_j = g_j for each direction in a least-squares sense
+            #     P = pts[i] - trx[i]
+            #     for j in range(self.dim):
+            #         hj = np.zeros(self.dim)
+            #         gj = trg[j]
 
-                    hj = lstsq(P, gj)
+            #         hj = lstsq(P, gj)
 
-                    hess[i][:,j] = hj
+            #         hess[i][:,j] = hj
 
         if(self.options["hessian"] == "surrogate"):
 
@@ -240,8 +250,6 @@ class HessianFit(ASCriteria):
         #sum contributions in this vector
         err = np.zeros(self.ntr)
 
-        dists = pdist(trx)
-        dists = squareform(dists)
         for i in range(self.ntr):
             #ind = indn[i]
             ind = dists[i,:]
