@@ -41,13 +41,12 @@ def quadraticSolve(x, xn, f, fn, g, gn):
     rsize = M + M*N    # number of equations, fh, gh conditions 
 
     # solution vector, stored as {fc, gc1, gc2, .., gN, H }
-    sol = np.zeros(1 + N + vN)
+    sol = np.zeros(csize)
 
     mat = np.zeros([rsize, csize])
     rhs = np.zeros(rsize)
     dx = xn
     for i in range(M-1):
-
         dx[i,:] -= x
 
     # assemble rhs
@@ -100,6 +99,85 @@ def quadraticSolve(x, xn, f, fn, g, gn):
 
     #import pdb; pdb.set_trace()
     return fh, gh, Hh
+
+
+def quadraticSolveHOnly(x, xn, f, fn, g, gn):
+
+    """
+    Construct a quadratic interpolation over a limited neighborhood of points 
+    about a given point, for which the function values and gradients are known.
+    
+    solve : fh_i(x_j) = f_j = f_i + g_i(x_j-x_i) + (x_j-x_i)^T H_i (x_j-x_i) 
+    and   : gh_i(x_j) = g_j = g_i + H_i(x_j-x_i)
+    unknown : {f_i, g_i, H_i} or if we use data, {H_i}
+
+    in a minimum norm least squares sense.
+
+    Inputs: 
+        x - point to center the approximation
+        xn - neighborhood of points to attempt interpolation through
+        f - function value at center point
+        fn - function values of neighborhood points
+        g - gradient at center point
+        gn - gradient at neighborhood points
+
+    Outputs
+        fc - solved center function value
+        gc - solved center gradient
+        Hc - solved center Hessian
+    """
+    N = g.shape[0] # problem dimension
+    M = xn.shape[0] # number of points to fit
+    vN = sum(range(N+1))
+    csize = vN # number of unknowns, H
+    rsize = M+M*N    # number of equations, gh conditions 
+
+    # solution vector, stored as { H }
+    sol = np.zeros(csize)
+
+    mat = np.zeros([rsize, csize])
+    rhs = np.zeros(rsize)
+    dx = xn
+    for i in range(M):
+        dx[i,:] -= x
+
+    # assemble rhs
+    
+    for i in range(M):
+        rhs[i] = fn[i] - f - np.dot(g, dx[i,:]) 
+        gvec = gn[i,:] - g
+        rhs[(M+i*N):(M+i*N + N)] = gvec
+
+    # assemble mat
+    # function fitting
+    for k in range(0,M):
+        for i in range(N):
+            for j in range(N):
+                ind = symMatfromVec(i,j,N)
+                mat[k, ind] += 0.5*dx[k,i]*dx[k,j]
+
+    # gradient fitting
+    for k in range(M):
+        for i in range(N):
+            for j in range(N):
+                ind = symMatfromVec(i,j,N)
+                mat[M+k*N+i, ind] += dx[k,j]
+
+    # now solve the system in a least squares sense
+    # rhs[0] *= 100
+    # mat[0,0] *= 100
+    import pdb; pdb.set_trace()
+
+    sol = lstsq(mat, rhs)
+    # LU, PIV = lu_factor(mat)
+    sol = solve(mat, rhs)
+
+    import pdb; pdb.set_trace()
+
+    Hh = sol[0]
+
+    #import pdb; pdb.set_trace()
+    return Hh
 
 
 
@@ -175,15 +253,15 @@ trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits)
 
-nt0  = 2
+nt0  = 3
 
-t0 = np.array([[0.25, 0.4],[0.75, 0.6]])# sampling(nt0)[0.5, 0.5],
+t0 = np.array([[0.25, 0.75],[0.8, 0.5],[0.75, 0.1]])# sampling(nt0)[0.5, 0.5],
 f0 = trueFunc(t0)
 g0 = np.zeros([nt0,dim])
 for i in range(dim):
     g0[:,i:i+1] = trueFunc(t0,i)
 
-quadraticSolve(t0[0,:], t0[1:2,:], f0[0], f0[1:2], g0[0,:], g0[1:2,:])
+quadraticSolveHOnly(t0[0,:], t0[1:3,:], f0[0], f0[1:3], g0[0,:], g0[1:3,:])
 
 
 
