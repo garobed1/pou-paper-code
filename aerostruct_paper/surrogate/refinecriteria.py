@@ -6,7 +6,7 @@ from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
 from scipy.linalg import lstsq, eig
 from scipy.spatial.distance import pdist, squareform
-from utils import quadratic, quadraticSolve
+from utils import quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec
 
 """Base Class for Adaptive Sampling Criteria Functions"""
 class ASCriteria():
@@ -102,8 +102,8 @@ class looCV(ASCriteria):
     #TODO: This could be a variety of possible LOO-averaging functions
     def evaluate(self, x, dir=0):
         
-        # if(len(x.shape) != 2):
-        #     x = np.array([x])
+        if(len(x.shape) != 2):
+            x = np.array([x])
 
         # evaluate the point for the original model
         #import pdb; pdb.set_trace()
@@ -132,7 +132,7 @@ class looCV(ASCriteria):
 
         ind = np.argmax(diff)
 
-        return t0[ind]
+        return np.array([t0[ind]])
 
     def post_asopt(self, x, dir=0):
 
@@ -195,10 +195,19 @@ class HessianFit(ASCriteria):
 
                     
             for i in range(self.ntr):
-                fh, gh, Hh = quadraticSolve(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
+                # fh, gh, Hh = quadraticSolve(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
+                #                             trf[i], trf[indn[i][1:self.options["neval"]+1]], \
+                #                             trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
+
+                Hh = quadraticSolveHOnly(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
                                             trf[i], trf[indn[i][1:self.options["neval"]+1]], \
                                             trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
 
+                hess.append(np.zeros([self.dim, self.dim]))
+                for j in range(self.dim):
+                    for k in range(self.dim):
+                        hess[i][j,k] = Hh[symMatfromVec(j,k,self.dim)]
+                
                 import pdb; pdb.set_trace()
             # 1b. Fit a Hessian over the points using least squares
 
@@ -272,7 +281,7 @@ class HessianFit(ASCriteria):
         for i in badlist:
             H = hess[i]
             eigvals, eigvecs = eig(H)
-            o = np.argsort(eigvals)
+            o = np.argsort(abs(eigvals))
             opt_dir.append(eigvecs[:,o[-1]])
 
         import pdb; pdb.set_trace()

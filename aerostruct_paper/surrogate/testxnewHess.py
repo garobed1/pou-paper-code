@@ -4,29 +4,31 @@ from refinecriteria import looCV, HessianFit
 from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
 from pougrad import POUSurrogate
+from numpy.linalg import eig
 
 
-from heaviside import Heaviside, Quad2D
+from heaviside import Heaviside, Quad2D, QuadHadamard
 from smt.problems import Sphere, LpNorm
 from smt.surrogate_models import kpls, gekpls
 from smt.sampling_methods import LHS
 
-dim = 2
+dim = 16
 rho = 100
 
-trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
+trueFunc = QuadHadamard(ndim=dim)#, theta=np.pi/4)
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits)
 
-nt0  = 3
+nt0  = 20
 dist = 0.01
-ntr = 10
+ntr = 1
 nte = 20
 
-t0 = np.zeros([nt0,dim])
-t0 = np.array([[0.25, 0.75],[0.5, 0.5],[0.75, 0.25]])# sampling(nt0)
-
-
+# t0 = np.zeros([nt0,dim])
+# t0 = np.array([[0.25, 0.75],[0.5, 0.5],[0.75, 0.25]])# 
+t0 = sampling(nt0)
+HHH = trueFunc.getHessian()
+import pdb; pdb.set_trace()
 
 g0 = np.zeros([nt0,dim])
 
@@ -42,13 +44,13 @@ for i in range(dim):
 # fe = trueFunc(te)
 
 # for "fake" gradient enhanced kriging in 1 dim
-tk = np.zeros([2*nt0,dim])
-fk = np.zeros([2*nt0,1])
-for i in range(nt0):
-    tk[2*i,[0]] = t0[i,[0]]-dist
-    fk[2*i,[0]] = f0[i,[0]]-dist*g0[i,[0]]
-    tk[2*i+1,[0]] = t0[i,[0]]+dist
-    fk[2*i+1,[0]] = f0[i,[0]]+dist*g0[i,[0]]
+# tk = np.zeros([2*nt0,dim])
+# fk = np.zeros([2*nt0,1])
+# for i in range(nt0):
+#     tk[2*i,[0]] = t0[i,[0]]-dist
+#     fk[2*i,[0]] = f0[i,[0]]-dist*g0[i,[0]]
+#     tk[2*i+1,[0]] = t0[i,[0]]+dist
+#     fk[2*i+1,[0]] = f0[i,[0]]+dist*g0[i,[0]]
 
 #import pdb; pdb.set_trace()
 #gek = kpls.KPLS()
@@ -93,7 +95,7 @@ gek.train()
 
 
 
-criteria = HessianFit(gek, improve=0.5, neval=1) #looCV(gek, approx=False)
+criteria = HessianFit(gek, improve=0., neval=16) #looCV(gek, approx=False)
 
 xzt = np.linspace(-1, 1, 50)
 zlv = np.zeros(50)

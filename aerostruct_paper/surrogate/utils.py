@@ -85,13 +85,12 @@ def quadraticSolve(x, xn, f, fn, g, gn):
     # now solve the system in a least squares sense
     # rhs[0] *= 100
     # mat[0,0] *= 100
-    import pdb; pdb.set_trace()
-
+    #import pdb; pdb.set_trace()
     sol = lstsq(mat, rhs)
     # LU, PIV = lu_factor(mat)
-    sol = solve(mat, rhs)
+    #sol = solve(mat, rhs)
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
 
     fh = sol[0][0]
     gh = sol[0][1:N+1]
@@ -166,13 +165,13 @@ def quadraticSolveHOnly(x, xn, f, fn, g, gn):
     # now solve the system in a least squares sense
     # rhs[0] *= 100
     # mat[0,0] *= 100
+    #import pdb; pdb.set_trace()
     import pdb; pdb.set_trace()
-
     sol = lstsq(mat, rhs)
     # LU, PIV = lu_factor(mat)
-    sol = solve(mat, rhs)
+    #sol = solve(mat, rhs)
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
 
     Hh = sol[0]
 
@@ -248,20 +247,20 @@ def symMatfromVec(i, j, N):
     else:
         return int(j*N - (j - 1) * j/2 + i - j)
     
-dim = 2
-trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
-xlimits = trueFunc.xlimits
-sampling = LHS(xlimits=xlimits)
+# dim = 2
+# trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
+# xlimits = trueFunc.xlimits
+# sampling = LHS(xlimits=xlimits)
 
-nt0  = 3
+# nt0  = 3
 
-t0 = np.array([[0.25, 0.75],[0.8, 0.5],[0.75, 0.1]])# sampling(nt0)[0.5, 0.5],
-f0 = trueFunc(t0)
-g0 = np.zeros([nt0,dim])
-for i in range(dim):
-    g0[:,i:i+1] = trueFunc(t0,i)
+# t0 = np.array([[0.25, 0.75],[0.8, 0.5],[0.75, 0.1]])# sampling(nt0)[0.5, 0.5],
+# f0 = trueFunc(t0)
+# g0 = np.zeros([nt0,dim])
+# for i in range(dim):
+#     g0[:,i:i+1] = trueFunc(t0,i)
 
-quadraticSolveHOnly(t0[0,:], t0[1:3,:], f0[0], f0[1:3], g0[0,:], g0[1:3,:])
+# quadraticSolveHOnly(t0[0,:], t0[1:3,:], f0[0], f0[1:3], g0[0,:], g0[1:3,:])
 
 
 

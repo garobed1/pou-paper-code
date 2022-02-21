@@ -35,7 +35,6 @@ def getxnew(rcrit, x0, bounds, options=None):
     #gresults = optimize(rcrit.evaluate, args=(), bounds=bounds, type="global")
     for i in range(rcrit.nnew):
         x0 = rcrit.pre_asopt()
-
         args=(i,)
         if(options["localswitch"]):
             results = optimize(rcrit.evaluate, args=args, bounds=bounds, type="local", x0=x0)
@@ -59,7 +58,8 @@ def adaptivesampling(func, model, rcrit, bounds, ntr, options=None):
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
             for i in range(dim):
                 g0.append(model.training_points[None][i+1][1])
-        xnew = np.array([getxnew(rcrit, x0, bounds, options)])
+        xnew = np.array(getxnew(rcrit, x0, bounds, options))
+        #import pdb; pdb.set_trace()
         t0 = np.append(t0, xnew, axis=0)
         f0 = np.append(f0, func(xnew), axis=0)
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
