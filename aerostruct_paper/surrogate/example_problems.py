@@ -248,6 +248,48 @@ class QuadHadamard(Problem):
         self.applyHadamard(iden, self.eigen_vectors)
 
 
-# prob = QuadHadamard()
-# prob(np.array([[1.,0.]]))
+# f(x) = arctan(alpha*(x dot t))
+class MultiDimJump(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("alpha", 5., types=float)
+        self.options.declare("name", "MultiDimJump", types=str)
+
+        self.t = None
+
+    def _setup(self):
+        self.xlimits[:, 0] = -2.5
+        self.xlimits[:, 1] = 2.5
+
+        self.t = np.random.normal(size=self.options["ndim"])
+        self.t = self.t/np.linalg.norm(self.t)
+        self.alpha = self.options["alpha"]
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            work = np.dot(x[i,:], self.t)
+            if kx is None:
+                y[i,0] = np.arctan(self.alpha*work)
+            else:
+                work2 = (1./(1.+work*work))
+                y[i,0] = work2*self.t[kx]
+
+        return y
 

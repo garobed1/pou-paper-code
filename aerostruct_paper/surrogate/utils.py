@@ -1,6 +1,7 @@
 import numpy as np
-from scipy.linalg import lstsq, lu_factor, lu_solve, solve
-from heaviside import Heaviside, Quad2D
+from numpy.linalg import qr
+from scipy.linalg import lstsq, lu_factor, lu_solve, solve, inv, eig
+from example_problems import Heaviside, Quad2D
 from smt.sampling_methods import LHS
 
 
@@ -166,7 +167,6 @@ def quadraticSolveHOnly(x, xn, f, fn, g, gn):
     # rhs[0] *= 100
     # mat[0,0] *= 100
     #import pdb; pdb.set_trace()
-    import pdb; pdb.set_trace()
     sol = lstsq(mat, rhs)
     # LU, PIV = lu_factor(mat)
     #sol = solve(mat, rhs)
@@ -246,7 +246,69 @@ def symMatfromVec(i, j, N):
         return int(i*N - (i - 1) * i/2 + j - i)
     else:
         return int(j*N - (j - 1) * j/2 + i - j)
+
+
+def maxEigenEstimate(x, xn, g, gn):
+
+    """
+    Find the maximum eigenvalue pair of the sample-space projected Hessian at x, 
+    in the neighborhood xn. 
+
+    HX \approx G, H - Hessian, G - Gradient
     
+    X = xn.T - x, QR = X, Q.T H Q \approx Q.T G R
+
+    Find eigenpairs of 0.5(Q.T G R^-1 + R^-1.T G.T Q), \lambda, vhat
+
+    Then the corresponding eigenvector of H is v = Qvhat
+
+    Inputs: 
+        x - point to center the approximation
+        xn - neighborhood of points to attempt interpolation through
+        g - gradient at center point
+        gn - gradient at neighborhood points
+
+    Outputs
+        evalm - max eigenvalue
+        evecm - corresponding eigenvector
+    """
+    N = g.shape[0] # problem dimension
+    M = xn.shape[0] # number of points to fit
+
+    # get matrix of neighborhood distances
+    dx = xn
+    for i in range(M):
+        dx[i,:] -= x
+    dx = dx.T
+
+    # get gradient matrix
+    dg = gn
+    for i in range(M):
+        dg[i,:] -= g
+    G = dg.T
+
+    # QR factorize the dx matrix
+    Q, R = qr(dx, mode='reduced')
+
+    # Invert upper part of R
+    Rinv = inv(R)
+
+    # Create the approximation of the projected Hessian
+    M = np.matmul(Q.T, np.matmul(G, Rinv))
+
+    # Find the eigenvalues of the symmetric part
+    evals, evecs = eig(0.5*(M + M.T))
+
+    # Find the largest eigenpair and estimate the Hessian eigenvector
+    o = np.argsort(abs(evals))
+    evalm = evals[o[-1]]
+    evecmtilde = evecs[:,o[-1]]
+    evecm = np.matmul(Q, evecmtilde)
+    import pdb; pdb.set_trace()
+    return evalm, evecm
+
+
+
 # dim = 2
 # trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
 # xlimits = trueFunc.xlimits

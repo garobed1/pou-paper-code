@@ -6,7 +6,7 @@ from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
 from scipy.linalg import lstsq, eig
 from scipy.spatial.distance import pdist, squareform
-from utils import quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec
+from utils import quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate
 
 """Base Class for Adaptive Sampling Criteria Functions"""
 class ASCriteria():
@@ -208,6 +208,9 @@ class HessianFit(ASCriteria):
                     for k in range(self.dim):
                         hess[i][j,k] = Hh[symMatfromVec(j,k,self.dim)]
                 
+                evalm, evecm = maxEigenEstimate(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
+                                                trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
+
                 import pdb; pdb.set_trace()
             # 1b. Fit a Hessian over the points using least squares
 
