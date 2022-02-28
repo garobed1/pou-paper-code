@@ -31,17 +31,20 @@ def getxnew(rcrit, x0, bounds, options=None):
         options = DefaultOptOptions
     
     xnew = []
+    bounds_used = bounds
 
     #gresults = optimize(rcrit.evaluate, args=(), bounds=bounds, type="global")
     for i in range(rcrit.nnew):
-        x0 = rcrit.pre_asopt()
+        x0, lbounds = rcrit.pre_asopt(bounds, dir=i)
+        if(lbounds is not None):
+            bounds_used = lbounds
         args=(i,)
         if(options["localswitch"]):
-            results = optimize(rcrit.evaluate, args=args, bounds=bounds, type="local", x0=x0)
+            results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="local", x0=x0)
         else:
-            results = optimize(rcrit.evaluate, args=args, bounds=bounds, type="global")
+            results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="global")
     #    results = gresults
-        xnew.append(rcrit.post_asopt(results.x))
+        xnew.append(rcrit.post_asopt(results.x, dir=i))
 
     return xnew
 
@@ -49,33 +52,33 @@ def getxnew(rcrit, x0, bounds, options=None):
 def adaptivesampling(func, model, rcrit, bounds, ntr, options=None):
 
     #TODO: Alternate Stopping Criteria
-    for i in range(ntr):
-        x0 = np.array([[0.25, 0]])
+    count = int(ntr/rcrit.nnew)
+    for i in range(count):
         t0 = model.training_points[None][0][0]
         f0 = model.training_points[None][0][1]
         g0 = []
         nt, dim = t0.shape
+        x0 = np.zeros([1, dim])
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
             for i in range(dim):
                 g0.append(model.training_points[None][i+1][1])
+
+        # get the new points
         xnew = np.array(getxnew(rcrit, x0, bounds, options))
-        #import pdb; pdb.set_trace()
+
+        # add the new points to the model
         t0 = np.append(t0, xnew, axis=0)
         f0 = np.append(f0, func(xnew), axis=0)
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
             for i in range(dim):
                 g0[i] = np.append(g0[i], func(xnew, i), axis=0)
-
         model.set_training_values(t0, f0)
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
             for i in range(dim):
                 model.set_training_derivatives(t0, g0[i], i)
         model.train()
 
-        #zs = model.predict_values(x)
-
-        #replace criteria
-        rcrit.__init__(model, approx=False)# = looCV(model, approx=False)
-        #zlv = criteria.evaluate(x)
+        # replace criteria
+        rcrit.initialize(model)
 
     return model, rcrit

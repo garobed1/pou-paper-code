@@ -2,6 +2,7 @@ import numpy as np
 from numpy.linalg import qr
 from scipy.linalg import lstsq, lu_factor, lu_solve, solve, inv, eig
 from example_problems import Heaviside, Quad2D
+from smt.problems import RobotArm
 from smt.sampling_methods import LHS
 
 
@@ -206,6 +207,29 @@ def quadratic(x, x0, f0, g, h):
 
     return f
 
+def linear(x, x0, f0, g):
+    """
+    Given the gradient and Hessian about a nearby point, return the linear
+    Taylor series approximation of the function
+    
+    f(x) = f(x0) + g(x0)^T*(x-x0) + O((x-x0)^2)
+
+    Inputs:
+        x - point to evaluate the approximation
+        x0 - center point of the Taylor series
+        f0 - function value at the center
+        g - gradient at the center
+
+    Outputs:
+        f - linear Taylor series approximation at x
+    """
+
+    dx = x - x0
+
+    f = f0 + np.dot(g,dx)
+
+    return f
+
 
 def neighborhood(i, trx):
     """
@@ -304,8 +328,38 @@ def maxEigenEstimate(x, xn, g, gn):
     evalm = evals[o[-1]]
     evecmtilde = evecs[:,o[-1]]
     evecm = np.matmul(Q, evecmtilde)
-    import pdb; pdb.set_trace()
     return evalm, evecm
+
+
+# return intersection points of line with the problem bounds through exhaustive search
+
+# this assumes we know the line intersects with the box, and our origin is inside
+#TODO: Write a test for this
+def boxIntersect(xc, xdir, bounds):
+
+    m = xc.shape[0]
+
+    blims = np.zeros(m*2)
+    blims[0:m] = (bounds[:,0] - xc)/xdir # all element-wise
+    blims[m:2*m] = (bounds[:,1] - xc)/xdir
+
+    # find minimum positive alpha
+    p1 = min([i for i in blims if i > 0])
+
+    # find maximum negative alpha
+    p0 = max([i for i in blims if i < 0])
+    
+    return p0, p1
+
+# dim = 2
+# trueFunc = RobotArm(ndim=dim)
+# xlimits = trueFunc.xlimits
+
+# xc = np.array([0.9, np.pi])
+# xdir = np.array([1, 4])
+# xdir = xdir/np.linalg.norm(xdir)
+
+# p0, p1 = boxIntersect(xc, xdir, xlimits)
 
 
 

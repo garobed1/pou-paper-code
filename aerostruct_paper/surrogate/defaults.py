@@ -19,7 +19,7 @@ liter : int
 
 DefaultOptOptions = {
     "method":"ga",
-    "localswitch":False,
+    "localswitch":True,
     "strategy":'best1bin', 
     "lmethod":None, 
     "lstrategy":None,

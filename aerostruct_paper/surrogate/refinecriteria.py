@@ -6,7 +6,8 @@ from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
 from scipy.linalg import lstsq, eig
 from scipy.spatial.distance import pdist, squareform
-from utils import quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate
+from scipy.optimize import Bounds
+from utils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
 
 """Base Class for Adaptive Sampling Criteria Functions"""
 class ASCriteria():
@@ -42,16 +43,16 @@ class ASCriteria():
     def _init_options(self):
         pass
 
-    def initialize(self):
+    def initialize(self, model=None):
         pass
 
     def evaluate(self, x, dir=0):
         pass
 
-    def pre_asopt(self):
+    def pre_asopt(self, bounds, dir=0):
         pass
 
-    def post_asopt(self):
+    def post_asopt(self, x, dir=0):
         pass
 
     
@@ -68,7 +69,13 @@ class looCV(ASCriteria):
     def _init_options(self):
         self.options.declare("approx", False, types=bool)
 
-    def initialize(self):
+    def initialize(self, model=None):
+
+        if(model is not None):
+            self.model = copy.deepcopy(model)
+            kx = 0
+            self.dim = self.model.training_points[None][kx][0].shape[1]
+            self.ntr = self.model.training_points[None][kx][0].shape[0]
 
         # Create a list of LOO surrogate models
         self.loosm = []
@@ -120,7 +127,7 @@ class looCV(ASCriteria):
         return ans # to work with optimizers
 
     # if only using local optimization, start the optimizer at the worst LOO point
-    def pre_asopt(self, dir=0):
+    def pre_asopt(self, bounds, dir=0):
         t0 = self.model.training_points[None][0][0]
         #import pdb; pdb.set_trace()
         diff = np.zeros(self.ntr)
@@ -132,7 +139,7 @@ class looCV(ASCriteria):
 
         ind = np.argmax(diff)
 
-        return np.array([t0[ind]])
+        return np.array([t0[ind]]), None
 
     def post_asopt(self, x, dir=0):
 
@@ -146,6 +153,7 @@ class HessianFit(ASCriteria):
     def __init__(self, model, **kwargs):
 
         self.bads = None
+        self.bad_nbhd = None
         self.bad_dirs = None
 
         super().__init__(model, **kwargs)
@@ -156,15 +164,28 @@ class HessianFit(ASCriteria):
         #options: neighborhood, surrogate, exact
         self.options.declare("hessian", "neighborhood", types=str)
 
+        #options: honly, full, arnoldi
+        self.options.declare("interp", "arnoldi", types=str)
+
         #options: distance, variance, random
         self.options.declare("criteria", "distance", types=str)
+
+        #options: linear, quadratic
+        self.options.declare("error", "linear", types=str)
+
         self.options.declare("improve", 0.05, types=float)
 
         #number of closest points to evaluate nonlinearity measure
         self.options.declare("neval", self.dim*2, types=int)
         
-    def initialize(self):
+    def initialize(self, model=None):
         
+        if(model is not None):
+            self.model = copy.deepcopy(model)
+            kx = 0
+            self.dim = self.model.training_points[None][kx][0].shape[1]
+            self.ntr = self.model.training_points[None][kx][0].shape[0]
+
         self.nnew = int(self.ntr*self.options["improve"])
         if(self.nnew == 0):
             self.nnew = 1
@@ -172,14 +193,16 @@ class HessianFit(ASCriteria):
         trx = self.model.training_points[None][0][0]
         trf = self.model.training_points[None][0][1]
         trg = np.zeros_like(trx)
-        for j in range(self.dim):
-            trg[:,j] = self.model.training_points[None][j+1][1].flatten()
+        if(isinstance(self.model, GEKPLS)):
+            for j in range(self.dim):
+                trg[:,j] = self.model.training_points[None][j+1][1].flatten()
 
         dists = pdist(trx)
         dists = squareform(dists)
 
-        # 1. Estimate the Hessian about each point
+        # 1. Estimate the Hessian (or its principal eigenpair) about each point
         hess = []
+        nbhd = []
 
         if(self.options["hessian"] == "neighborhood"):
             pts = []
@@ -195,45 +218,29 @@ class HessianFit(ASCriteria):
 
                     
             for i in range(self.ntr):
-                # fh, gh, Hh = quadraticSolve(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
-                #                             trf[i], trf[indn[i][1:self.options["neval"]+1]], \
-                #                             trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
-
-                Hh = quadraticSolveHOnly(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
+                if(self.options["interp"] == "full"):
+                    fh, gh, Hh = quadraticSolve(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
                                             trf[i], trf[indn[i][1:self.options["neval"]+1]], \
                                             trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
 
-                hess.append(np.zeros([self.dim, self.dim]))
-                for j in range(self.dim):
-                    for k in range(self.dim):
-                        hess[i][j,k] = Hh[symMatfromVec(j,k,self.dim)]
+                if(self.options["interp"] == "honly"):
+                    Hh = quadraticSolveHOnly(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
+                                            trf[i], trf[indn[i][1:self.options["neval"]+1]], \
+                                            trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
+                    fh = trf[i]
+                    gh = trg[i,:]
+
+                if(self.options["interp"] == "full" or self.options["interp"] == "honly"):
+                    hess.append(np.zeros([self.dim, self.dim]))
+                    for j in range(self.dim):
+                        for k in range(self.dim):
+                            hess[i][j,k] = Hh[symMatfromVec(j,k,self.dim)]
                 
-                evalm, evecm = maxEigenEstimate(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
-                                                trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
+                else: #arnoldi
+                    evalm, evecm = maxEigenEstimate(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
+                                                    trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
 
-                import pdb; pdb.set_trace()
-            # 1b. Fit a Hessian over the points using least squares
-
-            # solve : fh_i(x_j) = f_j = f_i + g_i(x_j-x_i) + (x_j-x_i)^T H_i (x_j-x_i)
-            # 
-            # and   : gh_i(x_j) = g_j = g_i + H_i(x_j-x_i)
-            #
-            # unknown : {f_i, g_i, H_i} or if we use data, {H_i}
-
-            # H_i converted to compressed symmetric part
-
-            # for i in range(self.ntr):
-            #     hess.append(np.zeros((self.dim, self.dim)))
-
-            #     # Solve P*h_j = g_j for each direction in a least-squares sense
-            #     P = pts[i] - trx[i]
-            #     for j in range(self.dim):
-            #         hj = np.zeros(self.dim)
-            #         gj = trg[j]
-
-            #         hj = lstsq(P, gj)
-
-            #         hess[i][:,j] = hj
+                    hess.append([evalm, evecm])
 
         if(self.options["hessian"] == "surrogate"):
 
@@ -257,10 +264,8 @@ class HessianFit(ASCriteria):
                         hess[l][j,k] = hj[l]/h
 
 
-        # 2. For every point, sum the discrepancies between the quadratic 
+        # 2. For every point, sum the discrepancies between the linear (quadratic)
         # prediction in the neighborhood and the observation value
-        
-        #sum contributions in this vector
         err = np.zeros(self.ntr)
 
         for i in range(self.ntr):
@@ -268,31 +273,41 @@ class HessianFit(ASCriteria):
             ind = dists[i,:]
             ind = np.argsort(ind)
             for key in ind[1:self.options["neval"]]:
-                fh = quadratic(trx[key], trx[i], trf[i], trg[:][i], hess[i])
+                if(self.options["error"] == "linear" or self.options["interp"] == "arnoldi"):
+                    fh = linear(trx[key], trx[i], trf[i], trg[:][i])
+                else:
+                    fh = quadratic(trx[key], trx[i], trf[i], trg[:][i], hess[i])
                 err[i] += abs(trf[key] - fh)
             err[i] /= self.options["neval"]
+            nbhd.append(ind[1:self.options["neval"]])
 
         # 2a. Pick some percentage of the "worst" points, and their principal Hessian directions
         badlist = np.argsort(err)
         badlist = badlist[-self.nnew:]
         bads = trx[badlist]
+        bad_nbhd = np.zeros([bads.shape[0], self.options["neval"]-1], dtype=int)
+        for i in range(bads.shape[0]):
+            bad_nbhd[i,:] = nbhd[badlist[i]]
 
-        # 3. Generate a 1D distance/variance criteria for each bad point
+        # 3. Generate a criteria for each bad point
 
         # 3a. Take the highest eigenvalue/vector of each Hessian
         opt_dir = []
-        for i in badlist:
-            H = hess[i]
-            eigvals, eigvecs = eig(H)
-            o = np.argsort(abs(eigvals))
-            opt_dir.append(eigvecs[:,o[-1]])
+        if(self.options["interp"] == "arnoldi"):
+            for i in badlist:
+                opt_dir.append(hess[i][1])
+        else:
+            for i in badlist:
+                H = hess[i]
+                eigvals, eigvecs = eig(H)
+                o = np.argsort(abs(eigvals))
+                opt_dir.append(eigvecs[:,o[-1]])
 
-        import pdb; pdb.set_trace()
         # we have what we need
         self.bads = bads
+        self.bad_nbhd = bad_nbhd
         self.bad_dirs = opt_dir
         
-
 
     def evaluate(self, x, dir=0):
         
@@ -316,17 +331,28 @@ class HessianFit(ASCriteria):
 
         elif(self.options["criteria"] == "variance"):
             
-            ans = -self.model.predict_variances(xeval)
+            ans = -self.model.predict_variances(np.array([xeval]))[0,0]
 
         else:
             print("Invalid Criteria Option")
 
         return ans 
 
-    def pre_asopt(self, dir=0):
+    def pre_asopt(self, bounds, dir=0):
         xc = self.bads[dir]
+        xdir = self.bad_dirs[dir]
+        trx = self.model.training_points[None][0][0]
+        nbhd = trx[self.bad_nbhd[dir],:]
+        dists = pdist(np.append(np.array([xc]), nbhd, axis=0))
+        dists = squareform(dists)
+        B = max(dists[0,:])
 
-        return xc
+        # check if we need to limit further based on bounds
+        p0, p1 = boxIntersect(xc, xdir, bounds)
+        bp = min(B, p1)
+        bm = max(-B, p0)
+
+        return np.array([0.+0.1*bp]), Bounds(bm, bp)
 
     def post_asopt(self, x, dir=0):
 
