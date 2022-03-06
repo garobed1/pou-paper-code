@@ -1,4 +1,5 @@
 from optimizers import optimize
+import copy
 from defaults import DefaultOptOptions
 import numpy as np
 from smt.surrogate_models import GEKPLS
@@ -53,15 +54,17 @@ def adaptivesampling(func, model, rcrit, bounds, ntr, options=None):
 
     #TODO: Alternate Stopping Criteria
     count = int(ntr/rcrit.nnew)
+    hist = []
+    
     for i in range(count):
         t0 = model.training_points[None][0][0]
         f0 = model.training_points[None][0][1]
-        g0 = []
+        g0 = rcrit.grad
         nt, dim = t0.shape
         x0 = np.zeros([1, dim])
-        if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
-            for i in range(dim):
-                g0.append(model.training_points[None][i+1][1])
+        # if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
+        #     for i in range(dim):
+        #         g0.append(model.training_points[None][i+1][1])
 
         # get the new points
         xnew = np.array(getxnew(rcrit, x0, bounds, options))
@@ -69,16 +72,19 @@ def adaptivesampling(func, model, rcrit, bounds, ntr, options=None):
         # add the new points to the model
         t0 = np.append(t0, xnew, axis=0)
         f0 = np.append(f0, func(xnew), axis=0)
-        if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
-            for i in range(dim):
-                g0[i] = np.append(g0[i], func(xnew, i), axis=0)
+        g0 = np.append(g0, np.zeros([xnew.shape[0], xnew.shape[1]]), axis=0)
+        for i in range(dim):
+            g0[nt:,i] = func(xnew, i)[:,0]
+
         model.set_training_values(t0, f0)
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
             for i in range(dim):
                 model.set_training_derivatives(t0, g0[i], i)
         model.train()
 
-        # replace criteria
-        rcrit.initialize(model)
+        hist.append(copy.deepcopy(rcrit))
 
-    return model, rcrit
+        # replace criteria
+        rcrit.initialize(model, g0)
+
+    return model, rcrit, hist

@@ -2,12 +2,26 @@ import unittest
 import numpy as np
 import sys
 sys.path.insert(1,"../")
+sys.path.insert(1,"../surrogate")
 
-from surrogate.utils import quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate
+from surrogate.utils import quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
+from smt.problems import RobotArm
 
-class ProblemDiffTest(unittest.TestCase):
+class UtilTest(unittest.TestCase):
     
-    None
+    def test_boxIntersect(self):
+        dim = 2
+        trueFunc = RobotArm(ndim=dim)
+        xlimits = trueFunc.xlimits
+
+        xc = np.array([0.9, np.pi])
+        xdir = np.array([1, 4])
+        xdir = xdir/np.linalg.norm(xdir)
+
+        p0, p1 = boxIntersect(xc, xdir, xlimits)
+
+        self.assertTrue(p0 - -3.238279585853798 < 1.e-14)
+        self.assertTrue(p1 - 0.41231056256176596 < 1.e-14)
 # dim = 2
 # trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
 # xlimits = trueFunc.xlimits

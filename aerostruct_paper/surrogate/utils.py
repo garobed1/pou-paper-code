@@ -360,7 +360,7 @@ def boxIntersect(xc, xdir, bounds):
 # xdir = xdir/np.linalg.norm(xdir)
 
 # p0, p1 = boxIntersect(xc, xdir, xlimits)
-
+# import pdb; pdb.set_trace()
 
 
 # dim = 2

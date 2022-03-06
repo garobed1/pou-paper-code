@@ -18,11 +18,11 @@ from smt.sampling_methods import LHS
 dim = 2
 rho = 100
 
-trueFunc = MultiDimJump(ndim=dim)#, theta=np.pi/4)
+trueFunc = MultiDimJump(ndim=dim, alpha = 15.)#, theta=np.pi/4)
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits)
 
-nt0  = 10
+nt0  = 30
 dist = 0.01
 ntr = 10
 nte = 20
@@ -67,7 +67,7 @@ if(isinstance(gek, gekpls.GEKPLS) or isinstance(gek, POUSurrogate)):
         gek.set_training_derivatives(t0, g0[:,i:i+1], i)
 gek.train()
 
-criteria = HessianFit(gek, improve=0., neval=6, hessian="neighborhood", interp="honly", criteria="variance") #looCV(gek, approx=False)
+criteria = HessianFit(gek, g0, improve=ntr, neval=6, hessian="neighborhood", interp="honly", criteria="variance") #looCV(gek, approx=False)
 
 #Contour
 plt.figure(2)
@@ -166,18 +166,22 @@ options["localswitch"] = True
 #import pdb; pdb.set_trace()
 #gek.name = "GEKPLS"
 
-gek, criteria = adaptivesampling(trueFunc, gek, criteria, xlimits, ntr, options=options)
+gek, criteria, hist = adaptivesampling(trueFunc, gek, criteria, xlimits, ntr, options=options)
 
 t0 = gek.training_points[None][0][0]
 f0 = gek.training_points[None][0][1]
-b0 = criteria.bads
-
+# b0 = hist[0].bads
+# b1ind = hist[0].bad_nbhd
+# b1 = t0[b1ind,:][0]
 # plt.plot(x, zt, "k-")
 # plt.plot(x, zs, "r-")
 plt.plot(t0[0:nt0,0], t0[0:nt0,1], "bo")
 plt.plot(t0[nt0:,0], t0[nt0:,1], "ro")
-#plt.plot(b0[:,0], b0[:,1], "go")
+# plt.plot(b0[:,0], b0[:,1], "go")
+# plt.plot(b1[:,0], b1[:,1], "mo")
+
 plt.savefig("asplotgek.png")
+import pdb; pdb.set_trace()
 # plt.figure(1)
 # plt.clf()
 # plt.plot(x, zlv, "b-")

@@ -261,7 +261,7 @@ class MultiDimJump(Problem):
         self.xlimits[:, 0] = -2.5
         self.xlimits[:, 1] = 2.5
 
-        self.t = np.random.normal(size=self.options["ndim"])
+        self.t = np.array([1.,1.])# np.random.normal(size=self.options["ndim"])
         self.t = self.t/np.linalg.norm(self.t)
         self.alpha = self.options["alpha"]
 
@@ -288,7 +288,7 @@ class MultiDimJump(Problem):
             if kx is None:
                 y[i,0] = np.arctan(self.alpha*work)
             else:
-                work2 = (1./(1.+work*work))
+                work2 = (1./(1.+work*work*self.alpha*self.alpha))*self.alpha
                 y[i,0] = work2*self.t[kx]
 
         return y

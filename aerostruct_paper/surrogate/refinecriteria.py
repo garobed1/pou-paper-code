@@ -150,11 +150,14 @@ class looCV(ASCriteria):
 # Hessian estimation and direction criteria
 
 class HessianFit(ASCriteria):
-    def __init__(self, model, **kwargs):
+    def __init__(self, model, grad, **kwargs):
 
         self.bads = None
+        self.bad_eigs = None
+        self.bad_list = None
         self.bad_nbhd = None
         self.bad_dirs = None
+        self.grad = grad
 
         super().__init__(model, **kwargs)
 
@@ -173,12 +176,12 @@ class HessianFit(ASCriteria):
         #options: linear, quadratic
         self.options.declare("error", "linear", types=str)
 
-        self.options.declare("improve", 0.05, types=float)
+        self.options.declare("improve", 0, types=int)
 
         #number of closest points to evaluate nonlinearity measure
         self.options.declare("neval", self.dim*2, types=int)
         
-    def initialize(self, model=None):
+    def initialize(self, model=None, grad=None):
         
         if(model is not None):
             self.model = copy.deepcopy(model)
@@ -186,17 +189,20 @@ class HessianFit(ASCriteria):
             self.dim = self.model.training_points[None][kx][0].shape[1]
             self.ntr = self.model.training_points[None][kx][0].shape[0]
 
-        self.nnew = int(self.ntr*self.options["improve"])
+        if(grad is not None):
+            self.grad = grad
+
+        self.nnew = self.options["improve"]#int(self.ntr*self.options["improve"])
         if(self.nnew == 0):
             self.nnew = 1
-        
+
         trx = self.model.training_points[None][0][0]
         trf = self.model.training_points[None][0][1]
         trg = np.zeros_like(trx)
+        trg = self.grad
         if(isinstance(self.model, GEKPLS)):
             for j in range(self.dim):
                 trg[:,j] = self.model.training_points[None][j+1][1].flatten()
-
         dists = pdist(trx)
         dists = squareform(dists)
 
@@ -241,6 +247,8 @@ class HessianFit(ASCriteria):
                                                     trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
 
                     hess.append([evalm, evecm])
+
+
 
         if(self.options["hessian"] == "surrogate"):
 
@@ -293,6 +301,7 @@ class HessianFit(ASCriteria):
 
         # 3a. Take the highest eigenvalue/vector of each Hessian
         opt_dir = []
+        opt_val = []
         if(self.options["interp"] == "arnoldi"):
             for i in badlist:
                 opt_dir.append(hess[i][1])
@@ -302,8 +311,11 @@ class HessianFit(ASCriteria):
                 eigvals, eigvecs = eig(H)
                 o = np.argsort(abs(eigvals))
                 opt_dir.append(eigvecs[:,o[-1]])
+                opt_val.append(eigvals[o[-1]])
 
         # we have what we need
+        self.bad_list = badlist
+        self.bad_eigs = opt_val
         self.bads = bads
         self.bad_nbhd = bad_nbhd
         self.bad_dirs = opt_dir
@@ -340,19 +352,30 @@ class HessianFit(ASCriteria):
 
     def pre_asopt(self, bounds, dir=0):
         xc = self.bads[dir]
+        gc = self.grad[self.bad_list[dir],:]
+        eig = self.bad_eigs[dir]
         xdir = self.bad_dirs[dir]
         trx = self.model.training_points[None][0][0]
         nbhd = trx[self.bad_nbhd[dir],:]
         dists = pdist(np.append(np.array([xc]), nbhd, axis=0))
         dists = squareform(dists)
         B = max(dists[0,:])
-
         # check if we need to limit further based on bounds
         p0, p1 = boxIntersect(xc, xdir, bounds)
-        bp = min(B, p1)
-        bm = max(-B, p0)
+        bp = p1# min(B, p1)
+        bm = p0# max(-B, p0)
 
-        return np.array([0.+0.1*bp]), Bounds(bm, bp)
+        # choose the direction to go
+
+        # if concave up, move up the gradient, if concave down, move down the gradient
+        work = np.dot(gc, xdir)
+        adir = np.sign(work)*np.sign(eig)
+        if(adir > 0):
+            bm = 0
+        else:
+            bp = 0
+
+        return np.array([0.+adir*0.01*B]), Bounds(bm, bp)
 
     def post_asopt(self, x, dir=0):
 
