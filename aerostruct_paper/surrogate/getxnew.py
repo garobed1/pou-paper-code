@@ -4,6 +4,7 @@ from defaults import DefaultOptOptions
 import numpy as np
 from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
+from error import rmse
 
 
 """
@@ -50,11 +51,13 @@ def getxnew(rcrit, x0, bounds, options=None):
     return xnew
 
 
-def adaptivesampling(func, model, rcrit, bounds, ntr, options=None):
+def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
 
     #TODO: Alternate Stopping Criteria
     count = int(ntr/rcrit.nnew)
     hist = []
+    errh = []
+    model = copy.deepcopy(model0)
     
     for i in range(count):
         t0 = model.training_points[None][0][0]
@@ -79,12 +82,21 @@ def adaptivesampling(func, model, rcrit, bounds, ntr, options=None):
         model.set_training_values(t0, f0)
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
             for i in range(dim):
-                model.set_training_derivatives(t0, g0[i], i)
+                model.set_training_derivatives(t0, g0[:,i], i)
         model.train()
+
+
+        # evaluate error, rmse for now
+        if(options["errorcheck"] is not None):
+            xdata, fdata = options["errorcheck"]
+            err = rmse(model, func, xdata=xdata, fdata=fdata)
+            errh.append(err)
+        else:
+            errh = None
 
         hist.append(copy.deepcopy(rcrit))
 
         # replace criteria
         rcrit.initialize(model, g0)
 
-    return model, rcrit, hist
+    return model, rcrit, hist, errh

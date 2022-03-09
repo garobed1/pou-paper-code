@@ -20,23 +20,25 @@ def rmse(model, prob, N=5000, xdata=None, fdata=None):
     """
     err = 0
     xlimits = prob.xlimits
-    sampling = LHS(xlimits, criterion='maximin')
      
-    if(xdata):
+    if(xdata is not None):
         tx = xdata
         N = xdata.shape[0]
     else:
+        sampling = LHS(xlimits=xlimits, criterion='maximin')
         tx = sampling(N)
 
-    if(fdata and xdata):
+    if(fdata is not None and xdata is not None):
         tf = fdata
     else:
         tf = prob(tx)
 
     # compute RMSE
+    vals = model.predict_values(tx)
     for i in range(N):
-        work = tf[i] - model.predict_values(tx[i])
+        work = tf[i] - vals[i]
         err += work*work
+        import pdb; pdb.set_trace()
     
     err = np.sqrt(err/N)
     

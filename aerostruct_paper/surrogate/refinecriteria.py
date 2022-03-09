@@ -206,9 +206,14 @@ class HessianFit(ASCriteria):
         dists = pdist(trx)
         dists = squareform(dists)
 
+        neval = self.options["neval"]
+        if(self.options["interp"] == "arnoldi"):
+            neval = self.dim
+
         # 1. Estimate the Hessian (or its principal eigenpair) about each point
         hess = []
         nbhd = []
+
 
         if(self.options["hessian"] == "neighborhood"):
             pts = []
@@ -220,19 +225,19 @@ class HessianFit(ASCriteria):
                 ind = np.argsort(ind)
                 pts.append(np.array(trx[ind,:]))
                 indn.append(ind)
-                #for key in ind[1:self.options["neval"]]:
+                #for key in ind[1:neval]:
 
                     
             for i in range(self.ntr):
                 if(self.options["interp"] == "full"):
-                    fh, gh, Hh = quadraticSolve(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
-                                            trf[i], trf[indn[i][1:self.options["neval"]+1]], \
-                                            trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
+                    fh, gh, Hh = quadraticSolve(trx[i,:], trx[indn[i][1:neval+1],:], \
+                                            trf[i], trf[indn[i][1:neval+1]], \
+                                            trg[i,:], trg[indn[i][1:neval+1],:])
 
                 if(self.options["interp"] == "honly"):
-                    Hh = quadraticSolveHOnly(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
-                                            trf[i], trf[indn[i][1:self.options["neval"]+1]], \
-                                            trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
+                    Hh = quadraticSolveHOnly(trx[i,:], trx[indn[i][1:neval+1],:], \
+                                            trf[i], trf[indn[i][1:neval+1]], \
+                                            trg[i,:], trg[indn[i][1:neval+1],:])
                     fh = trf[i]
                     gh = trg[i,:]
 
@@ -243,8 +248,8 @@ class HessianFit(ASCriteria):
                             hess[i][j,k] = Hh[symMatfromVec(j,k,self.dim)]
                 
                 else: #arnoldi
-                    evalm, evecm = maxEigenEstimate(trx[i,:], trx[indn[i][1:self.options["neval"]+1],:], \
-                                                    trg[i,:], trg[indn[i][1:self.options["neval"]+1],:])
+                    evalm, evecm = maxEigenEstimate(trx[i,:], trx[indn[i][1:neval],:], \
+                                                    trg[i,:], trg[indn[i][1:neval],:])
 
                     hess.append([evalm, evecm])
 
@@ -276,6 +281,7 @@ class HessianFit(ASCriteria):
         # prediction in the neighborhood and the observation value
         err = np.zeros(self.ntr)
 
+        # using the original neval here
         for i in range(self.ntr):
             #ind = indn[i]
             ind = dists[i,:]
@@ -287,7 +293,7 @@ class HessianFit(ASCriteria):
                     fh = quadratic(trx[key], trx[i], trf[i], trg[:][i], hess[i])
                 err[i] += abs(trf[key] - fh)
             err[i] /= self.options["neval"]
-            nbhd.append(ind[1:self.options["neval"]])
+            nbhd.append(ind[1:neval])
 
         # 2a. Pick some percentage of the "worst" points, and their principal Hessian directions
         badlist = np.argsort(err)
@@ -305,6 +311,7 @@ class HessianFit(ASCriteria):
         if(self.options["interp"] == "arnoldi"):
             for i in badlist:
                 opt_dir.append(hess[i][1])
+                opt_val.append(hess[i][0])
         else:
             for i in badlist:
                 H = hess[i]
@@ -360,6 +367,7 @@ class HessianFit(ASCriteria):
         dists = pdist(np.append(np.array([xc]), nbhd, axis=0))
         dists = squareform(dists)
         B = max(dists[0,:])
+
         # check if we need to limit further based on bounds
         p0, p1 = boxIntersect(xc, xdir, bounds)
         bp = p1# min(B, p1)
@@ -369,12 +377,11 @@ class HessianFit(ASCriteria):
 
         # if concave up, move up the gradient, if concave down, move down the gradient
         work = np.dot(gc, xdir)
-        adir = np.sign(work)*np.sign(eig)
+        adir = np.sign(work)*np.sign(np.real(eig))
         if(adir > 0):
             bm = 0
         else:
             bp = 0
-
         return np.array([0.+adir*0.01*B]), Bounds(bm, bp)
 
     def post_asopt(self, x, dir=0):

@@ -15,6 +15,7 @@ gpop : int
     Population/Swarm size for global methods
 liter : int
     Local optimizer iterations 
+errorcheck : list, [xdata, fdata]
 """
 
 DefaultOptOptions = {
@@ -27,5 +28,6 @@ DefaultOptOptions = {
     "gpop":15, 
     "gtol":0.01,
     "liter":100,
-    "ltol":None
+    "ltol":None,
+    "errorcheck":None
 }
