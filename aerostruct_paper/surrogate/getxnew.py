@@ -46,7 +46,7 @@ def getxnew(rcrit, x0, bounds, options=None):
         else:
             results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="global")
     #    results = gresults
-        xnew.append(rcrit.post_asopt(results.x, dir=i))
+        xnew.append(rcrit.post_asopt(results.x, bounds, dir=i))
 
     return xnew
 
@@ -78,7 +78,6 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         g0 = np.append(g0, np.zeros([xnew.shape[0], xnew.shape[1]]), axis=0)
         for i in range(dim):
             g0[nt:,i] = func(xnew, i)[:,0]
-
         model.set_training_values(t0, f0)
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
             for i in range(dim):

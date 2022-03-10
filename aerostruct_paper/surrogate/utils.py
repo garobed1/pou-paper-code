@@ -338,16 +338,23 @@ def maxEigenEstimate(x, xn, g, gn):
 def boxIntersect(xc, xdir, bounds):
 
     m = xc.shape[0]
+    large = 1e100
 
     blims = np.zeros(m*2)
-    blims[0:m] = (bounds[:,0] - xc)/xdir # all element-wise
-    blims[m:2*m] = (bounds[:,1] - xc)/xdir
+
+    for j in range(m):
+        if(xdir[j] < 1e-10):
+            blims[j] = np.sign(bounds[j,0] - xc[j])*large
+            blims[m+j] = np.sign(bounds[j,1] - xc[j])*large
+        else:
+            blims[j] = (bounds[j,0] - xc[j])/xdir[j] # all element-wise
+            blims[m+j] = (bounds[j,1] - xc[j])/xdir[j]
 
     # find minimum positive alpha
-    p1 = min([i for i in blims if i > 0])
+    p1 = min([i for i in blims if i >= 0])
 
     # find maximum negative alpha
-    p0 = max([i for i in blims if i < 0])
+    p0 = max([i for i in blims if i <= 0])
     
     return p0, p1
 

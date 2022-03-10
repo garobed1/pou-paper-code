@@ -52,7 +52,7 @@ class ASCriteria():
     def pre_asopt(self, bounds, dir=0):
         pass
 
-    def post_asopt(self, x, dir=0):
+    def post_asopt(self, x, bounds, dir=0):
         pass
 
     
@@ -141,7 +141,7 @@ class looCV(ASCriteria):
 
         return np.array([t0[ind]]), None
 
-    def post_asopt(self, x, dir=0):
+    def post_asopt(self, x, bounds, dir=0):
 
         return x
         
@@ -180,6 +180,9 @@ class HessianFit(ASCriteria):
 
         #number of closest points to evaluate nonlinearity measure
         self.options.declare("neval", self.dim*2, types=int)
+
+        #perturb the optimal result in a random orthogonal direction
+        self.options.declare("perturb", False, types=bool)
         
     def initialize(self, model=None, grad=None):
         
@@ -302,6 +305,7 @@ class HessianFit(ASCriteria):
         bad_nbhd = np.zeros([bads.shape[0], self.options["neval"]-1], dtype=int)
         for i in range(bads.shape[0]):
             bad_nbhd[i,:] = nbhd[badlist[i]]
+        import pdb; pdb.set_trace()
 
         # 3. Generate a criteria for each bad point
 
@@ -333,6 +337,7 @@ class HessianFit(ASCriteria):
         xc = self.bads[dir]
         xdir = self.bad_dirs[dir]
         trx = self.model.training_points[None][0][0]
+        #trx = self.bads
         m, n = trx.shape
 
         # x is alpha, the distance from xc along xdir, x(alpha) = xc + alpha*xdir
@@ -345,6 +350,8 @@ class HessianFit(ASCriteria):
             sum = 0
             for i in range(m):
                 sum += np.linalg.norm(xeval-trx[i])**2
+                #sum -= np.exp(-np.linalg.norm(xeval-trx[i])**2)
+            #sum = np.linalg.norm(xeval-xc)**2
             
             ans = -sum
 
@@ -366,12 +373,22 @@ class HessianFit(ASCriteria):
         nbhd = trx[self.bad_nbhd[dir],:]
         dists = pdist(np.append(np.array([xc]), nbhd, axis=0))
         dists = squareform(dists)
-        B = max(dists[0,:])
+        B = max(np.delete(dists[0,:],[0,0]))
+
+
+        # find a cluster threshold (max of minimum distances, Aute 2013)
+        mins = np.zeros(dists.shape[0])
+        for i in range(dists.shape[0]):
+            mins[i] = min(np.delete(dists[i,:], [i,i]))
+        S = 0.5*max(mins)
+        if(self.options["criteria"] == "variance"):
+            S = 0.01*max(mins)
+
 
         # check if we need to limit further based on bounds
         p0, p1 = boxIntersect(xc, xdir, bounds)
-        bp = p1# min(B, p1)
-        bm = p0# max(-B, p0)
+        bp = min(B, p1)
+        bm = max(-B, p0)
 
         # choose the direction to go
 
@@ -379,18 +396,38 @@ class HessianFit(ASCriteria):
         work = np.dot(gc, xdir)
         adir = np.sign(work)*np.sign(np.real(eig))
         if(adir > 0):
-            bm = 0
+            bm = max(adir*S, p0)
         else:
-            bp = 0
-        return np.array([0.+adir*0.01*B]), Bounds(bm, bp)
+            bp = min(adir*S, p1)
+        #import pdb; pdb.set_trace()
+        return np.array([adir*S]), Bounds(bm, bp)
 
-    def post_asopt(self, x, dir=0):
+    def post_asopt(self, x, bounds, dir=0):
 
         # transform back to regular coordinates
 
         xc = self.bads[dir]
         xdir = self.bad_dirs[dir]
+        eig = self.bad_eigs[dir]
+
         xeval = xc + x*xdir
+
+        # generate random vector and orthogonalize, if we want to perturb
+        if(self.options["perturb"]):
+            trx = self.model.training_points[None][0][0]
+            nbhd = trx[self.bad_nbhd[dir],:]
+            dists = pdist(np.append(np.array([xc]), nbhd, axis=0))
+            dists = squareform(dists)
+            B = min(dists[0,:])
+            xrand = np.random.randn(self.dim)
+            xrand -= xrand.dot(xdir)*xdir/np.linalg.norm(xdir)**2
+            
+            p0, p1 = boxIntersect(xeval, xrand, bounds)
+
+            bp = min(B, p1)
+            bm = max(-B, p0)
+            alpha = np.random.rand(1)*(bp-bm) + bm
+            xeval += alpha*xrand
 
         return xeval
 
