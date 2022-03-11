@@ -1,6 +1,8 @@
+from io import BufferedRandom
 import numpy as np
 import copy
 
+from matplotlib import pyplot as plt
 from smt.utils.options_dictionary import OptionsDictionary
 from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
@@ -213,24 +215,28 @@ class HessianFit(ASCriteria):
         if(self.options["interp"] == "arnoldi"):
             neval = self.dim
 
+
+
+
         # 1. Estimate the Hessian (or its principal eigenpair) about each point
         hess = []
         nbhd = []
+        indn = []
+        pts = []
 
+        # 1a. Determine the neighborhood to fit the Hessian for each point/evaluate the error
+        # along with minimum distances
+        mins = np.zeros(self.ntr)
+        for i in range(self.ntr):
+            ind = dists[i,:]
+            ind = np.argsort(ind)
+            pts.append(np.array(trx[ind,:]))
+            indn.append(ind)
+            mins[i] = dists[i,ind[1]]
+        dminmax = max(mins)
+        lmax = np.amax(dists)
 
-        if(self.options["hessian"] == "neighborhood"):
-            pts = []
-            indn = []
-
-            # 1a. Determine the neighborhood to fit the Hessian for each point
-            for i in range(self.ntr):
-                ind = dists[i,:]
-                ind = np.argsort(ind)
-                pts.append(np.array(trx[ind,:]))
-                indn.append(ind)
-                #for key in ind[1:neval]:
-
-                    
+        if(self.options["hessian"] == "neighborhood"):        
             for i in range(self.ntr):
                 if(self.options["interp"] == "full"):
                     fh, gh, Hh = quadraticSolve(trx[i,:], trx[indn[i][1:neval+1],:], \
@@ -256,10 +262,7 @@ class HessianFit(ASCriteria):
 
                     hess.append([evalm, evecm])
 
-
-
         if(self.options["hessian"] == "surrogate"):
-
             # 1a. Get the hessian as determined by the surrogate
             # central difference scheme
             h = 1e-5
@@ -280,6 +283,8 @@ class HessianFit(ASCriteria):
                         hess[l][j,k] = hj[l]/h
 
 
+
+
         # 2. For every point, sum the discrepancies between the linear (quadratic)
         # prediction in the neighborhood and the observation value
         err = np.zeros(self.ntr)
@@ -298,6 +303,13 @@ class HessianFit(ASCriteria):
             err[i] /= self.options["neval"]
             nbhd.append(ind[1:neval])
 
+        emax = max(err)
+        for i in range(self.ntr):
+            # ADDING A DISTANCE PENALTY TERM
+            err[i] /= emax
+            err[i] *= 1. - mins[i]/lmax
+            err[i] += mins[i]/dminmax
+
         # 2a. Pick some percentage of the "worst" points, and their principal Hessian directions
         badlist = np.argsort(err)
         badlist = badlist[-self.nnew:]
@@ -305,7 +317,10 @@ class HessianFit(ASCriteria):
         bad_nbhd = np.zeros([bads.shape[0], self.options["neval"]-1], dtype=int)
         for i in range(bads.shape[0]):
             bad_nbhd[i,:] = nbhd[badlist[i]]
-        import pdb; pdb.set_trace()
+
+
+
+
 
         # 3. Generate a criteria for each bad point
 
@@ -350,10 +365,9 @@ class HessianFit(ASCriteria):
             sum = 0
             for i in range(m):
                 sum += np.linalg.norm(xeval-trx[i])**2
-                #sum -= np.exp(-np.linalg.norm(xeval-trx[i])**2)
-            #sum = np.linalg.norm(xeval-xc)**2
             
             ans = -sum
+
 
         elif(self.options["criteria"] == "variance"):
             
@@ -363,6 +377,9 @@ class HessianFit(ASCriteria):
             print("Invalid Criteria Option")
 
         return ans 
+
+
+
 
     def pre_asopt(self, bounds, dir=0):
         xc = self.bads[dir]
@@ -374,7 +391,8 @@ class HessianFit(ASCriteria):
         dists = pdist(np.append(np.array([xc]), nbhd, axis=0))
         dists = squareform(dists)
         B = max(np.delete(dists[0,:],[0,0]))
-
+        #B = 0.8*B
+        #import pdb; pdb.set_trace()
 
         # find a cluster threshold (max of minimum distances, Aute 2013)
         mins = np.zeros(dists.shape[0])
@@ -397,10 +415,27 @@ class HessianFit(ASCriteria):
         adir = np.sign(work)*np.sign(np.real(eig))
         if(adir > 0):
             bm = max(adir*S, p0)
+            #bp = bm+0.01
         else:
             bp = min(adir*S, p1)
+            #bm = bp-0.01
+
+        # N = 50
+        # xt = np.linspace(bm, bp, N)
+        # yt = np.zeros(N)
+        # for i in range(N):
+        #     yt[i] = self.evaluate(xt[i], dir)
+        
+        # import pdb; pdb.set_trace()
+        # plt.plot(xt, yt)
+        # plt.savefig("obj.png")
+        # import pdb; pdb.set_trace()
+        # plt.clf()
         #import pdb; pdb.set_trace()
         return np.array([adir*S]), Bounds(bm, bp)
+
+
+
 
     def post_asopt(self, x, bounds, dir=0):
 
@@ -430,12 +465,4 @@ class HessianFit(ASCriteria):
             xeval += alpha*xrand
 
         return xeval
-
-
-        
-
-
-
-
-
 

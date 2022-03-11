@@ -21,7 +21,7 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
-stype = "gekpls"    #surrogate type
+stype = "kpls"    #surrogate type
 rtype = "hessian" #criteria type
 dim = 2           #problem dimension
 nt0  = dim*10     #initial design size
