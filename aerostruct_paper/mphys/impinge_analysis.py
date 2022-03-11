@@ -120,13 +120,12 @@ class Top(Multipoint):
 ################################################################################
 prob = om.Problem()
 prob.model = Top()
-model = prob.model
 prob.setup()
-om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
+#om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
 #prob.run_model()
 prob.check_partials()
 
-prob.model.list_outputs()
+#prob.model.list_outputs()
 
 # if MPI.COMM_WORLD.rank == 0:
 #     #print("cd = ", prob["test.aero_post.cd_def"])

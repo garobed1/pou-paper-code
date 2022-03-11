@@ -107,7 +107,7 @@ aeroOptions = { #ADflow aero solver options
     # Output
     'volumeVariables':['eddyratio','mach','cp','temp'],
     'surfaceVariables':['yplus','cf','cp','cfx','cfy','cfz'],
-    'printIterations':False,
+    'printIterations':True,
     'printTiming':True,
     'printWarnings':False,
     'setMonitor':False
@@ -124,7 +124,8 @@ structOptions = {
     "Iyy":None,
     "th":np.ones(nelem+1)*0.001,
     "l_bound":2.0,
-    "get_funcs":None
+    "smax": 500,
+    "get_funcs":["mass", "stresscon"]
     }
 
 warpOptions = { #IDwarp mesh movement options

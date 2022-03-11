@@ -55,7 +55,7 @@ class OTODispXfer(om.ExplicitComponent):
                                   tags=['mphys_coupling'])
 
         # partials
-        #self.declare_partials('u_aero',['x_struct0','x_aero0','u_struct'])
+        self.declare_partials('u_aero',['x_struct0','x_aero0','u_struct'])
 
     def compute(self, inputs, outputs):
         x_s0 = np.array(inputs['x_struct0'])
@@ -190,7 +190,7 @@ class OTOLoadXfer(om.ExplicitComponent):
                                     tags=['mphys_coupling'])
 
         # partials
-        #self.declare_partials('f_struct',['x_struct0','x_aero0','u_struct','f_aero'])
+        self.declare_partials('f_struct',['x_struct0','x_aero0','u_struct','f_aero'])
 
     def compute(self, inputs, outputs):
         if self.check_partials:

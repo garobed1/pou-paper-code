@@ -4,6 +4,7 @@ from scipy.sparse.linalg.dsolve.linsolve import spsolve_triangular
 from hermite_basis import cubicHermite, cubicHermiteD, cubicHermiteD2
 import assembly as asm
 from utils import Error
+import copy
 
 """
 Implementing the solver as a class with the ability to call the solver, a setup function, 
@@ -59,6 +60,9 @@ class EulerBeamSolver():
         self.u = None
         self.res = None
 
+        # max stress constraint value
+        self.smax = None
+
         # call setup if we have settings
         if(settings):
             self.setup(settings)
@@ -105,6 +109,7 @@ class EulerBeamSolver():
         self.force = settings["force"]
         self.Iyy = settings["Iyy"]
         self.th = settings["th"]
+        self.smax = settings["smax"]
         
         #set left bound of beam in x just for mesh transfer purposes
         if "l_bound" in settings:
@@ -185,20 +190,33 @@ class EulerBeamSolver():
 
         # element-wise stress, don't compute if we only want mass
         #if(not all((func_list, ["mass"]))):
-        dx = self.L/self.Nelem 
-        sigma = np.zeros(self.Nelem+1, dtype='complex_')
-        zero = np.array([0])
-        utrue = np.concatenate((zero,zero,self.u,zero,zero))
-        for i in range(self.Nelem):
-            xi = [-1,1]
-            d2Nl = cubicHermiteD2(xi[0], dx)
-            d2Nr = cubicHermiteD2(xi[1], dx)
-            sigma[i] = 0.5*self.E*self.th[i]*np.dot(d2Nl,utrue[i*2:(i+1)*2+2])
-            sigma[i+1] = 0.5*self.E*self.th[i+1]*np.dot(d2Nr,utrue[i*2:(i+1)*2+2])
+        sm = self.smax
+        if("stress" in func_list or "stresscon" in func_list):
+            dx = self.L/self.Nelem 
+            sigma = np.zeros(self.Nelem+1, dtype='complex_')
+            g = np.zeros(self.Nelem+1, dtype='complex_')
+            zero = np.array([0])
+            utrue = np.concatenate((zero,zero,self.u,zero,zero))
+            for i in range(self.Nelem):
+                xi = [-1,1]
+                d2Nl = cubicHermiteD2(xi[0], dx)
+                d2Nr = cubicHermiteD2(xi[1], dx)
+                sigma[i] += 0.5*self.E*self.th[i]*np.dot(d2Nl,utrue[i*2:(i+1)*2+2])
+                sigma[i+1] += 0.5*self.E*self.th[i+1]*np.dot(d2Nr,utrue[i*2:(i+1)*2+2])
 
-        sigma = sum(sigma)
+            # aggregate, Martins 2005, Kreisselmeier-Steinhauser
+            #sigma = sum(abs(sigma))
+            #sigma = sigma[-1]
+            rho = 5
+            s2 = sigma*sigma
+            sm2 = sm*sm
+            g = s2 - sm2
+            gm = max(g)
+            esum = 0
+            for i in range(self.Nelem+1):
+                esum += np.exp(rho*(g[i] - gm))
+            KS = gm + (1./rho)*np.log(esum)
         # mass
-
         mass = self.evalMass()
         
         dict = {}
@@ -208,6 +226,8 @@ class EulerBeamSolver():
                 dict["mass"] = mass
             if(key == "stress"):
                 dict["stress"] = sigma
+            if(key == "stresscon"):
+                dict["stresscon"] = KS
 
         return dict
 
@@ -228,7 +248,10 @@ class EulerBeamSolver():
         gdict = {} 
 
         for key in func:
-            gdict[key] = np.zeros(len(self.th))
+            if(key == "stress"):
+                continue
+            else:
+                gdict[key] = np.zeros(len(self.th))
         
         thc = np.zeros(len(self.th), dtype='complex_')
         for i in range(len(self.th)):
@@ -240,7 +263,10 @@ class EulerBeamSolver():
             sol = self.evalFunctions(func)
 
             for key in func:
-                gdict[key][i] = np.imag(sol[key])/h
+                if(key == "stress"):
+                    continue
+                else:
+                    gdict[key][i] = np.imag(sol[key])/h
         
         # reset
         self.setThickness(self.th)
@@ -254,7 +280,10 @@ class EulerBeamSolver():
         gdict = {} 
 
         for key in func:
-            gdict[key] = np.zeros(len(self.force))
+            if(key == "stress"):
+                continue
+            else:
+                gdict[key] = np.zeros(len(self.force))
         
         fc = np.zeros(len(self.force), dtype='complex_')
         for i in range(len(self.force)):
@@ -266,40 +295,120 @@ class EulerBeamSolver():
             sol = self.evalFunctions(func)
 
             for key in func:
-                gdict[key][i] = np.imag(sol[key])/h
+                if(key == "stress"):
+                    continue
+                else:
+                    gdict[key][i] = np.imag(sol[key])/h
 
         # reset
         self.setLoad(self.force)
         return gdict
 
-# Nelem = 20
+    def evalstateSens(self, func):
 
-# settings = {
-#     # "name":"hello",
-#     # "Nelem":10,
-#     # "L":4,
-#     # "E":300,
-#     # "force":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-#     # "Iyy":None,
-#     # "th":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-#     "name":"hello",
-#     "Nelem":Nelem,
-#     "L":0.254, #0.254, 
-#     "E":400000,
-#     "force":np.ones(Nelem+1)*1.0,
-#     "Iyy":None,
-#     "th":np.ones(Nelem+1)*0.01,
-#     "l_bound":2.0,
-# }
+        # complex step
+        h = 1e-10
+
+        gdict = {} 
+
+        # make sure to keep the current state
+        ucurrent = copy.deepcopy(self.u)
+
+        for key in func:
+            if(key == "stress"):
+                continue
+            else:
+                gdict[key] = np.zeros(len(self.u))
+        
+        uc = np.zeros(len(self.u), dtype='complex_')
+        for i in range(len(self.u)):
+            uc.real = self.u
+            uc.imag = np.zeros(len(self.u))
+            uc[i] = uc[i] + h*1j
+            #no need to call
+            self.u = uc
+            sol = self.evalFunctions(func)
+
+            for key in func:
+                if(key == "stress"):
+                    continue
+                else:
+                    gdict[key][i] = np.imag(sol[key])/h
+            
+        # reset
+        self.u = ucurrent
+        return gdict
+
+    def evalassembleSens(self):
+
+        # complex step
+        h = 1e-10
+
+        # sensitivity of Au w.r.t. th
+        dAudth = np.zeros([len(self.b), len(self.force)])
+
+        thcurrent = copy.deepcopy(self.th)
+
+        thc = np.zeros(len(self.th), dtype='complex_')
+        for i in range(len(self.th)):
+            thc.real = self.th
+            thc.imag = np.zeros(len(self.th))
+            thc[i] = thc[i] + h*1j
+            self.setThickness(thc)
+            dA = asm.StiffAssemble(self.L, self.E, self.Iyy, self.Nelem)
+            dA = np.imag(dA)/h
+            dAudth[:,i] = dA.dot(self.u)
+
+        # sensitivity of -b w.r.t. force
+        dbdf = np.zeros([len(self.b), len(self.force)])
+
+        fc = np.zeros(len(self.force), dtype='complex_')
+        for i in range(len(self.force)):
+            fc.real = self.force
+            fc.imag = np.zeros(len(self.force))
+            fc[i] = fc[i] + h*1j
+            db = asm.LoadAssemble(self.L, fc, self.Nelem)
+            db = np.imag(db)/h
+
+            dbdf[:,i] = db
+
+        # reset
+        self.setThickness(thcurrent)
+        self.setLoad(self.force)
+
+        return dAudth, dbdf
+
+Nelem = 20
+
+settings = {
+    # "name":"hello",
+    # "Nelem":10,
+    # "L":4,
+    # "E":300,
+    # "force":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+    # "Iyy":None,
+    # "th":[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    "name":"hello",
+    "Nelem":Nelem,
+    "L":0.254, #0.254, 
+    "E":400000,
+    "force":np.ones(Nelem+1)*1.0,
+    "Iyy":None,
+    "th":np.ones(Nelem+1)*0.01,
+    "l_bound":2.0,
+    "smax": 500,
+}
 
 # beamsolve = EulerBeamSolver(settings)
+# beamsolve()
 
+# da, db = beamsolve.evalassembleSens()
+# import pdb; pdb.set_trace()
+#func_list = ["mass","stress","stresscon"]
 
-# func_list = ["mass","stress"]
+#csdict = beamsolve.evalthSens(func_list)
 
-# csdict = beamsolve.evalthSens(func_list)
-
-# h = 1e-7
+#h = 1e-7
 
 # #finite difference
 # fddict = {} 
@@ -308,7 +417,7 @@ class EulerBeamSolver():
 # beamsolve.setThickness(th)
 # beamsolve()
 # dict = beamsolve.evalFunctions(func_list)
-# s0 = dict["stress"]
+# s0 = dict["stresscon"]
 # fd = np.zeros(len(settings["th"]))
 # for i in range(len(settings["th"])):
 #     thc = np.array(th)
@@ -316,7 +425,24 @@ class EulerBeamSolver():
 #     beamsolve.setThickness(thc)
 #     beamsolve()
 #     dict = beamsolve.evalFunctions(func_list)
-#     fd[i] = (dict["stress"]-s0)/h
+#     fd[i] = (dict["stresscon"]-s0)/h
 
-# import pdb; pdb.set_trace()
+
+# csdict = beamsolve.evalstateSens(func_list)
+
+# #finite difference
+# fddict = {} 
+# ucurrent = copy.deepcopy(beamsolve.u)
+
+# dict = beamsolve.evalFunctions(func_list)
+# s0 = dict["stresscon"]
+# fd = np.zeros(len(beamsolve.u))
+# for i in range(len(beamsolve.u)):
+#     uf = copy.deepcopy(beamsolve.u)
+#     uf[i] = uf[i] + h
+#     beamsolve.u = uf
+#     dict = beamsolve.evalFunctions(func_list)
+#     fd[i] = (dict["stresscon"]-s0)/h
+#     beamsolve.u = ucurrent
+
 
