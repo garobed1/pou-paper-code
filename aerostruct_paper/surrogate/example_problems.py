@@ -261,7 +261,8 @@ class MultiDimJump(Problem):
         self.xlimits[:, 0] = -2.5
         self.xlimits[:, 1] = 2.5
 
-        self.t = np.array([1.,1.])# np.random.normal(size=self.options["ndim"])
+        self.t = np.ones(self.options["ndim"])# np.random.normal(size=self.options["ndim"])
+        self.t[1] = 3.
         self.t = self.t/np.linalg.norm(self.t)
         self.alpha = self.options["alpha"]
 

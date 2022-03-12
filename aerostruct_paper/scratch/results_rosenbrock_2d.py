@@ -39,15 +39,14 @@ if(pperb == 0):
     pperb = 1
 
 # Refinement Settings
-neval = 1+dim*2
+neval = dim*2
 hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
-perturb = True
+perturb = False
 
 # Problem Settings
-alpha = 8.       #arctangent jump strength
-trueFunc = MultiDimJump(ndim=dim, alpha=alpha) #problem Sphere(ndim=dim)#
+trueFunc = Rosenbrock(ndim=dim)#, alpha=alpha) #problem Sphere(ndim=dim)#
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m') #initial design scheme
 
@@ -111,7 +110,6 @@ else:
     model0 = KRG()
     model0.options.update({"corr":corr})
     model0.options.update({"poly":poly})
-
 model0.options.update({"n_start":30})
 model0.options.update({"print_global":False})
 model0.set_training_values(xtrain0, ftrain0)
@@ -153,9 +151,6 @@ print("Performing Adaptive Sampling ...")
 
 # Perform Adaptive Sampling
 modelF, RCF, hist, errh = adaptivesampling(trueFunc, model0, RC0, xlimits, ntr, options=options)
-#modelf.options.update({"print_global":True})
-#modelF.train()
-
 modelf = modelF
 # xf = modelF.training_points[None][0][0]
 # ff = modelF.training_points[None][0][1]
@@ -182,7 +177,7 @@ plt.plot(samplehist, errh, "b")
 # Plot Non-Adaptive Error
 plt.plot([samplehist[0], samplehist[-1]], [errk, errk], "k--")
 
-plt.savefig("arctan_2d_err.png")
+plt.savefig("rosenbrock_2d_err.png")
 
 plt.clf()
 
@@ -194,7 +189,9 @@ plt.plot(tr[0:nt0,0], tr[0:nt0,1], "bo")
 plt.plot(br[:,0], br[:,1], "go")
 plt.plot(tr[nt0:,0], tr[nt0:,1], "ro")
 
-plt.savefig("arctan_2d_pts.png")
+plt.savefig("rosenbrock_2d_pts.png")
+import pdb; pdb.set_trace()
+
 
 # Plot Error Contour
 #Contour
@@ -222,12 +219,15 @@ for i in range(ndir):
         Za[i,j] = abs(F[i,j] - TF[i,j])
         Zk[i,j] = abs(modelK.predict_values(xi) - TF[i,j])
         Z0[i,j] = abs(model0.predict_values(xi) - TF[i,j])
+        # Va[i,j] = modelf.predict_variances(xi)
+        # Vk[i,j] = modelK.predict_variances(xi)
+        # V0[i,j] = model0.predict_variances(xi)
 
 
 cs = plt.contour(Y, X, Za, levels = 15)
 plt.colorbar(cs)
 
-plt.savefig("arctan_2d_errcona.png")
+plt.savefig("rosenbrock_2d_errcona.png")
 
 plt.clf()
 
@@ -237,14 +237,14 @@ plt.plot(tk[:,0], tk[:,1], "bo")
 plt.contour(Y, X, Zk, levels = cs.levels)
 plt.colorbar(cs)
 
-plt.savefig("arctan_2d_errconk.png")
+plt.savefig("rosenbrock_2d_errconk.png")
 
 plt.clf()
 plt.plot(tr[0:nt0,0], tr[0:nt0,1], "bo")
 plt.contour(Y, X, Z0, levels = cs.levels)
 plt.colorbar(cs)
 
-plt.savefig("arctan_2d_errcon0.png")
+plt.savefig("rosenbrock_2d_errcon0.png")
 
 plt.clf()
 
@@ -253,5 +253,14 @@ ax = fig.add_subplot(111, projection='3d')
 ax.plot_surface(Y, X, F)
 ax.scatter(tr[0:nt0,0], tr[0:nt0,1], fr[0:nt0])
 ax.scatter(tr[nt0:,0], tr[nt0:,1], fr[nt0:])
-
+import pdb; pdb.set_trace()
 pickle.dump(fig, open('FigureObject.fig.pickle', 'wb'))
+
+plt.clf()
+cs2 = plt.contour(Y, X, F, levels = 20)
+plt.savefig("rosenbrock_2d_surf_model.png")
+
+plt.clf()
+
+plt.contour(Y, X, TF, levels = cs2.levels)
+plt.savefig("rosenbrock_2d_surf.png")

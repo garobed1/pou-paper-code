@@ -399,6 +399,7 @@ class HessianFit(ASCriteria):
         for i in range(dists.shape[0]):
             mins[i] = min(np.delete(dists[i,:], [i,i]))
         S = 0.5*max(mins)
+        S = 0.5*mins[0]
         if(self.options["criteria"] == "variance"):
             S = 0.01*max(mins)
 
@@ -414,12 +415,13 @@ class HessianFit(ASCriteria):
         work = np.dot(gc, xdir)
         adir = np.sign(work)*np.sign(np.real(eig))
         if(adir > 0):
-            bm = max(adir*S, p0)
-            #bp = bm+0.01
+            bm = min(adir*S, p1)-0.01#p0)
+            bp = bm+0.01
         else:
-            bp = min(adir*S, p1)
-            #bm = bp-0.01
+            bp = max(adir*S, p0)+0.01#p1)
+            bm = bp-0.01
 
+        #import pdb; pdb.set_trace()
         # N = 50
         # xt = np.linspace(bm, bp, N)
         # yt = np.zeros(N)
@@ -453,7 +455,7 @@ class HessianFit(ASCriteria):
             nbhd = trx[self.bad_nbhd[dir],:]
             dists = pdist(np.append(np.array([xc]), nbhd, axis=0))
             dists = squareform(dists)
-            B = min(dists[0,:])
+            B = min(np.delete(dists[0,:],[0,0]))
             xrand = np.random.randn(self.dim)
             xrand -= xrand.dot(xdir)*xdir/np.linalg.norm(xdir)**2
             

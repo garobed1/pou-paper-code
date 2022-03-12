@@ -1,6 +1,5 @@
 import sys
 import copy
-import pickle
 sys.path.insert(1,"../surrogate")
 
 import numpy as np
@@ -11,7 +10,7 @@ from defaults import DefaultOptOptions
 from error import rmse
 
 from example_problems import MultiDimJump
-from smt.problems import Sphere, LpNorm, Rosenbrock
+from smt.problems import Sphere, LpNorm
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
 from pougrad import POUSurrogate
@@ -22,15 +21,15 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
-stype = "gekpls"    #surrogate type
+stype = "kpls"    #surrogate type
 rtype = "hessian" #criteria type
 corr  = "squar_exp" #kriging correlation
 poly  = "linear"  #kriging regression 
 extra = 1           #gek extra points
 dim = 2           #problem dimension
 rho = 10            #POU parameter
-nt0  = dim*10     #initial design size
-ntr = dim*5      #number of points to add
+nt0  = 6#dim*10     #initial design size
+ntr = 6#dim*5      #number of points to add
 ntot = nt0 + ntr  #total number of points
 batch = 0.0     #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
@@ -39,11 +38,11 @@ if(pperb == 0):
     pperb = 1
 
 # Refinement Settings
-neval = 1+dim*2
+neval = dim*2
 hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
-perturb = True
+perturb = False
 
 # Problem Settings
 alpha = 8.       #arctangent jump strength
@@ -111,8 +110,6 @@ else:
     model0 = KRG()
     model0.options.update({"corr":corr})
     model0.options.update({"poly":poly})
-
-model0.options.update({"n_start":30})
 model0.options.update({"print_global":False})
 model0.set_training_values(xtrain0, ftrain0)
 if(isinstance(model0, GEKPLS) or isinstance(model0, POUSurrogate)):
@@ -154,7 +151,7 @@ print("Performing Adaptive Sampling ...")
 # Perform Adaptive Sampling
 modelF, RCF, hist, errh = adaptivesampling(trueFunc, model0, RC0, xlimits, ntr, options=options)
 #modelf.options.update({"print_global":True})
-#modelF.train()
+modelF.train()
 
 modelf = modelF
 # xf = modelF.training_points[None][0][0]
@@ -182,7 +179,7 @@ plt.plot(samplehist, errh, "b")
 # Plot Non-Adaptive Error
 plt.plot([samplehist[0], samplehist[-1]], [errk, errk], "k--")
 
-plt.savefig("arctan_2d_err.png")
+plt.savefig("arctan_1d_err.png")
 
 plt.clf()
 
@@ -190,68 +187,23 @@ plt.clf()
 tr = modelf.training_points[None][0][0]
 fr = modelf.training_points[None][0][1]
 br = hist[0].bads
-plt.plot(tr[0:nt0,0], tr[0:nt0,1], "bo")
-plt.plot(br[:,0], br[:,1], "go")
-plt.plot(tr[nt0:,0], tr[nt0:,1], "ro")
+plt.plot(tr[0:nt0], fr[0:nt0], "bo")
+plt.plot(tr[nt0:], fr[nt0:], "ro")
 
-plt.savefig("arctan_2d_pts.png")
 
-# Plot Error Contour
-#Contour
+
+# Plot True Function and Surrogate
 ndir = 150
 x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
-y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
-
-X, Y = np.meshgrid(x, y)
-Za = np.zeros([ndir, ndir])
-Va = np.zeros([ndir, ndir])
-V0 = np.zeros([ndir, ndir])
-Zk = np.zeros([ndir, ndir])
-Vk = np.zeros([ndir, ndir])
-Z0 = np.zeros([ndir, ndir])
-F  = np.zeros([ndir, ndir])
-TF = np.zeros([ndir, ndir])
-
-for i in range(ndir):
-    for j in range(ndir):
-        xi = np.zeros([1,2])
-        xi[0,0] = x[i]
-        xi[0,1] = y[j]
-        F[i,j]  = modelf.predict_values(xi)
-        TF[i,j] = trueFunc(xi)
-        Za[i,j] = abs(F[i,j] - TF[i,j])
-        Zk[i,j] = abs(modelK.predict_values(xi) - TF[i,j])
-        Z0[i,j] = abs(model0.predict_values(xi) - TF[i,j])
+ymodelf = modelf.predict_values(x)
+ymodel0 = model0.predict_values(x)
+ytrue = trueFunc(x)
+plt.plot(x, ytrue, "k-")
+plt.plot(x, ymodelf, "g--")
+plt.plot(x, ymodel0, "r--")
 
 
-cs = plt.contour(Y, X, Za, levels = 15)
-plt.colorbar(cs)
 
-plt.savefig("arctan_2d_errcona.png")
+plt.savefig("arctan_1d.png")
 
-plt.clf()
-
-# Plot Non-Adaptive Error
-tk = modelK.training_points[None][0][0]
-plt.plot(tk[:,0], tk[:,1], "bo")
-plt.contour(Y, X, Zk, levels = cs.levels)
-plt.colorbar(cs)
-
-plt.savefig("arctan_2d_errconk.png")
-
-plt.clf()
-plt.plot(tr[0:nt0,0], tr[0:nt0,1], "bo")
-plt.contour(Y, X, Z0, levels = cs.levels)
-plt.colorbar(cs)
-
-plt.savefig("arctan_2d_errcon0.png")
-
-plt.clf()
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot_surface(Y, X, F)
-ax.scatter(tr[0:nt0,0], tr[0:nt0,1], fr[0:nt0])
-ax.scatter(tr[nt0:,0], tr[nt0:,1], fr[nt0:])
-
-pickle.dump(fig, open('FigureObject.fig.pickle', 'wb'))
+import pdb; pdb.set_trace()
