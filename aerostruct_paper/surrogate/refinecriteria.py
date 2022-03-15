@@ -4,10 +4,11 @@ import copy
 
 from matplotlib import pyplot as plt
 from smt.utils.options_dictionary import OptionsDictionary
+from smt.sampling_methods import LHS
 from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
 from scipy.linalg import lstsq, eig
-from scipy.spatial.distance import pdist, squareform
+from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds
 from utils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
 
@@ -36,11 +37,14 @@ class ASCriteria():
         # set options
         self.options = OptionsDictionary()
         self._init_options()
+        self.options.declare("print_iter", True, types=bool)
         self.options.update(kwargs)
         
         self.nnew = 1
+        self.opt = True
+        self.condict = None #for constrained optimization
 
-        self.initialize()
+        self.initialize(self.model)
 
     def _init_options(self):
         pass
@@ -57,6 +61,9 @@ class ASCriteria():
     def post_asopt(self, x, bounds, dir=0):
         pass
 
+    def eval_constraint(self, x, dir=0):
+        pass
+
     
 """
 A Continuous Leave-One-Out Cross Validation function
@@ -64,15 +71,22 @@ A Continuous Leave-One-Out Cross Validation function
 class looCV(ASCriteria):
     def __init__(self, model, **kwargs):
         super().__init__(model, **kwargs)
+        self.dminmax = None
 
 
-        #TODO: Add more options for this
-    
     def _init_options(self):
         self.options.declare("approx", False, types=bool)
 
     def initialize(self, model=None):
 
+        # set up constraints
+        self.condict = {
+            "type":"ineq",
+            "fun":self.eval_constraint,
+            "args":[],
+        }
+
+        # in case the model gets updated externally by getxnew
         if(model is not None):
             self.model = copy.deepcopy(model)
             kx = 0
@@ -107,6 +121,16 @@ class looCV(ASCriteria):
 
             if(self.options["approx"] == False):
                 self.loosm[i].train()
+
+        # Get the cluster threshold for exploration constraint
+        dists = pdist(trx)
+        dists = squareform(dists)
+        mins = np.zeros(self.ntr)
+        for i in range(self.ntr):
+            ind = dists[i,:]
+            ind = np.argsort(ind)
+            mins[i] = dists[i,ind[1]]
+        self.dminmax = max(mins)
 
     #TODO: This could be a variety of possible LOO-averaging functions
     def evaluate(self, x, dir=0):
@@ -148,6 +172,15 @@ class looCV(ASCriteria):
         return x
         
 
+    def eval_constraint(self, x, dir=0):
+        t0 = self.model.training_points[None][0][0]
+
+        con = np.zeros(self.ntr)
+        for i in range(self.ntr):
+            con[i] = np.linalg.norm(x - t0[i])
+
+        return con - 0.5*self.dminmax
+
 
 # Hessian estimation and direction criteria
 
@@ -159,6 +192,7 @@ class HessianFit(ASCriteria):
         self.bad_list = None
         self.bad_nbhd = None
         self.bad_dirs = None
+        self.dminmax = None
         self.grad = grad
 
         super().__init__(model, **kwargs)
@@ -181,13 +215,21 @@ class HessianFit(ASCriteria):
         self.options.declare("improve", 0, types=int)
 
         #number of closest points to evaluate nonlinearity measure
-        self.options.declare("neval", self.dim*2, types=int)
+        self.options.declare("neval", self.dim*2+1, types=int)
 
         #perturb the optimal result in a random orthogonal direction
         self.options.declare("perturb", False, types=bool)
         
     def initialize(self, model=None, grad=None):
         
+        # set up constraints
+        self.condict = {
+            "type":"ineq",
+            "fun":self.eval_constraint,
+            "args":[],
+        }
+
+
         if(model is not None):
             self.model = copy.deepcopy(model)
             kx = 0
@@ -233,7 +275,7 @@ class HessianFit(ASCriteria):
             pts.append(np.array(trx[ind,:]))
             indn.append(ind)
             mins[i] = dists[i,ind[1]]
-        dminmax = max(mins)
+        self.dminmax = max(mins)
         lmax = np.amax(dists)
 
         if(self.options["hessian"] == "neighborhood"):        
@@ -308,7 +350,7 @@ class HessianFit(ASCriteria):
             # ADDING A DISTANCE PENALTY TERM
             err[i] /= emax
             err[i] *= 1. - mins[i]/lmax
-            err[i] += mins[i]/dminmax
+            err[i] += mins[i]/self.dminmax
 
         # 2a. Pick some percentage of the "worst" points, and their principal Hessian directions
         badlist = np.argsort(err)
@@ -422,18 +464,6 @@ class HessianFit(ASCriteria):
             bm = bp-0.01
 
         #import pdb; pdb.set_trace()
-        # N = 50
-        # xt = np.linspace(bm, bp, N)
-        # yt = np.zeros(N)
-        # for i in range(N):
-        #     yt[i] = self.evaluate(xt[i], dir)
-        
-        # import pdb; pdb.set_trace()
-        # plt.plot(xt, yt)
-        # plt.savefig("obj.png")
-        # import pdb; pdb.set_trace()
-        # plt.clf()
-        #import pdb; pdb.set_trace()
         return np.array([adir*S]), Bounds(bm, bp)
 
 
@@ -455,7 +485,7 @@ class HessianFit(ASCriteria):
             nbhd = trx[self.bad_nbhd[dir],:]
             dists = pdist(np.append(np.array([xc]), nbhd, axis=0))
             dists = squareform(dists)
-            B = min(np.delete(dists[0,:],[0,0]))
+            B = max(np.delete(dists[0,:],[0,0]))
             xrand = np.random.randn(self.dim)
             xrand -= xrand.dot(xdir)*xdir/np.linalg.norm(xdir)**2
             
@@ -468,3 +498,138 @@ class HessianFit(ASCriteria):
 
         return xeval
 
+    def eval_constraint(self, x, dir=0):
+        xc = self.bads[dir]
+        xdir = self.bad_dirs[dir]
+        trx = self.model.training_points[None][0][0]
+        nbhd = trx[self.bad_nbhd[dir],:]
+        m, n = nbhd.shape
+
+        xeval = xc + x*xdir
+
+        con = np.zeros(m)
+        for i in range(m):
+            con[i] = np.linalg.norm(xeval - nbhd[i])
+
+        return con - 0.5*self.dminmax
+
+
+
+
+
+
+
+
+
+
+
+
+# TEAD Method with exact gradients
+
+class TEAD(ASCriteria):
+    def __init__(self, model, grad, bounds, **kwargs):
+
+        self.cand = None
+        self.dminmax = None
+        self.lmax = None
+        self.grad = grad
+        self.bounds = bounds
+        self.bad_list = None
+        self.bads = None
+        self.bad_nbhd = None
+
+        super().__init__(model, **kwargs)
+
+        self.opt = False #no optimization performed for this
+        
+    def _init_options(self):
+        #number of candidates to consider
+        self.options.declare("ncand", self.dim*10, types=int)
+
+        #number of points to pick
+        self.options.declare("improve", 0, types=int)
+        
+        #number of closest points to evaluate nonlinearity measure
+        self.options.declare("neval", self.dim*2, types=int)
+
+    def initialize(self, model=None, grad=None):
+        
+        if(model is not None):
+            self.model = copy.deepcopy(model)
+            kx = 0
+            self.dim = self.model.training_points[None][kx][0].shape[1]
+            self.ntr = self.model.training_points[None][kx][0].shape[0]
+
+        if(grad is not None):
+            self.grad = grad
+
+        self.nnew = self.options["improve"]#int(self.ntr*self.options["improve"])
+        if(self.nnew == 0):
+            self.nnew = 1
+
+        trx = self.model.training_points[None][0][0]
+        trf = self.model.training_points[None][0][1]
+        trg = np.zeros_like(trx)
+        trg = self.grad
+        if(isinstance(self.model, GEKPLS)):
+            for j in range(self.dim):
+                trg[:,j] = self.model.training_points[None][j+1][1].flatten()
+        
+        
+        
+
+        # 1. Generate candidate points, determine reference distances and neighborhoods
+        sampling = LHS(xlimits=self.bounds, criterion='m')
+        ncand = self.options["ncand"]
+        self.cand = sampling(ncand)
+        dists = cdist(self.cand, trx)
+
+        mins = np.zeros(ncand)
+        nbhd = np.zeros([ncand, self.options["neval"]], dtype=int)
+        for i in range(ncand):
+            ind = dists[i,:]
+            ind = np.argsort(ind)
+            mins[i] = dists[i,ind[0]]
+            nbhd[i] = ind[0:self.options["neval"]]
+        self.dminmax = max(mins)
+        self.lmax = np.amax(dists)
+
+        # 2. For every candidate point, sum the discrepancies between the linear (quadratic)
+        # prediction in the neighborhood and the surrogate value at the candidate point
+        lerr = np.zeros(ncand)
+        err = np.zeros(ncand)
+        for i in range(ncand):
+            for key in nbhd[i,0:self.options["neval"]]:
+                fh = linear(self.cand[i], trx[key], trf[key], trg[:][key])
+                lerr[i] += abs(model.predict_values(self.cand[[i],:]) - fh)
+
+            lerr[i] /= self.options["neval"]
+
+        emax = max(lerr)
+        for i in range(ncand):
+            # ADDING A DISTANCE PENALTY TERM
+            lerr[i] /= emax
+            w = 1. - mins[i]/self.lmax
+            err[i] += mins[i]/self.dminmax + w*lerr[i]
+
+        # 2a. Pick some percentage of the "worst" points
+        badlist = np.argsort(err)
+        badlist = badlist[-self.nnew:]
+        bads = self.cand[badlist]
+        bad_nbhd = np.zeros([bads.shape[0], self.options["neval"]], dtype=int)
+        for i in range(bads.shape[0]):
+            bad_nbhd[i,:] = nbhd[badlist[i]]
+
+        # we have what we need
+        self.bad_list = badlist
+        self.bads = bads
+        self.bad_nbhd = bad_nbhd
+
+    def post_asopt(self, x, bounds, dir=0):
+
+        return self.bads[dir]
+
+
+
+
+    

@@ -114,7 +114,7 @@ aeroOptions = { #ADflow aero solver options
     }
 
 # Euler Bernoulli Structural Solver Options
-nelem = 30
+nelem = 17
 structOptions = {
     "name":probName,
     "Nelem":nelem,

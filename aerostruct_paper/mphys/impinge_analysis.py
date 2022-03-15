@@ -61,14 +61,14 @@ class Top(Multipoint):
         # Transfer Scheme Setup
         ################################################################################
 
-        self.onetoone = True
+        self.onetoone = False
 
         if(self.onetoone):
             ldxfer_builder = OTOBuilder(aero_builder, struct_builder)
             ldxfer_builder.initialize(self.comm)
         else:
-            isym = 0
-            ldxfer_builder = MeldBuilder(aero_builder, struct_builder, isym=isym)
+            isym = 1
+            ldxfer_builder = MeldBuilder(aero_builder, struct_builder, isym=isym, n=2)
             ldxfer_builder.initialize(self.comm)
 
         ################################################################################
@@ -122,8 +122,9 @@ prob = om.Problem()
 prob.model = Top()
 prob.setup()
 #om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
-#prob.run_model()
-prob.check_partials()
+prob.model.add_objective("test.aero_post.cd_def")
+prob.run_model()
+prob.check_totals()
 
 #prob.model.list_outputs()
 

@@ -55,7 +55,7 @@ class OTODispXfer(om.ExplicitComponent):
                                   tags=['mphys_coupling'])
 
         # partials
-        self.declare_partials('u_aero',['x_struct0','x_aero0','u_struct'])
+        self.declare_partials('u_aero',['u_struct'])
 
     def compute(self, inputs, outputs):
         x_s0 = np.array(inputs['x_struct0'])
@@ -74,67 +74,19 @@ class OTODispXfer(om.ExplicitComponent):
 
         outputs['u_aero'] = u_a
 
-    # def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-    #     """
-    #     The explicit component is defined as:
-    #         u_a = g(u_s,x_a0,x_s0)
-    #     The MELD residual is defined as:
-    #         D = u_a - g(u_s,x_a0,x_s0)
-    #     So explicit partials below for u_a are negative partials of D
-    #     """
-    #     if self.check_partials:
-    #         x_s0 = np.array(inputs['x_struct0'],dtype=TransferScheme.dtype)
-    #         x_a0 = np.array(inputs['x_aero0'],dtype=TransferScheme.dtype)
-    #         self.meld.setStructNodes(x_s0)
-    #         self.meld.setAeroNodes(x_a0)
-    #     u_s  = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #     for i in range(3):
-    #         u_s[i::3] = inputs['u_struct'][i::self.struct_ndof]
-    #     u_a = np.zeros(self.aero_nnodes*3,dtype=TransferScheme.dtype)
-    #     self.meld.transferDisps(u_s,u_a)
+    def compute_partials(self, inputs, partials):
+        
+        # u_a  = np.array(outputs['u_aero'])
 
-    #     if mode == 'fwd':
-    #         if 'u_aero' in d_outputs:
-    #             if 'u_struct' in d_inputs:
-    #                 d_in = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #                 for i in range(3):
-    #                     d_in[i::3] = d_inputs['u_struct'][i::self.struct_ndof]
-    #                 prod = np.zeros(self.aero_nnodes*3,dtype=TransferScheme.dtype)
-    #                 self.meld.applydDduS(d_in,prod)
-    #                 d_outputs['u_aero'] -= np.array(prod,dtype=float)
+        # u_s  = np.zeros(self.struct_nnodes*3)
+        
+        # for i in range(3):
+        #     u_s[i::3] = inputs['u_struct'][i::self.struct_ndof]
 
-    #             if 'x_aero0' in d_inputs:
-    #                 if self.check_partials:
-    #                     pass
-    #                 else:
-    #                     raise ValueError('MELD forward mode requested but not implemented')
+        # uatos = np.eye()
 
-    #             if 'x_struct0' in d_inputs:
-    #                 if self.check_partials:
-    #                     pass
-    #                 else:
-    #                     raise ValueError('MELD forward mode requested but not implemented')
+        partials['u_aero','u_struct']
 
-    #     if mode == 'rev':
-    #         if 'u_aero' in d_outputs:
-    #             du_a = np.array(d_outputs['u_aero'],dtype=TransferScheme.dtype)
-    #             if 'u_struct' in d_inputs:
-    #                 # du_a/du_s^T * psi = - dD/du_s^T psi
-    #                 prod = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #                 self.meld.applydDduSTrans(du_a,prod)
-    #                 for i in range(3):
-    #                     d_inputs['u_struct'][i::self.struct_ndof] -= np.array(prod[i::3],dtype=np.float64)
-
-    #             # du_a/dx_a0^T * psi = - psi^T * dD/dx_a0 in F2F terminology
-    #             if 'x_aero0' in d_inputs:
-    #                 prod = np.zeros(d_inputs['x_aero0'].size,dtype=TransferScheme.dtype)
-    #                 self.meld.applydDdxA0(du_a,prod)
-    #                 d_inputs['x_aero0'] -= np.array(prod,dtype=float)
-
-    #             if 'x_struct0' in d_inputs:
-    #                 prod = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #                 self.meld.applydDdxS0(du_a,prod)
-    #                 d_inputs['x_struct0'] -= np.array(prod,dtype=float)
 
 class OTOLoadXfer(om.ExplicitComponent):
     """
@@ -215,91 +167,9 @@ class OTOLoadXfer(om.ExplicitComponent):
         for i in range(3):
             outputs['f_struct'][i::self.struct_ndof] = f_s[i::3]
 
-    # def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
-    #     """
-    #     The explicit component is defined as:
-    #         f_s = g(f_a,u_s,x_a0,x_s0)
-    #     The MELD internal residual is defined as:
-    #         L = f_s - g(f_a,u_s,x_a0,x_s0)
-    #     So explicit partials below for f_s are negative partials of L
-    #     """
-    #     if self.check_partials:
-    #         x_s0 = np.array(inputs['x_struct0'],dtype=TransferScheme.dtype)
-    #         x_a0 = np.array(inputs['x_aero0'],dtype=TransferScheme.dtype)
-    #         self.meld.setStructNodes(x_s0)
-    #         self.meld.setAeroNodes(x_a0)
-    #     f_a =  np.array(inputs['f_aero'],dtype=TransferScheme.dtype)
-    #     f_s = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-
-    #     u_s  = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #     for i in range(3):
-    #         u_s[i::3] = inputs['u_struct'][i::self.struct_ndof]
-    #     u_a = np.zeros(inputs['f_aero'].size,dtype=TransferScheme.dtype)
-    #     self.meld.transferDisps(u_s,u_a)
-    #     self.meld.transferLoads(f_a,f_s)
-
-    #     if mode == 'fwd':
-    #         if 'f_struct' in d_outputs:
-    #             if 'u_struct' in d_inputs:
-    #                 d_in = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #                 for i in range(3):
-    #                     d_in[i::3] = d_inputs['u_struct'][i::self.struct_ndof]
-    #                 prod = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #                 self.meld.applydLduS(d_in,prod)
-    #                 for i in range(3):
-    #                     d_outputs['f_struct'][i::self.struct_ndof] -= np.array(prod[i::3],dtype=float)
-
-    #             if 'f_aero' in d_inputs:
-    #                 # df_s/df_a psi = - dL/df_a * psi = -dD/du_s^T * psi
-    #                 prod = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #                 df_a = np.array(d_inputs['f_aero'],dtype=TransferScheme.dtype)
-    #                 self.meld.applydDduSTrans(df_a,prod)
-    #                 for i in range(3):
-    #                     d_outputs['f_struct'][i::self.struct_ndof] -= np.array(prod[i::3],dtype=float)
-
-    #             if 'x_aero0' in d_inputs:
-    #                 if self.check_partials:
-    #                     pass
-    #                 else:
-    #                     raise ValueError('forward mode requested but not implemented')
-
-    #             if 'x_struct0' in d_inputs:
-    #                 if self.check_partials:
-    #                     pass
-    #                 else:
-    #                     raise ValueError('forward mode requested but not implemented')
-
-    #     if mode == 'rev':
-    #         if 'f_struct' in d_outputs:
-    #             d_out = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #             for i in range(3):
-    #                 d_out[i::3] = d_outputs['f_struct'][i::self.struct_ndof]
-
-    #             if 'u_struct' in d_inputs:
-    #                 d_in = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #                 # df_s/du_s^T * psi = - dL/du_s^T * psi
-    #                 self.meld.applydLduSTrans(d_out,d_in)
-
-    #                 for i in range(3):
-    #                     d_inputs['u_struct'][i::self.struct_ndof] -= np.array(d_in[i::3],dtype=float)
-
-    #             if 'f_aero' in d_inputs:
-    #                 # df_s/df_a^T psi = - dL/df_a^T * psi = -dD/du_s * psi
-    #                 prod = np.zeros(self.aero_nnodes*3,dtype=TransferScheme.dtype)
-    #                 self.meld.applydDduS(d_out,prod)
-    #                 d_inputs['f_aero'] -= np.array(prod,dtype=float)
-
-    #             if 'x_aero0' in d_inputs:
-    #                 # df_s/dx_a0^T * psi = - psi^T * dL/dx_a0 in F2F terminology
-    #                 prod = np.zeros(self.aero_nnodes*3,dtype=TransferScheme.dtype)
-    #                 self.meld.applydLdxA0(d_out,prod)
-    #                 d_inputs['x_aero0'] -= np.array(prod,dtype=float)
-
-    #             if 'x_struct0' in d_inputs:
-    #                 # df_s/dx_s0^T * psi = - psi^T * dL/dx_s0 in F2F terminology
-    #                 prod = np.zeros(self.struct_nnodes*3,dtype=TransferScheme.dtype)
-    #                 self.meld.applydLdxS0(d_out,prod)
-    #                 d_inputs['x_struct0'] -= np.array(prod,dtype=float)
+    def compute_partials(self, inputs, partials):
+    
+        partials['f_struct','f_aero']
 
 class OTOBuilder(Builder):
     def __init__(self, aero_builder, struct_builder, check_partials=False):

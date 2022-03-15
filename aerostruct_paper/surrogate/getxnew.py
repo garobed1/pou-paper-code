@@ -4,7 +4,7 @@ from defaults import DefaultOptOptions
 import numpy as np
 from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
-from error import rmse
+from error import rmse, meane
 
 
 """
@@ -37,16 +37,22 @@ def getxnew(rcrit, x0, bounds, options=None):
 
     #gresults = optimize(rcrit.evaluate, args=(), bounds=bounds, type="global")
     for i in range(rcrit.nnew):
-        x0, lbounds = rcrit.pre_asopt(bounds, dir=i)
-        if(lbounds is not None):
-            bounds_used = lbounds
-        args=(i,)
-        if(options["localswitch"]):
-            results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="local", x0=x0)
+        rx = None
+        if(rcrit.opt): #for methods that don't use optimization
+            x0, lbounds = rcrit.pre_asopt(bounds, dir=i)
+            if(lbounds is not None):
+                bounds_used = lbounds
+            args=(i,)
+            rcrit.condict["args"] = [i]
+            if(options["localswitch"]):
+                results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="local", constraints=rcrit.condict, x0=x0)
+            else:
+                results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="global", constraints=rcrit.condict)
+            rx = results.x
         else:
-            results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="global")
-    #    results = gresults
-        xnew.append(rcrit.post_asopt(results.x, bounds, dir=i))
+            rx = None
+
+        xnew.append(rcrit.post_asopt(rx, bounds, dir=i))
 
     return xnew
 
@@ -59,6 +65,7 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
     errh = []
     model = copy.deepcopy(model0)
     
+
     for i in range(count):
         t0 = model.training_points[None][0][0]
         f0 = model.training_points[None][0][1]
@@ -76,12 +83,12 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         t0 = np.append(t0, xnew, axis=0)
         f0 = np.append(f0, func(xnew), axis=0)
         g0 = np.append(g0, np.zeros([xnew.shape[0], xnew.shape[1]]), axis=0)
-        for i in range(dim):
-            g0[nt:,i] = func(xnew, i)[:,0]
+        for j in range(dim):
+            g0[nt:,j] = func(xnew, j)[:,0]
         model.set_training_values(t0, f0)
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
-            for i in range(dim):
-                model.set_training_derivatives(t0, g0[:,i], i)
+            for j in range(dim):
+                model.set_training_derivatives(t0, g0[:,j], j)
         model.train()
 
 
@@ -94,6 +101,9 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
             errh = None
 
         hist.append(copy.deepcopy(rcrit))
+
+        if(rcrit.options["print_iter"]):
+            print("Iteration: ", i)
 
         # replace criteria
         rcrit.initialize(model, g0)

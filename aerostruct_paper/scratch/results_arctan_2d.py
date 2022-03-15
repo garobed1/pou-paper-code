@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from refinecriteria import looCV, HessianFit
 from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
-from error import rmse
+from error import rmse, meane
 
 from example_problems import MultiDimJump
 from smt.problems import Sphere, LpNorm, Rosenbrock
@@ -24,15 +24,15 @@ Error estimate for the arctangent jump problem
 # Conditions
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
-corr  = "squar_exp" #kriging correlation
+corr  = "abs_exp" #kriging correlation
 poly  = "linear"  #kriging regression 
 extra = 1           #gek extra points
-dim = 2           #problem dimension
+dim = 2          #problem dimension
 rho = 10            #POU parameter
 nt0  = dim*10     #initial design size
-ntr = dim*5      #number of points to add
+ntr = dim*50      #number of points to add
 ntot = nt0 + ntr  #total number of points
-batch = 0.0     #batch size for refinement, as a percentage of ntr
+batch = 0.05    #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = int(batch*ntr)
 if(pperb == 0):
@@ -101,9 +101,11 @@ print("Training Initial Surrogate ...")
 # Initial Design Surrogate
 if(stype == "gekpls"):
     model0 = GEKPLS(xlimits=xlimits)
-    model0.options.update({"extra_points":1})
+    model0.options.update({"extra_points":extra})
     model0.options.update({"corr":corr})
     model0.options.update({"poly":poly})
+    model0.options.update({"n_start":5})
+
 elif(stype == "pou"):
     model0 = POUSurrogate()
     model0.options.update({"rho":rho})
@@ -111,8 +113,8 @@ else:
     model0 = KRG()
     model0.options.update({"corr":corr})
     model0.options.update({"poly":poly})
+    model0.options.update({"n_start":5})
 
-model0.options.update({"n_start":30})
 model0.options.update({"print_global":False})
 model0.set_training_values(xtrain0, ftrain0)
 if(isinstance(model0, GEKPLS) or isinstance(model0, POUSurrogate)):
@@ -170,12 +172,34 @@ print("Experiment Complete")
 
 plt.clf()
 
+tr = modelf.training_points[None][0][0]
+fr = modelf.training_points[None][0][1]
+gr = np.zeros_like(tr)
+for j in range(dim):
+    gr[:,j] = modelf.training_points[None][j+1][1].flatten()
+br = hist[0].bads
+
 # Plot Error History
 errh = [err0] + errh #[errf] #errh
 iters = len(errh)
 samplehist = np.zeros(iters, dtype=int)
 for i in range(iters):
     samplehist[i] = nt0 + i*pperb
+
+samplehist = np.append(samplehist, samplehist[-1]+2)
+corners = np.array([[-2.5,-2.5],[2.5,2.5]])
+tr = np.append(tr, corners, axis=0)
+fr = np.append(fr, trueFunc(corners), axis=0)
+gr = np.append(gr, np.zeros([corners.shape[0], corners.shape[1]]), axis=0)
+for j in range(dim):
+    gr[ntot:,j] = trueFunc(corners, j)[:,0]
+modelf.set_training_values(tr, fr)
+if(isinstance(model0, GEKPLS) or isinstance(model0, POUSurrogate)):
+    for i in range(dim):
+        modelf.set_training_derivatives(tr, gr[:,i:i+1], i)
+modelf.train()
+
+errh = errh + [rmse(modelf, trueFunc, N=Nerr, xdata=xtest, fdata=ftest)]
 
 plt.plot(samplehist, errh, "b")
 
@@ -187,9 +211,6 @@ plt.savefig("arctan_2d_err.png")
 plt.clf()
 
 # Plot Training Points
-tr = modelf.training_points[None][0][0]
-fr = modelf.training_points[None][0][1]
-br = hist[0].bads
 plt.plot(tr[0:nt0,0], tr[0:nt0,1], "bo")
 plt.plot(br[:,0], br[:,1], "go")
 plt.plot(tr[nt0:,0], tr[nt0:,1], "ro")

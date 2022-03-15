@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.linalg import qr
 from scipy.linalg import lstsq, lu_factor, lu_solve, solve, inv, eig
-from example_problems import Heaviside, Quad2D
+from example_problems import Heaviside, MultiDimJump, Quad2D
 from smt.problems import RobotArm
 from smt.sampling_methods import LHS
 
@@ -339,11 +339,10 @@ def boxIntersect(xc, xdir, bounds):
 
     m = xc.shape[0]
     large = 1e100
-
     blims = np.zeros(m*2)
 
     for j in range(m):
-        if(xdir[j] < 1e-10):
+        if(abs(xdir[j]) < 1e-12):
             blims[j] = np.sign(bounds[j,0] - xc[j])*large
             blims[m+j] = np.sign(bounds[j,1] - xc[j])*large
         else:
@@ -355,8 +354,29 @@ def boxIntersect(xc, xdir, bounds):
 
     # find maximum negative alpha
     p0 = max([i for i in blims if i <= 0])
-    
+
+    # edge cases
+    if(p0 == p1):
+        p1b = min([i for i in blims if i > 0])
+        p0b = max([i for i in blims if i < 0])
+        x1b = xc + p1b*xdir
+        x0b = xc + p0b*xdir
+
+        # check which point is in bounds
+        if all((x1b - bounds[:,0]) >= 0) and all(x1b - bounds[:,1] <= 0):
+            p1 = p1b
+        elif all((x0b - bounds[:,0]) >= 0) and all(x0b - bounds[:,1] <= 0):
+            p0 = p0b
+        else: #corner case, hope this never happens
+            p0 = 0.0
+            p1 = 0.0
+
     return p0, p1
+
+dim = 2
+trueFunc = MultiDimJump(ndim=dim)
+bounds = trueFunc.xlimits
+boxIntersect(np.array([-2.5, 0.5]), np.array([-.707,-.707]), bounds)
 
 # dim = 2
 # trueFunc = RobotArm(ndim=dim)

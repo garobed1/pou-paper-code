@@ -30,9 +30,9 @@ extra = 1           #gek extra points
 dim = 2           #problem dimension
 rho = 10            #POU parameter
 nt0  = dim*10     #initial design size
-ntr = dim*5      #number of points to add
+ntr = dim*50      #number of points to add
 ntot = nt0 + ntr  #total number of points
-batch = 0.0     #batch size for refinement, as a percentage of ntr
+batch = 0.05    #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = int(batch*ntr)
 if(pperb == 0):
@@ -43,7 +43,7 @@ neval = dim*2
 hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
-perturb = False
+perturb = True
 
 # Problem Settings
 trueFunc = Rosenbrock(ndim=dim)#, alpha=alpha) #problem Sphere(ndim=dim)#
@@ -64,7 +64,7 @@ print("Initial Sample Size  : ", nt0)
 print("Refined Points Size  : ", ntr)
 print("Total Points         : ", ntot)
 print("Points Per Iteration : ", int(batch*ntr))
-print("RMSE Size            : ", Nerr)
+print("Error Test Size      : ", Nerr)
 print("\n")
 
 # Error
@@ -100,9 +100,10 @@ print("Training Initial Surrogate ...")
 # Initial Design Surrogate
 if(stype == "gekpls"):
     model0 = GEKPLS(xlimits=xlimits)
-    model0.options.update({"extra_points":1})
+    model0.options.update({"extra_points":extra})
     model0.options.update({"corr":corr})
     model0.options.update({"poly":poly})
+    model0.options.update({"n_start":5})
 elif(stype == "pou"):
     model0 = POUSurrogate()
     model0.options.update({"rho":rho})
@@ -110,7 +111,8 @@ else:
     model0 = KRG()
     model0.options.update({"corr":corr})
     model0.options.update({"poly":poly})
-model0.options.update({"n_start":30})
+    model0.options.update({"n_start":5})
+
 model0.options.update({"print_global":False})
 model0.set_training_values(xtrain0, ftrain0)
 if(isinstance(model0, GEKPLS) or isinstance(model0, POUSurrogate)):
@@ -190,8 +192,6 @@ plt.plot(br[:,0], br[:,1], "go")
 plt.plot(tr[nt0:,0], tr[nt0:,1], "ro")
 
 plt.savefig("rosenbrock_2d_pts.png")
-import pdb; pdb.set_trace()
-
 
 # Plot Error Contour
 #Contour
@@ -246,15 +246,7 @@ plt.colorbar(cs)
 
 plt.savefig("rosenbrock_2d_errcon0.png")
 
-plt.clf()
 
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot_surface(Y, X, F)
-ax.scatter(tr[0:nt0,0], tr[0:nt0,1], fr[0:nt0])
-ax.scatter(tr[nt0:,0], tr[nt0:,1], fr[nt0:])
-import pdb; pdb.set_trace()
-pickle.dump(fig, open('FigureObject.fig.pickle', 'wb'))
 
 plt.clf()
 cs2 = plt.contour(Y, X, F, levels = 20)
@@ -264,3 +256,13 @@ plt.clf()
 
 plt.contour(Y, X, TF, levels = cs2.levels)
 plt.savefig("rosenbrock_2d_surf.png")
+
+plt.clf()
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.plot_surface(Y, X, F)
+ax.scatter(tr[0:nt0,0], tr[0:nt0,1], fr[0:nt0])
+ax.scatter(tr[nt0:,0], tr[nt0:,1], fr[nt0:])
+
+pickle.dump(fig, open('FigureObject.fig.pickle', 'wb'))
