@@ -90,7 +90,7 @@ class EBSolver(om.ImplicitComponent):
         self.add_output('struct_states', distributed=True, shape=state_size, val = np.zeros(state_size), desc='structural state vector', tags=['mphys_coupling'])
 
         # partials
-        self.declare_partials('struct_states',['dv_struct','struct_force'], method='cs')
+        self.declare_partials('struct_states',['dv_struct','struct_force','struct_states'])
 
     def _need_update(self,inputs):
 
@@ -153,11 +153,11 @@ class EBSolver(om.ImplicitComponent):
         self._update_internal(inputs,outputs)
 
         ans  = self.beam_solver()
-        partials['struct_states'] = self.beam_solver.A
+        partials['struct_states','struct_states'] = self.beam_solver.A.real
 
         dAudth, dbdf = self.beam_solver.evalassembleSens()
-        partials['struct_force'] = dbdf
-        partials['dv_struct'] = dAudth
+        partials['struct_states','struct_force'] = dbdf
+        partials['struct_states','dv_struct'] = dAudth
 
 class EBGroup(om.Group):
     def initialize(self):
@@ -297,7 +297,7 @@ class EBForce(om.ExplicitComponent):
 
         self.add_output("struct_force", distributed=True, shape=local_coord_size, val=np.zeros(local_coord_size), tags=["mphys_coupling"])
 
-
+        self.declare_partials("*","*",method="fd")
 
     def compute(self, inputs, outputs):
 
@@ -314,7 +314,6 @@ class EBForce(om.ExplicitComponent):
         #     u_struct[3*i+2] = u_z[i]
         #     u_struct[len(u_z)*3 + 3*i+2] = u_z[i]
         #import pdb; pdb.set_trace()
-
         outputs["struct_force"] = f_z
 
 
@@ -339,13 +338,12 @@ class EBDisp(om.ExplicitComponent):
         #import pdb; pdb.set_trace()
         self.add_output("u_struct", distributed=True, shape=local_coord_size, val=np.zeros(local_coord_size), tags=["mphys_coupling"])
 
-
+        self.declare_partials("*","*",method="fd")
 
     def compute(self, inputs, outputs):
 
         solver = self.solver
 
-        # we don't actually know if the solution here is exactly what we want. will need to investigate
         #u = solver.getSolution() #should actually get this from inputs instead
         u = inputs['struct_states']
         u_z = np.zeros(int(len(u)/2 + 2))
@@ -356,7 +354,6 @@ class EBDisp(om.ExplicitComponent):
         for i in range(len(u_z)):
             u_struct[3*i+2] = u_z[i]
             u_struct[len(u_z)*3 + 3*i+2] = u_z[i]
-        #import pdb; pdb.set_trace()
 
         outputs["u_struct"] = u_struct
 
@@ -449,7 +446,6 @@ class EBFunctions(om.ExplicitComponent):
                     usens = self.beam_solver.evalstateSens(func)
                     d_inputs['u_struct'][:] += np.array(usens,dtype=float) * d_func[ifunc]
 
-        import pdb; pdb.set_trace()
 
 class EBMass(om.ExplicitComponent):
     """

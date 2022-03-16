@@ -370,7 +370,7 @@ class EulerBeamSolver():
             db = asm.LoadAssemble(self.L, fc, self.Nelem)
             db = np.imag(db)/h
 
-            dbdf[:,i] = db
+            dbdf[:,i] = -db
 
         # reset
         self.setThickness(thcurrent)

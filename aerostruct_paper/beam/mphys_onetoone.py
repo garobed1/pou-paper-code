@@ -71,21 +71,20 @@ class OTODispXfer(om.ExplicitComponent):
             Error("Grid Mismatch for One to One transfer!")
 
         u_a = u_s
-
         outputs['u_aero'] = u_a
 
     def compute_partials(self, inputs, partials):
         
         # u_a  = np.array(outputs['u_aero'])
 
-        # u_s  = np.zeros(self.struct_nnodes*3)
+        u_s  = np.zeros(self.struct_nnodes*3)
         
         # for i in range(3):
         #     u_s[i::3] = inputs['u_struct'][i::self.struct_ndof]
 
         # uatos = np.eye()
 
-        partials['u_aero','u_struct']
+        partials['u_aero','u_struct'] = np.eye(len(u_s))
 
 
 class OTOLoadXfer(om.ExplicitComponent):
@@ -169,7 +168,8 @@ class OTOLoadXfer(om.ExplicitComponent):
 
     def compute_partials(self, inputs, partials):
     
-        partials['f_struct','f_aero']
+        u_s  = np.zeros(self.struct_nnodes*3)
+        partials['f_struct','f_aero'] = np.eye(len(u_s))
 
 class OTOBuilder(Builder):
     def __init__(self, aero_builder, struct_builder, check_partials=False):

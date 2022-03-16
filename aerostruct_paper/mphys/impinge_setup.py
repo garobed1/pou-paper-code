@@ -7,7 +7,7 @@ outputDirectory = './results'
 aeroGridFile = f'../meshes/imp_mphys_73_73_25.cgns'
 alpha = 0. #
 beta = 7.2833969362749187
-mach = 2.6381157549933598 #3.0
+mach = 2.6381157549933598 + 1e-7 #3.0
 areaRef = 1.0
 chordRef = 1.0
 T = 254.02071103827234 #217.
@@ -22,7 +22,7 @@ optOptions = { #general optimization parameters
     'prob_name':probName,
     'NX':2, #number of x FFD points, not necessarily the number of design vars
     'bumpBounds':[1.00, 2.00], #ends of the bump
-    'mach':0.1, #inflow mach number
+    'mach':mach, #inflow mach number
     'Re':936000, #inflow reynolds number
     'DVFraction':0.1, #fraction of NX on either side of bump control points not used as DVs
     'DVUpperBound':2.0,  #upper bound for control point movement
@@ -101,7 +101,7 @@ aeroOptions = { #ADflow aero solver options
     
     # Design options
     'meshSurfaceFamily':'customSurface',
-    #'designSurfaceFamily':'wall2',
+    'designSurfaceFamily':'wall2',
     # Adjoint options
     'adjointL2Convergence': 1e-06,
     # Output
@@ -114,7 +114,7 @@ aeroOptions = { #ADflow aero solver options
     }
 
 # Euler Bernoulli Structural Solver Options
-nelem = 17
+nelem = 30
 structOptions = {
     "name":probName,
     "Nelem":nelem,
@@ -122,7 +122,7 @@ structOptions = {
     "E":100000,
     "force":np.ones(nelem+1)*1.0,
     "Iyy":None,
-    "th":np.ones(nelem+1)*0.001,
+    "th":np.ones(nelem+1)*0.05,
     "l_bound":2.0,
     "smax": 500,
     "get_funcs":["mass", "stresscon"]

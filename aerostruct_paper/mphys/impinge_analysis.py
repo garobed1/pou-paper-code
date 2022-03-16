@@ -31,6 +31,7 @@ rank = comm.rank
 
 class Top(Multipoint):
     def setup(self):
+        opt_options = impinge_setup.optOptions
 
         ################################################################################
         # ADflow Setup
@@ -61,14 +62,14 @@ class Top(Multipoint):
         # Transfer Scheme Setup
         ################################################################################
 
-        self.onetoone = False
+        self.onetoone = True
 
         if(self.onetoone):
             ldxfer_builder = OTOBuilder(aero_builder, struct_builder)
             ldxfer_builder.initialize(self.comm)
         else:
-            isym = 1
-            ldxfer_builder = MeldBuilder(aero_builder, struct_builder, isym=isym, n=2)
+            isym = -1
+            ldxfer_builder = MeldBuilder(aero_builder, struct_builder, isym=isym, n=15)
             ldxfer_builder.initialize(self.comm)
 
         ################################################################################
@@ -77,8 +78,8 @@ class Top(Multipoint):
 
         # ivc to keep the top level DVs
         dvs = self.add_subsystem("dvs", om.IndepVarComp(), promotes=["*"])
-
-        dvs.add_output("dv_struct", np.array(ndv_struct * [0.05]))
+        dvs.add_output("mach", val=opt_options["mach"])
+        dvs.add_output("dv_struct", struct_options["th"])
 
         nonlinear_solver = om.NonlinearBlockGS(maxiter=25, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
         linear_solver = om.LinearBlockGS(maxiter=25, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
@@ -95,7 +96,7 @@ class Top(Multipoint):
         for discipline in ["aero", "struct"]:
             self.mphys_connect_scenario_coordinate_source("mesh_%s" % discipline, scenario, discipline)
 
-        self.connect("dv_struct", f"{scenario}.dv_struct")
+        
 
     def configure(self):
         # create the aero problem 
@@ -109,10 +110,19 @@ class Top(Multipoint):
             T = impinge_setup.T, 
             P = impinge_setup.P, 
             evalFuncs=["cd_def"],
-        )
+        )    
+
+        #TODO: Need to find a way to do this for the SA constants
+
+        ap.addDV("mach", value=impinge_setup.mach, name="mach")
 
         self.test.coupling.aero.mphys_set_ap(ap)
         self.test.aero_post.mphys_set_ap(ap)
+
+        self.connect("dv_struct", f"test.dv_struct")
+        self.connect("mach", "test.coupling.aero.mach")
+        self.add_design_var("mach", lower=2.0, upper=2.5)
+        self.add_objective("test.aero_post.cd_def")
 
 
 ################################################################################
@@ -120,14 +130,14 @@ class Top(Multipoint):
 ################################################################################
 prob = om.Problem()
 prob.model = Top()
-prob.setup()
+prob.setup(mode='rev')
 #om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
-prob.model.add_objective("test.aero_post.cd_def")
+#prob.model.add_design_var("mach", lower=2.0, upper=2.5)
 prob.run_model()
 prob.check_totals()
 
 #prob.model.list_outputs()
 
-# if MPI.COMM_WORLD.rank == 0:
-#     #print("cd = ", prob["test.aero_post.cd_def"])
+if MPI.COMM_WORLD.rank == 0:
+    print("cd = %.15f" % prob["test.aero_post.cd_def"])
 #     prob.model.
