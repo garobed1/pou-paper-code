@@ -81,7 +81,7 @@ class Top(Multipoint):
         dvs.add_output("mach", val=opt_options["mach"])
         dvs.add_output("dv_struct", struct_options["th"])
 
-        nonlinear_solver = om.NonlinearBlockGS(maxiter=25, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
+        nonlinear_solver = om.NonlinearBlockGS(maxiter=2, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
         linear_solver = om.LinearBlockGS(maxiter=25, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
         scenario = "test"
         self.mphys_add_scenario(
@@ -123,7 +123,8 @@ class Top(Multipoint):
         ##  EXTREMELY IMPORTANT TO CONNECT AP VARIABLES TO ALL OF THESE
         self.connect("mach", "test.coupling.aero.mach")
         self.connect("mach", "test.aero_post.mach")
-        self.add_design_var("mach", lower=2.0, upper=2.5)
+        #self.add_design_var("mach", lower=2.0, upper=2.5)
+        self.add_design_var("dv_struct")
         self.add_objective("test.aero_post.cd_def")
 
 
@@ -134,7 +135,8 @@ prob = om.Problem()
 prob.model = Top()
 prob.setup(mode='rev')
 om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
-prob.set_val("mach", impinge_setup.mach)
+#prob.set_val("mach", 2.)
+prob.set_val("dv_struct", impinge_setup.structOptions["th"])
 prob.run_model()
 prob.check_totals()
 #prob.check_partials()

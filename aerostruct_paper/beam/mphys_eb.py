@@ -3,6 +3,7 @@ import copy
 import openmdao.api as om
 from mphys.builder import Builder
 from beam_solver import EulerBeamSolver
+from scipy.sparse.linalg.dsolve import spsolve
 
 """
 Wrapper for the beam solver, incorporating as a structural solver in mphys
@@ -87,7 +88,7 @@ class EBSolver(om.ImplicitComponent):
 
         # outputs
         # its important that we set this to zero since this displacement value is used for the first iteration of the aero
-        self.add_output('struct_states', distributed=False, shape=state_size, val = np.zeros(state_size), desc='structural state vector', tags=['mphys_coupling'])
+        self.add_output('struct_states', distributed=False, shape=state_size, val = np.ones(state_size), desc='structural state vector', tags=['mphys_coupling'])
 
         # partials
         self.declare_partials('struct_states',['dv_struct','struct_force','struct_states'])
@@ -127,8 +128,7 @@ class EBSolver(om.ImplicitComponent):
             # self.beam_solver.setLoad(np.array(inputs['struct_force']))
 
         if outputs is not None:
-            ans = self.ans
-            ans[:] = outputs['struct_states']
+            self.beam_solver.u = outputs['struct_states']
         self.beam_solver.setLoad(np.array(inputs['struct_force']))
 
 
@@ -152,10 +152,23 @@ class EBSolver(om.ImplicitComponent):
         self.beam_solver.assemble()
         partials['struct_states','struct_states'] = copy.deepcopy(self.beam_solver.A.real.todense())
 
-        ans  = self.beam_solver()
+        #ans  = self.beam_solver()
         dAudth, dbdf = self.beam_solver.evalassembleSens()
         partials['struct_states','struct_force'] = dbdf
         partials['struct_states','dv_struct'] = dAudth
+        #import pdb; pdb.set_trace()
+
+    def solve_linear(self,d_outputs,d_residuals,mode):
+
+        if mode == 'fwd':
+            if self.check_partials:
+                print ('solver fwd')
+            else:
+                raise ValueError('forward mode requested but not implemented')
+
+        if mode == 'rev':
+            res_array = d_outputs['struct_states']
+            d_residuals['struct_states'] = spsolve(self.beam_solver.A.T, res_array)
 
 class EBGroup(om.Group):
     def initialize(self):
@@ -305,7 +318,7 @@ class EBForce(om.ExplicitComponent):
         
         f_z = np.zeros(int(len(f)/6))
         for i in range(len(f_z)):
-            f_z[i] = f[3*i+2]
+            f_z[i] = -f[3*i+2]
 
         # u_struct = np.zeros(2*len(u_z)*3)
         # for i in range(len(u_z)):
@@ -326,7 +339,7 @@ class EBForce(om.ExplicitComponent):
 
         dfz = np.zeros([int(len(f)/6),len(f)])
         for i in range(len(f_z)):
-            dfz[i,3*i+2] = 1.
+            dfz[i,3*i+2] = -1.
 
         partials["struct_force","f_struct"] = dfz
 

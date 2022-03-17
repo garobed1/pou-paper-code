@@ -119,7 +119,7 @@ structOptions = {
     "name":probName,
     "Nelem":nelem,
     "L":0.254, #0.254, 
-    "E":100000,
+    "E":10000,
     "force":np.ones(nelem+1)*1.0,
     "Iyy":None,
     "th":np.ones(nelem+1)*0.05,
