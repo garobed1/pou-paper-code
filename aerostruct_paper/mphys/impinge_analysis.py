@@ -69,7 +69,7 @@ class Top(Multipoint):
             ldxfer_builder.initialize(self.comm)
         else:
             isym = -1
-            ldxfer_builder = MeldBuilder(aero_builder, struct_builder, isym=isym, n=15)
+            ldxfer_builder = MeldBuilder(aero_builder, struct_builder, isym=isym, n=2)
             ldxfer_builder.initialize(self.comm)
 
         ################################################################################
@@ -120,7 +120,9 @@ class Top(Multipoint):
         self.test.aero_post.mphys_set_ap(ap)
 
         self.connect("dv_struct", f"test.dv_struct")
+        ##  EXTREMELY IMPORTANT TO CONNECT AP VARIABLES TO ALL OF THESE
         self.connect("mach", "test.coupling.aero.mach")
+        self.connect("mach", "test.aero_post.mach")
         self.add_design_var("mach", lower=2.0, upper=2.5)
         self.add_objective("test.aero_post.cd_def")
 
@@ -131,10 +133,11 @@ class Top(Multipoint):
 prob = om.Problem()
 prob.model = Top()
 prob.setup(mode='rev')
-#om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
-#prob.model.add_design_var("mach", lower=2.0, upper=2.5)
+om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
+prob.set_val("mach", impinge_setup.mach)
 prob.run_model()
 prob.check_totals()
+#prob.check_partials()
 
 #prob.model.list_outputs()
 

@@ -26,10 +26,10 @@ rtype = "hessian" #criteria type
 corr  = "squar_exp" #kriging correlation
 poly  = "linear"  #kriging regression 
 extra = 1           #gek extra points
-dim = 2           #problem dimension
+dim = 1           #problem dimension
 rho = 10            #POU parameter
 nt0  = 6#dim*10     #initial design size
-ntr = 6#dim*5      #number of points to add
+ntr = 1#dim*5      #number of points to add
 ntot = nt0 + ntr  #total number of points
 batch = 0.0     #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
@@ -186,9 +186,10 @@ plt.clf()
 # Plot Training Points
 tr = modelf.training_points[None][0][0]
 fr = modelf.training_points[None][0][1]
+gr = hist[0].grad
 br = hist[0].bads
-plt.plot(tr[0:nt0], fr[0:nt0], "bo")
-plt.plot(tr[nt0:], fr[nt0:], "ro")
+brl = hist[0].bad_list
+
 
 
 
@@ -198,9 +199,20 @@ x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
 ymodelf = modelf.predict_values(x)
 ymodel0 = model0.predict_values(x)
 ytrue = trueFunc(x)
+
 plt.plot(x, ytrue, "k-")
-plt.plot(x, ymodelf, "g--")
-plt.plot(x, ymodel0, "r--")
+plt.plot(tr[0:nt0], fr[0:nt0], "bo")
+plt.savefig("arctan_1d_1.png")
+
+plt.plot(tr[brl[0]], fr[brl[0]], "go")
+plt.plot([tr[brl[0]] - 1.,tr[brl[0]] + 1.], [fr[brl[0]] - gr[brl[0]], fr[brl[0]] + gr[brl[0]]], "k--")
+plt.savefig("arctan_1d_2.png")
+
+plt.plot(tr[nt0:], fr[nt0:], "ro")
+plt.savefig("arctan_1d_3.png")
+plt.plot(x, ymodel0, "g--")
+plt.plot(x, ymodelf, "r--")
+plt.savefig("arctan_1d_4.png")
 
 
 

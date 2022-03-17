@@ -87,7 +87,7 @@ class EulerBeamSolver():
 
         return self.u
 
-    def getResidual(self):
+    def getResidual(self, u):
 
         if(self.req_setup):
             Error("Must call setup(settings) at least once before attemping to solve")
@@ -96,7 +96,7 @@ class EulerBeamSolver():
             self.assemble()
 
         # multiply through
-        self.res = self.A*self.u - self.b
+        self.res = self.A*u - self.b
 
         return self.res
 
@@ -355,7 +355,7 @@ class EulerBeamSolver():
             thc.imag = np.zeros(len(self.th))
             thc[i] = thc[i] + h*1j
             self.setThickness(thc)
-            dA = asm.StiffAssemble(self.L, self.E, self.Iyy, self.Nelem)
+            dA = asm.StiffAssemble(self.L, self.E, self.Iyy, self.Nelem).todense()
             dA = np.imag(dA)/h
             dAudth[:,i] = dA.dot(self.u)
 

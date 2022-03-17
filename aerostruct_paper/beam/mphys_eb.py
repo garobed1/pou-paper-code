@@ -1,5 +1,5 @@
 import numpy as np
-
+import copy
 import openmdao.api as om
 from mphys.builder import Builder
 from beam_solver import EulerBeamSolver
@@ -82,12 +82,12 @@ class EBSolver(om.ImplicitComponent):
         state_size = len(self.ans)
         # inputs
         self.add_input('dv_struct', distributed=False, shape=self.ndv, desc='tacs design variables', tags=['mphys_input'])
-        self.add_input('x_struct0', distributed=True, shape_by_conn=True, desc='structural node coordinates',tags=['mphys_coordinates'])
-        self.add_input('struct_force',  distributed=True, shape_by_conn=True, desc='structural load vector', tags=['mphys_coupling'])
+        self.add_input('x_struct0', distributed=False, shape_by_conn=True, desc='structural node coordinates',tags=['mphys_coordinates'])
+        self.add_input('struct_force',  distributed=False, val=np.ones(self.npnt), desc='structural load vector', tags=['mphys_coupling'])
 
         # outputs
         # its important that we set this to zero since this displacement value is used for the first iteration of the aero
-        self.add_output('struct_states', distributed=True, shape=state_size, val = np.zeros(state_size), desc='structural state vector', tags=['mphys_coupling'])
+        self.add_output('struct_states', distributed=False, shape=state_size, val = np.zeros(state_size), desc='structural state vector', tags=['mphys_coupling'])
 
         # partials
         self.declare_partials('struct_states',['dv_struct','struct_force','struct_states'])
@@ -117,9 +117,9 @@ class EBSolver(om.ImplicitComponent):
         return update
 
     def _update_internal(self,inputs,outputs=None):
-        if self._need_update(inputs):
+        #if self._need_update(inputs):
             # update Iyy
-            self.beam_solver.computeRectMoment(np.array(inputs['dv_struct']))
+        self.beam_solver.computeRectMoment(np.array(inputs['dv_struct']))
             # have this function call setIyy internally
 
             # update force
@@ -129,16 +129,14 @@ class EBSolver(om.ImplicitComponent):
         if outputs is not None:
             ans = self.ans
             ans[:] = outputs['struct_states']
-
         self.beam_solver.setLoad(np.array(inputs['struct_force']))
 
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         
         self._update_internal(inputs,outputs)
-
-        res  = self.beam_solver.getResidual()
-
+        
+        res  = self.beam_solver.getResidual(outputs['struct_states'])
         residuals['struct_states'] = res
 
     def solve_nonlinear(self, inputs, outputs):
@@ -151,10 +149,10 @@ class EBSolver(om.ImplicitComponent):
     def linearize(self, inputs, outputs, partials):
 
         self._update_internal(inputs,outputs)
+        self.beam_solver.assemble()
+        partials['struct_states','struct_states'] = copy.deepcopy(self.beam_solver.A.real.todense())
 
         ans  = self.beam_solver()
-        partials['struct_states','struct_states'] = self.beam_solver.A.real
-
         dAudth, dbdf = self.beam_solver.evalassembleSens()
         partials['struct_states','struct_force'] = dbdf
         partials['struct_states','dv_struct'] = dAudth
@@ -205,7 +203,7 @@ class EBFuncsGroup(om.Group):
         self.add_subsystem('funcs', EBFunctions(
             struct_objects=self.struct_objects,
             check_partials=self.check_partials),
-            promotes_inputs=['x_struct0', 'u_struct','dv_struct'],
+            promotes_inputs=['x_struct0', 'struct_states','dv_struct'],
             promotes_outputs=['func_struct']
         )
 
@@ -297,7 +295,7 @@ class EBForce(om.ExplicitComponent):
 
         self.add_output("struct_force", distributed=True, shape=local_coord_size, val=np.zeros(local_coord_size), tags=["mphys_coupling"])
 
-        self.declare_partials("*","*",method="fd")
+        self.declare_partials("*","*")
 
     def compute(self, inputs, outputs):
 
@@ -315,6 +313,22 @@ class EBForce(om.ExplicitComponent):
         #     u_struct[len(u_z)*3 + 3*i+2] = u_z[i]
         #import pdb; pdb.set_trace()
         outputs["struct_force"] = f_z
+
+    def compute_partials(self, inputs, partials):
+
+        solver = self.solver
+
+        f = inputs["f_struct"]
+        
+        f_z = np.zeros(int(len(f)/6))
+        for i in range(len(f_z)):
+            f_z[i] = f[3*i+2]
+
+        dfz = np.zeros([int(len(f)/6),len(f)])
+        for i in range(len(f_z)):
+            dfz[i,3*i+2] = 1.
+
+        partials["struct_force","f_struct"] = dfz
 
 
 class EBDisp(om.ExplicitComponent):
@@ -338,7 +352,7 @@ class EBDisp(om.ExplicitComponent):
         #import pdb; pdb.set_trace()
         self.add_output("u_struct", distributed=True, shape=local_coord_size, val=np.zeros(local_coord_size), tags=["mphys_coupling"])
 
-        self.declare_partials("*","*",method="fd")
+        self.declare_partials("*","*")
 
     def compute(self, inputs, outputs):
 
@@ -348,7 +362,7 @@ class EBDisp(om.ExplicitComponent):
         u = inputs['struct_states']
         u_z = np.zeros(int(len(u)/2 + 2))
         for i in range(1,len(u_z)-1):
-            u_z[i] = u[2*i-1]
+            u_z[i] = u[2*i-2]
 
         u_struct = np.zeros(2*len(u_z)*3)
         for i in range(len(u_z)):
@@ -357,9 +371,26 @@ class EBDisp(om.ExplicitComponent):
 
         outputs["u_struct"] = u_struct
 
-    # def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+    def compute_partials(self, inputs, partials):
 
-    #     solver = self.solver
+        solver = self.solver
+
+        #u = solver.getSolution() #should actually get this from inputs instead
+        u = inputs['struct_states']
+        u_z = np.zeros(int(len(u)/2 + 2))
+
+        u_struct = np.zeros(2*len(u_z)*3)
+
+        duz = np.zeros([len(u_z),len(u)])
+        for i in range(1,len(u_z)-1):
+            duz[i,2*i-2] = 1.
+
+        dus = np.zeros([len(u_struct),len(u_z)])
+        for i in range(len(u_z)):
+            dus[3*i+2,i] = 1.
+            dus[len(u_z)*3 + 3*i+2, i] = 1.
+        
+        partials["u_struct","struct_states"] = np.matmul(dus, duz)
 
 
 
@@ -386,7 +417,7 @@ class EBFunctions(om.ExplicitComponent):
         # TODO move the dv_struct to an external call where we add the DVs
         self.add_input('dv_struct', distributed=False, shape = self.ndv, desc='design variables', tags=['mphys_input'])
         self.add_input('x_struct0', distributed=True, shape_by_conn=True, desc='structural node coordinates',tags=['mphys_coordinates'])
-        self.add_input('u_struct', distributed=True, shape_by_conn=True, desc='structural state vector', tags=['mphys_coupling'])
+        self.add_input('struct_states', distributed=False, shape_by_conn=True, desc='structural state vector', tags=['mphys_coupling'])
 
         # Remove the mass function from the func list if it is there
         # since it is not dependent on the structural state
@@ -399,7 +430,7 @@ class EBFunctions(om.ExplicitComponent):
         if len(self.func_list) > 0:
             self.add_output('func_struct', distributed=False, shape=len(self.func_list), desc='structural function values', tags=['mphys_result'])
             # declare the partials
-            #self.declare_partials('f_struct',['dv_struct','x_struct0','u_struct'])
+            self.declare_partials('func_struct',['dv_struct','struct_states'])
 
     def _update_internal(self,inputs):
         # update Iyy
@@ -414,37 +445,14 @@ class EBFunctions(om.ExplicitComponent):
             thing = list(self.beam_solver.evalFunctions(self.func_list).values())
             outputs['func_struct'] = thing
 
-    def compute_jacvec_product(self,inputs, d_inputs, d_outputs, mode):
-        if mode == 'fwd':
-            if not self.check_partials:
-                raise ValueError('EB forward mode requested but not implemented')
-        if mode == 'rev':
-            # always update internal because same tacs object could be used by multiple scenarios
-            # and we need to load this scenario's state back into TACS before doing derivatives
+    def compute_partials(self, inputs, partials):
+        if self.check_partials:
             self._update_internal(inputs)
 
-            if 'func_struct' in d_outputs:
-                proc_contribution = d_outputs['func_struct'][:]
-            else: # not sure why OM would call this method without func_struct, but here for safety
-                proc_contribution = np.zeros(len(self.func_list))
-            d_func = self.comm.allreduce(proc_contribution) / self.comm.size
-
-            for ifunc, func in enumerate(self.func_list):
-                self.beam_solver.evalFunctions(self.func_list)
-                if 'dv_struct' in d_inputs:
-                    dvsens = np.zeros(d_inputs['dv_struct'].size)
-                    dvsens = self.beam_solver.evalthSens(func)
-                    d_inputs['dv_struct'][:] += np.array(dvsens,dtype=float) * d_func[ifunc]
-
-                # if 'struct_force' in d_inputs:
-                #     dvsens = np.zeros(d_inputs['struct_force'].size)
-                #     dvsens = self.beam_solver.evalforceSens(func)
-                #     d_inputs['struct_force'][:] += np.array(dvsens,dtype=float) * d_func[ifunc]
-
-                if 'u_struct' in d_inputs:
-                    usens = np.zeros(d_inputs['u_struct'].size)
-                    usens = self.beam_solver.evalstateSens(func)
-                    d_inputs['u_struct'][:] += np.array(usens,dtype=float) * d_func[ifunc]
+        self.beam_solver.evalFunctions(self.func_list)
+        
+        partials['func_struct','dv_struct'] = list(self.beam_solver.evalthSens(self.func_list).values())
+        partials['func_struct','struct_states'] = list(self.beam_solver.evalstateSens(self.func_list).values())
 
 
 class EBMass(om.ExplicitComponent):
@@ -474,7 +482,7 @@ class EBMass(om.ExplicitComponent):
         self.add_input('dv_struct', distributed=False, shape=self.ndv, desc='design variables', tags=['mphys_input'])
         self.add_input('x_struct0', distributed=True, shape_by_conn=True, desc='structural node coordinates', tags=['mphys_coordinates'])
         self.add_output('mass', val=0.0, distributed=False, desc = 'structural mass', tags=['mphys_result'])
-        #self.declare_partials('mass',['dv_struct','x_struct0'])
+        self.declare_partials('mass',['dv_struct'])
 
     def _update_internal(self,inputs):
         # update Iyy
@@ -491,18 +499,13 @@ class EBMass(om.ExplicitComponent):
             thing = self.beam_solver.evalFunctions(['mass'])['mass']
             outputs['mass'] = thing
 
-    def compute_jacvec_product(self,inputs, d_inputs, d_outputs, mode):
-        if mode == 'fwd':
-            if not self.check_partials:
-                raise ValueError('EB forward mode requested but not implemented')
-        if mode == 'rev':
+    
+    def compute_partials(self, inputs, partials):
+        if self.check_partials:
             self._update_internal(inputs)
-            if 'mass' in d_outputs:
-                func = self.beam_solver.evalFunctions(['beam_mass'])
-                if 'dv_struct' in d_inputs:
-                    dvsens = np.zeros(d_inputs['dv_struct'].size)
-                    self.beam_solver.evalDVSens(func, dvsens)
 
-                    d_inputs['dv_struct'] += np.array(dvsens,dtype=float) * d_outputs['mass']
+        self.beam_solver.evalFunctions(['mass'])['mass']
+        
+        partials['mass','dv_struct'] = list(self.beam_solver.evalthSens(['mass']).values())
 
 
