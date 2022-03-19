@@ -63,6 +63,7 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
     count = int(ntr/rcrit.nnew)
     hist = []
     errh = []
+    errh2 = []
     model = copy.deepcopy(model0)
     
 
@@ -96,9 +97,12 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         if(options["errorcheck"] is not None):
             xdata, fdata = options["errorcheck"]
             err = rmse(model, func, xdata=xdata, fdata=fdata)
+            err2 = meane(model, func, xdata=xdata, fdata=fdata)
             errh.append(err)
+            errh2.append(err2)
         else:
             errh = None
+            errh2 = None
 
         hist.append(copy.deepcopy(rcrit))
 
@@ -108,4 +112,4 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         # replace criteria
         rcrit.initialize(model, g0)
 
-    return model, rcrit, hist, errh
+    return model, rcrit, hist, errh, errh2

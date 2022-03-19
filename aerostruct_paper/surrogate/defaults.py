@@ -22,7 +22,7 @@ DefaultOptOptions = {
     "method":"ga",
     "localswitch":True,
     "strategy":'best1bin', 
-    "lmethod":None, 
+    "lmethod":'SLSQP', 
     "lstrategy":None,
     "giter":100, 
     "gpop":15, 

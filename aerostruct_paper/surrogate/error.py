@@ -84,6 +84,7 @@ def meane(model, prob, N=5000, xdata=None, fdata=None):
     err = abs(tmean - mmean)
 
     # scale
-    err /= abs(tmean)
+    #err /= abs(tmean)
     
+
     return err

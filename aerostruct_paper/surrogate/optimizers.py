@@ -22,12 +22,13 @@ def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, co
     # check if using a global or local method
     if(type == "global"):
         if(method == "ga"):
-            results = differential_evolution(func, bounds, args, strategy, maxiter=giter, popsize=gpop, tol=gtol, constraints=constraints)
+            results = differential_evolution(func, bounds, args, strategy, maxiter=giter, popsize=gpop, tol=gtol)
         else:
             return
 
     # if local, use minimize
     else:
-        results = minimize(func, x0, args, method=lmethod, jac=jac, hess=hess, bounds=bounds, constraints=constraints, tol=ltol, options={"maxiter":liter,"disp":False})
+        results = minimize(func, x0, args, method=lmethod, jac=jac, hess=hess, bounds=bounds, tol=ltol, options={"maxiter":liter,"disp":False})
+        #import pdb; pdb.set_trace()
 
     return results

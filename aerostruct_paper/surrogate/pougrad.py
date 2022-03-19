@@ -1,5 +1,9 @@
 import numpy as np
 from smt.surrogate_models.surrogate_model import SurrogateModel
+from smt.utils.options_dictionary import OptionsDictionary
+from collections import defaultdict
+from scipy.spatial.distance import pdist, cdist, squareform
+
 
 
 """
@@ -8,7 +12,7 @@ Gradient-Enhanced Partition-of-Unity Surrogate model
 # Might be worth making a generic base class
 # Also, need to add some asserts just in case
 
-class POUSurrogate(SurrogateModel):
+class POUSurrogate(SurrogateModel): 
     name = "POU"
     """
     Create the surrogate object
@@ -213,3 +217,207 @@ class POUSurrogate(SurrogateModel):
 
         xgrad = (denom*dnumer - numer*ddenom)/(denom*denom)
         return xgrad
+
+
+
+
+
+
+class POUMetric():
+    name = "POUMetric"
+    """
+    Create the surrogate object
+
+    Parameters
+    ----------
+
+    xcenter : numpy array(numsample, dim)
+        Surrogate data locations
+    func : numpy array(numsample, dim, dim)
+        Surrogate data outputs, in this case, the matrix that defines the anisotropic metric
+    rho : float
+        Hyperparameter that controls smoothness
+    delta : float
+        Parameter used to regularize the distance function
+
+    """
+    def __init__(self, **kwargs):
+        self.options = OptionsDictionary()
+
+        self.supports = supports = {}
+        supports["training_derivatives"] = False
+        supports["derivatives"] = False
+        supports["output_derivatives"] = False
+        supports["adjoint_api"] = False
+        supports["variances"] = False
+        supports["variance_derivatives"] = False
+
+        declare = self.options.declare
+
+        declare(
+            "print_global",
+            True,
+            types=bool,
+            desc="Global print toggle. If False, all printing is suppressed",
+        )
+        declare(
+            "print_training",
+            True,
+            types=bool,
+            desc="Whether to print training information",
+        )
+        declare(
+            "print_prediction",
+            True,
+            types=bool,
+            desc="Whether to print prediction information",
+        )
+        declare(
+            "print_problem",
+            True,
+            types=bool,
+            desc="Whether to print problem information",
+        )
+        declare(
+            "print_solver", True, types=bool, desc="Whether to print solver information"
+        )
+        self.initialize()
+        self.options.update(kwargs)
+        self.training_points = defaultdict(dict)
+
+
+    def initialize(self):#, xcenter, func, grad, rho, delta=1e-10):
+        # initialize data and parameters
+        #super(POUMetric, self)._initialize()
+        declare = self.options.declare
+
+        declare(
+            "rho",
+            10,
+            types=(int, float),
+            desc="Distance scaling parameter"
+        )
+
+        declare(
+            "delta",
+            1e-10,
+            types=(int, float),
+            desc="Regularization parameter"
+        )
+
+        declare(
+            "metric",
+            None,
+            types=np.ndarray,
+            desc="Actual training outputs"
+        )
+
+        self.supports["training_derivatives"] = False
+
+    """
+    Add additional data to the surrogate
+
+    Parameters
+    ----------
+
+    xcenter : numpy array(numsample, dim)
+        Surrogate data locations
+    func : numpy array(numsample)
+        Surrogate data outputs
+    grad : numpy array(numsample, dim)
+        Surrogate data gradients
+    """
+    # def addPoints(self, xcenter, func, grad):
+    #     numsample += len(xcenter)
+
+    #     self.xc.append(xcenter)
+    #     self.f.append(func)
+    #     self.g.append(grad)
+
+    #     self.training_points = {}
+    #     self.training_points[None] = []
+    #     self.training_points[None].append([])
+    #     self.training_points[None][0].append(self.xc)
+    #     self.training_points[None][0].append(self.f)
+    #     for i in range(dim):
+    #         self.training_points[None].append(self.g[i])
+
+    """
+    Evaluate the surrogate as-is at the point x
+
+    Parameters
+    ----------
+
+    Parameters
+        ----------
+        x : np.ndarray[nt, nx]
+            Input values for the prediction points.
+
+        Returns
+        -------
+        y : np.ndarray[nt, ny, ny]
+            Output values at the prediction points.
+        
+    """
+    def predict_values(self, xt):
+
+        xc = self.training_points[None][0][0]
+        f = self.options["metric"]
+        numsample = xc.shape[0]
+        dim = xc.shape[1]
+        delta = self.options["delta"]
+        rho = self.options["rho"]
+        
+        # loop over rows in xt
+        y = np.zeros([xt.shape[0], dim, dim])
+        for k in range(xt.shape[0]):
+            x = xt[k,:]
+            # exhaustive search for closest sample point, for regularization
+            # mindist = 1e100
+            # dists = np.zeros(numsample)
+            # for i in range(numsample):
+            #     dists[i] = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
+
+            # mindist = min(dists)
+            mindist = min(cdist(np.array([x]),xc)[0])
+
+            # for i in range(numsample):
+            #     dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
+            #     mindist = min(mindist,dist)
+
+            numer = 0
+            denom = 0
+
+            # evaluate the surrogate, requiring the distance from every point
+            for i in range(numsample):
+                work = x-xc[i]
+                dist = np.sqrt(np.dot(work,work) + delta)
+                local = f[i]
+                expfac = np.exp(-rho*(dist-mindist))
+                numer += local*expfac
+                denom += expfac
+
+            y[k,:,:] = numer/denom
+
+        return y
+
+
+    def set_training_values(self, xt: np.ndarray, yt: np.ndarray, name=None) -> None:
+        """
+        Set training data (values).
+
+        Parameters
+        ----------
+
+        """
+
+        if xt.shape[0] != yt.shape[0]:
+            raise ValueError(
+                "the first dimension of xt and yt must have the same length"
+            )
+
+        self.nt = xt.shape[0]
+        # self.nx = xt.shape[1]
+        # self.ny = yt.shape[1]
+        kx = 0
+        self.training_points[name][kx] = [np.array(xt), np.array(yt)]
