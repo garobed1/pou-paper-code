@@ -26,7 +26,7 @@ Error estimate for the arctangent jump problem
 Nruns = 10
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
-corr  = "abs_exp" #kriging correlation
+corr  = "squar_exp" #kriging correlation
 poly  = "linear"  #kriging regression 
 extra = 1           #gek extra points
 dim = 2          #problem dimension
@@ -49,7 +49,7 @@ perturb = True
 
 # Problem Settings
 alpha = 8.       #arctangent jump strength
-trueFunc = MultiDimJump(ndim=dim, alpha=alpha) #problem Sphere(ndim=dim)#
+trueFunc = Rosenbrock(ndim=dim)#, alpha=alpha) #problem Sphere(ndim=dim)#
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m') #initial design scheme
 
@@ -61,7 +61,7 @@ print("Refinement Type      : ", rtype)
 print("Correlation Function : ", corr)
 print("Regression Function  : ", poly)
 print("GEK Extra Points     : ", extra)
-print("Problem              : MultiDimJump")
+print("Problem              : Rosenbrock")
 print("Problem Dimension    : ", dim)
 print("Initial Sample Size  : ", nt0)
 print("Refined Points Size  : ", ntr)
@@ -106,6 +106,7 @@ for n in range(len(samplehistK)):
     gtrainK.append(np.zeros([nt0+n*int(batch*ntr),dim]))
     for i in range(dim):
         gtrainK[n][:,i:i+1] = trueFunc(xtrainK[n],i)
+
 
 print("Training Initial Surrogate ...")
 
@@ -165,7 +166,6 @@ for n in range(len(samplehistK)):
     errkmean.append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
 
 
-
 print("Initial Refinement Criteria ...")
 
 # Initial Refinement Criteria
@@ -219,7 +219,7 @@ plt.grid()
 # Plot Non-Adaptive Error
 #plt.loglog([samplehist[0], samplehist[-1]], [errkrms, errkrms], "k--")
 plt.loglog(samplehistK, errkrms, 'k--')
-plt.savefig("arctan_2d_aniso_err_rms_ensemble.png")
+plt.savefig("rosenbrock_2d_aniso_err_rms_ensemble.png")
 
 plt.clf()
 
@@ -231,7 +231,7 @@ plt.grid()
 
 #plt.loglog([samplehist[0], samplehist[-1]], [errkmean, errkmean], "k:")
 plt.loglog(samplehistK, errkmean, 'k--')
-plt.savefig("arctan_2d_aniso_err_mean_ensemble.png")
+plt.savefig("rosenbrock_2d_aniso_err_mean_ensemble.png")
 
 
 plt.clf()

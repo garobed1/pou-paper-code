@@ -11,7 +11,7 @@ from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
 from error import rmse, meane
 
-from example_problems import MultiDimJump
+from example_problems import MultiDimJump, FuhgP8
 from smt.problems import Sphere, LpNorm, Rosenbrock
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
@@ -23,9 +23,10 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
+Nruns = 5
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
-corr  = "abs_exp" #kriging correlation
+corr  = "squar_exp" #kriging correlation
 poly  = "linear"  #kriging regression 
 extra = 1           #gek extra points
 dim = 2          #problem dimension
@@ -48,7 +49,7 @@ perturb = True
 
 # Problem Settings
 alpha = 8.       #arctangent jump strength
-trueFunc = MultiDimJump(ndim=dim, alpha=alpha) #problem Sphere(ndim=dim)#
+trueFunc = FuhgP8(ndim=dim)#, alpha=alpha) #problem Sphere(ndim=dim)#
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m') #initial design scheme
 
@@ -60,7 +61,7 @@ print("Refinement Type      : ", rtype)
 print("Correlation Function : ", corr)
 print("Regression Function  : ", poly)
 print("GEK Extra Points     : ", extra)
-print("Problem              : MultiDimJump")
+print("Problem              : FuhgP8")
 print("Problem Dimension    : ", dim)
 print("Initial Sample Size  : ", nt0)
 print("Refined Points Size  : ", ntr)
@@ -82,89 +83,114 @@ options["errorcheck"] = testdata
 print("Computing Initial Design ...")
 
 # Initial Design
-xtrain0 = sampling(nt0)
-ftrain0 = trueFunc(xtrain0)
-gtrain0 = np.zeros([nt0,dim])
-for i in range(dim):
-    gtrain0[:,i:i+1] = trueFunc(xtrain0,i)
+xtrain0 = []
+ftrain0 = []
+gtrain0 = []
+for n in range(Nruns):
+    xtrain0.append(sampling(nt0))
+    ftrain0.append(trueFunc(xtrain0[n]))
+    gtrain0.append(np.zeros([nt0,dim]))
+    for i in range(dim):
+        gtrain0[n][:,i:i+1] = trueFunc(xtrain0[n],i)
 
 print("Computing Final Non-Adaptive Design ...")
 
-# Final Design
-xtrainK = sampling(ntot)
-ftrainK = trueFunc(xtrainK)
-gtrainK = np.zeros([ntot,dim])
-for i in range(dim):
-    gtrainK[:,i:i+1] = trueFunc(xtrainK,i)
+# Final Design(s)
+xtrainK = []
+ftrainK = []
+gtrainK = []
+samplehistK = np.linspace(nt0, ntot, int((ntot-nt0)/pperb)+1, dtype=int)
+for n in range(len(samplehistK)):
+    xtrainK.append(sampling(nt0+n*int(batch*ntr)))
+    ftrainK.append(trueFunc(xtrainK[n]))
+    gtrainK.append(np.zeros([nt0+n*int(batch*ntr),dim]))
+    for i in range(dim):
+        gtrainK[n][:,i:i+1] = trueFunc(xtrainK[n],i)
+
 
 print("Training Initial Surrogate ...")
 
 # Initial Design Surrogate
 if(stype == "gekpls"):
-    model0 = GEKPLS(xlimits=xlimits)
-    model0.options.update({"extra_points":extra})
-    model0.options.update({"corr":corr})
-    model0.options.update({"poly":poly})
-    model0.options.update({"n_start":5})
+    modelbase = GEKPLS(xlimits=xlimits)
+    modelbase.options.update({"extra_points":extra})
+    modelbase.options.update({"corr":corr})
+    modelbase.options.update({"poly":poly})
+    modelbase.options.update({"n_start":5})
 
 elif(stype == "pou"):
-    model0 = POUSurrogate()
-    model0.options.update({"rho":rho})
+    modelbase = POUSurrogate()
+    modelbase.options.update({"rho":rho})
 else:
-    model0 = KRG()
-    model0.options.update({"corr":corr})
-    model0.options.update({"poly":poly})
-    model0.options.update({"n_start":5})
+    modelbase = KRG()
+    modelbase.options.update({"corr":corr})
+    modelbase.options.update({"poly":poly})
+    modelbase.options.update({"n_start":5})
+modelbase.options.update({"print_global":False})
 
-model0.options.update({"print_global":False})
-model0.set_training_values(xtrain0, ftrain0)
-if(isinstance(model0, GEKPLS) or isinstance(model0, POUSurrogate)):
-    for i in range(dim):
-        model0.set_training_derivatives(xtrain0, gtrain0[:,i:i+1], i)
-model0.train()
+model0 = []
+for n in range(Nruns):
+    model0.append(copy.deepcopy(modelbase))
+    model0[n].set_training_values(xtrain0[n], ftrain0[n])
+    if(isinstance(model0[n], GEKPLS) or isinstance(model0[n], POUSurrogate)):
+        for i in range(dim):
+            model0[n].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
+    model0[n].train()
 
 
 
 print("Computing Initial Surrogate Error ...")
 
 # Initial Model Error
-err0 = rmse(model0, trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+err0rms = []
+err0mean = []
+for n in range(Nruns):
+    err0rms.append(rmse(model0[n], trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    err0mean.append(meane(model0[n], trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
 
 
 
 print("Computing Final Non-Adaptive Surrogate Error ...")
 
 # Non-Adaptive Model Error
-modelK = copy.deepcopy(model0)
-modelK.set_training_values(xtrainK, ftrainK)
-if(isinstance(model0, GEKPLS) or isinstance(model0, POUSurrogate)):
-    for i in range(dim):
-        modelK.set_training_derivatives(xtrainK, gtrainK[:,i:i+1], i)
-modelK.train()
-errk = rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-
+errkrms = []
+errkmean = []
+modelK = copy.deepcopy(modelbase)
+for n in range(len(samplehistK)):
+    modelK.set_training_values(xtrainK[n], ftrainK[n])
+    if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate)):
+        for i in range(dim):
+            modelK.set_training_derivatives(xtrainK[n], gtrainK[n][:,i:i+1], i)
+    modelK.train()
+    errkrms.append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    errkmean.append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
 
 
 print("Initial Refinement Criteria ...")
 
 # Initial Refinement Criteria
-RC0 = AnisotropicRefine(model0, gtrain0, improve=pperb, neval=neval, hessian=hess, interp=interp) 
+RC0 = []
+for n in range(Nruns):
+    RC0.append(AnisotropicRefine(model0[n], gtrain0[n], improve=pperb, neval=neval, hessian=hess, interp=interp))
 
 
 
 print("Performing Adaptive Sampling ...")
 
 # Perform Adaptive Sampling
-modelF, RCF, hist, errh, errh2 = adaptivesampling(trueFunc, model0, RC0, xlimits, ntr, options=options)
-#modelf.options.update({"print_global":True})
-#modelF.train()
-
-modelf = modelF
-# xf = modelF.training_points[None][0][0]
-# ff = modelF.training_points[None][0][1]
-# modelf.set_training_values(xf, ff)
-# modelf.train()
-# errf = rmse(modelf, trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+modelf = []
+RCF = []
+hist = []
+errhrms = []
+errhmean = []
+for n in range(Nruns):
+    print("RUN: ", n)
+    mf, rF, hf, ef, ef2 = adaptivesampling(trueFunc, model0[n], RC0[n], xlimits, ntr, options=options)
+    modelf.append(mf)
+    RCF.append(rF)
+    hist.append(hf)
+    errhrms.append(ef)
+    errhmean.append(ef2)
 
 print("\n")
 print("Experiment Complete")
@@ -173,36 +199,53 @@ print("Experiment Complete")
 
 plt.clf()
 
-tr = modelf.training_points[None][0][0]
-fr = modelf.training_points[None][0][1]
-gr = np.zeros_like(tr)
-for j in range(dim):
-    gr[:,j] = modelf.training_points[None][j+1][1].flatten()
-br = hist[0].bads
+
 
 # Plot Error History
-errh = [err0] + errh #[errf] #errh
-iters = len(errh)
+for n in range(Nruns):
+    errhrms[n] = [err0rms[n]] + errhrms[n] #[errf] #errh
+    errhmean[n] = [err0mean[n]] + errhmean[n]
+
+iters = len(errhrms[0])
 samplehist = np.zeros(iters, dtype=int)
 for i in range(iters):
     samplehist[i] = nt0 + i*pperb
 
-plt.loglog(samplehist, errh, "b")
+for n in range(Nruns):
+    plt.loglog(samplehist, errhrms[n], "-")
+
 plt.grid()
 
 # Plot Non-Adaptive Error
-plt.loglog([samplehist[0], samplehist[-1]], [errk, errk], "k--")
-
-plt.savefig("arctan_2d_aniso_err.png")
+#plt.loglog([samplehist[0], samplehist[-1]], [errkrms, errkrms], "k--")
+plt.loglog(samplehistK, errkrms, 'k--')
+plt.savefig("fuhgp8_2d_aniso_err_rms_ensemble.png")
 
 plt.clf()
 
+
+for n in range(Nruns):
+    plt.loglog(samplehist, errhmean[n], "-")
+
+plt.grid()
+
+#plt.loglog([samplehist[0], samplehist[-1]], [errkmean, errkmean], "k:")
+plt.loglog(samplehistK, errkmean, 'k--')
+plt.savefig("fuhgp8_2d_aniso_err_mean_ensemble.png")
+
+
+plt.clf()
+
+
+tr = modelf[0].training_points[None][0][0]
+fr = modelf[0].training_points[None][0][1]
+
 # Plot Training Points
 plt.plot(tr[0:nt0,0], tr[0:nt0,1], "bo")
-plt.plot(br[:,0], br[:,1], "go")
 plt.plot(tr[nt0:,0], tr[nt0:,1], "ro")
 
-plt.savefig("arctan_2d_aniso_pts.png")
+plt.savefig("fuhgp8_2d_aniso_pts.png")
+
 
 # Plot Error Contour
 #Contour
@@ -225,17 +268,17 @@ for i in range(ndir):
         xi = np.zeros([1,2])
         xi[0,0] = x[i]
         xi[0,1] = y[j]
-        F[i,j]  = modelf.predict_values(xi)
+        F[i,j]  = modelf[0].predict_values(xi)
         TF[i,j] = trueFunc(xi)
         Za[i,j] = abs(F[i,j] - TF[i,j])
         Zk[i,j] = abs(modelK.predict_values(xi) - TF[i,j])
-        Z0[i,j] = abs(model0.predict_values(xi) - TF[i,j])
+        Z0[i,j] = abs(model0[0].predict_values(xi) - TF[i,j])
 
 
 cs = plt.contour(Y, X, Za, levels = 15)
 plt.colorbar(cs)
 
-plt.savefig("arctan_2d_aniso_errcona.png")
+plt.savefig("fuhgp8_2d_aniso_errcona.png")
 
 plt.clf()
 
@@ -245,21 +288,13 @@ plt.plot(tk[:,0], tk[:,1], "bo")
 plt.contour(Y, X, Zk, levels = cs.levels)
 plt.colorbar(cs)
 
-plt.savefig("arctan_2d_aniso_errconk.png")
+plt.savefig("fuhgp8_2d_aniso_errconk.png")
 
 plt.clf()
 plt.plot(tr[0:nt0,0], tr[0:nt0,1], "bo")
 plt.contour(Y, X, Z0, levels = cs.levels)
 plt.colorbar(cs)
 
-plt.savefig("arctan_2d_aniso_errcon0.png")
+plt.savefig("fuhgp8_2d_aniso_errcon0.png")
 
 plt.clf()
-
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.plot_surface(Y, X, F)
-ax.scatter(tr[0:nt0,0], tr[0:nt0,1], fr[0:nt0])
-ax.scatter(tr[nt0:,0], tr[nt0:,1], fr[nt0:])
-
-pickle.dump(fig, open('FigureObject.fig.pickle', 'wb'))

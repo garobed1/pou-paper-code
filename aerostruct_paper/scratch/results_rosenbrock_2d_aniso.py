@@ -153,7 +153,7 @@ RC0 = AnisotropicRefine(model0, gtrain0, improve=pperb, neval=neval, hessian=hes
 print("Performing Adaptive Sampling ...")
 
 # Perform Adaptive Sampling
-modelF, RCF, hist, errh = adaptivesampling(trueFunc, model0, RC0, xlimits, ntr, options=options)
+modelF, RCF, hist, errh, errh2 = adaptivesampling(trueFunc, model0, RC0, xlimits, ntr, options=options)
 modelf = modelF
 # xf = modelF.training_points[None][0][0]
 # ff = modelF.training_points[None][0][1]
