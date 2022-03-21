@@ -34,6 +34,9 @@ class ASCriteria():
         self.dim = self.model.training_points[None][kx][0].shape[1]
         self.ntr = self.model.training_points[None][kx][0].shape[0]
 
+        self.supports = supports = {}
+        supports["obj_derivatives"] = False
+
         # set options
         self.options = OptionsDictionary()
         self._init_options()
@@ -53,6 +56,9 @@ class ASCriteria():
         pass
 
     def evaluate(self, x, dir=0):
+        pass
+
+    def eval_grad(self, x, dir=0):
         pass
 
     def pre_asopt(self, bounds, dir=0):

@@ -44,8 +44,11 @@ def getxnew(rcrit, x0, bounds, options=None):
                 bounds_used = lbounds
             args=(i,)
             rcrit.condict["args"] = [i]
+            jac = None
+            if(rcrit.supports["obj_derivatives"]):
+                jac = rcrit.eval_grad
             if(options["localswitch"]):
-                results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="local", constraints=rcrit.condict, x0=x0)
+                results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="local", constraints=rcrit.condict, jac=jac, x0=x0)
             else:
                 results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="global", constraints=rcrit.condict)
             rx = results.x

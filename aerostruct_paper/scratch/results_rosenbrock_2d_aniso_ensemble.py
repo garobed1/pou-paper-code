@@ -34,7 +34,7 @@ rho = 10            #POU parameter
 nt0  = dim*10     #initial design size
 ntr = dim*50      #number of points to add
 ntot = nt0 + ntr  #total number of points
-batch = 0.05   #batch size for refinement, as a percentage of ntr
+batch = (10./300)   #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = int(batch*ntr)
 if(pperb == 0):
