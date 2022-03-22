@@ -26,10 +26,10 @@ Error estimate for the arctangent jump problem
 Nruns = 3
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
-corr  = "squar_exp" #kriging correlation
+corr  = "abs_exp" #kriging correlation
 poly  = "linear"  #kriging regression 
 extra = 1           #gek extra points
-dim = 2          #problem dimension
+dim = 6          #problem dimension
 rho = 10            #POU parameter
 nt0  = dim*10     #initial design size
 ntr = dim*50      #number of points to add
@@ -49,7 +49,7 @@ perturb = True
 
 # Problem Settings
 alpha = 8.       #arctangent jump strength
-trueFunc = Rosenbrock(ndim=dim)#, alpha=alpha) #problem Sphere(ndim=dim)#
+trueFunc = MultiDimJump(ndim=dim, alpha=alpha) #problem Sphere(ndim=dim)#
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m') #initial design scheme
 
@@ -61,7 +61,7 @@ print("Refinement Type      : ", rtype)
 print("Correlation Function : ", corr)
 print("Regression Function  : ", poly)
 print("GEK Extra Points     : ", extra)
-print("Problem              : Rosenbrock")
+print("Problem              : MultiDimJump")
 print("Problem Dimension    : ", dim)
 print("Initial Sample Size  : ", nt0)
 print("Refined Points Size  : ", ntr)
@@ -100,18 +100,12 @@ xtrainK = []
 ftrainK = []
 gtrainK = []
 samplehistK = np.linspace(nt0, ntot, int((ntot-nt0)/pperb)+1, dtype=int)
-for m in range(Nruns):
-    xtrainK.append([])
-    ftrainK.append([])
-    gtrainK.append([])
-    for n in range(len(samplehistK)):
-        xtrainK[m].append(sampling(nt0+n*int(batch*ntr)))
-        ftrainK[m].append(trueFunc(xtrainK[m][n]))
-        gtrainK[m].append(np.zeros([nt0+n*int(batch*ntr),dim]))
-        for i in range(dim):
-            gtrainK[m][n][:,i:i+1] = trueFunc(xtrainK[m][n],i)
-
-
+for n in range(len(samplehistK)):
+    xtrainK.append(sampling(nt0+n*int(batch*ntr)))
+    ftrainK.append(trueFunc(xtrainK[n]))
+    gtrainK.append(np.zeros([nt0+n*int(batch*ntr),dim]))
+    for i in range(dim):
+        gtrainK[n][:,i:i+1] = trueFunc(xtrainK[n],i)
 
 print("Training Initial Surrogate ...")
 
@@ -158,20 +152,23 @@ for n in range(Nruns):
 print("Computing Final Non-Adaptive Surrogate Error ...")
 
 # Non-Adaptive Model Error
-klen = len(samplehistK)
-errkrms = np.zeros(klen)
-errkmean = np.zeros(klen)
+errkrms = []
+errkmean = []
 modelK = copy.deepcopy(modelbase)
 for m in range(Nruns):
-    for n in range(klen):
-        modelK.set_training_values(xtrainK[m][n], ftrainK[m][n])
+    for n in range(len(samplehistK)):
+        modelK.set_training_values(xtrainK[n], ftrainK[n])
         if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate)):
             for i in range(dim):
-                modelK.set_training_derivatives(xtrainK[m][n], gtrainK[m][n][:,i:i+1], i)
+                modelK.set_training_derivatives(xtrainK[n], gtrainK[n][:,i:i+1], i)
         modelK.train()
-        errkrms[n] += (rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))/Nruns
-        errkmean[n] += (meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))/Nruns
-
+        errkrms.append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+        errkmean.append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+for m in range(Nruns):
+    errkrms[m] = sum(errkrms[m::len(samplehistK)])/Nruns
+    errkmean[m] = sum(errkmean[m::len(samplehistK)])/Nruns
+errkrms = errkrms[0:len(samplehistK)]
+errkmean = errkmean[0:len(samplehistK)]
 
 print("Initial Refinement Criteria ...")
 
@@ -226,7 +223,7 @@ plt.grid()
 # Plot Non-Adaptive Error
 #plt.loglog([samplehist[0], samplehist[-1]], [errkrms, errkrms], "k--")
 plt.loglog(samplehistK, errkrms, 'k--')
-plt.savefig("rosenbrock_2d_aniso_err_rms_ensemble.png")
+plt.savefig("arctan_6d_aniso_err_rms_ensemble.png")
 
 plt.clf()
 
@@ -238,7 +235,16 @@ plt.grid()
 
 #plt.loglog([samplehist[0], samplehist[-1]], [errkmean, errkmean], "k:")
 plt.loglog(samplehistK, errkmean, 'k--')
-plt.savefig("rosenbrock_2d_aniso_err_mean_ensemble.png")
+plt.savefig("arctan_6d_aniso_err_mean_ensemble.png")
 
 
 plt.clf()
+
+# # Plot Training Points
+# tr = modelf[0].training_points[None][0][0]
+# fr = modelf[0].training_points[None][0][1]
+
+# plt.scatter(tr[0:nt0,0], tr[0:nt0,1], tr[0:nt0,2], "b")
+# plt.scatter(tr[nt0:,0], tr[nt0:,1], tr[nt0:,2], "r")
+
+# plt.savefig("arctan_3d_aniso_pts.png")

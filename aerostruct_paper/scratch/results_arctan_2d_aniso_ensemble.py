@@ -100,12 +100,16 @@ xtrainK = []
 ftrainK = []
 gtrainK = []
 samplehistK = np.linspace(nt0, ntot, int((ntot-nt0)/pperb)+1, dtype=int)
-for n in range(len(samplehistK)):
-    xtrainK.append(sampling(nt0+n*int(batch*ntr)))
-    ftrainK.append(trueFunc(xtrainK[n]))
-    gtrainK.append(np.zeros([nt0+n*int(batch*ntr),dim]))
-    for i in range(dim):
-        gtrainK[n][:,i:i+1] = trueFunc(xtrainK[n],i)
+for m in range(Nruns):
+    xtrainK.append([])
+    ftrainK.append([])
+    gtrainK.append([])
+    for n in range(len(samplehistK)):
+        xtrainK[m].append(sampling(nt0+n*int(batch*ntr)))
+        ftrainK[m].append(trueFunc(xtrainK[m][n]))
+        gtrainK[m].append(np.zeros([nt0+n*int(batch*ntr),dim]))
+        for i in range(dim):
+            gtrainK[m][n][:,i:i+1] = trueFunc(xtrainK[m][n],i)
 
 print("Training Initial Surrogate ...")
 
@@ -152,17 +156,20 @@ for n in range(Nruns):
 print("Computing Final Non-Adaptive Surrogate Error ...")
 
 # Non-Adaptive Model Error
-errkrms = []
-errkmean = []
+klen = len(samplehistK)
+errkrms = np.zeros(klen)
+errkmean = np.zeros(klen)
 modelK = copy.deepcopy(modelbase)
-for n in range(len(samplehistK)):
-    modelK.set_training_values(xtrainK[n], ftrainK[n])
-    if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate)):
-        for i in range(dim):
-            modelK.set_training_derivatives(xtrainK[n], gtrainK[n][:,i:i+1], i)
-    modelK.train()
-    errkrms.append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-    errkmean.append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+for m in range(Nruns):
+    for n in range(klen):
+        modelK.set_training_values(xtrainK[m][n], ftrainK[m][n])
+        if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate)):
+            for i in range(dim):
+                modelK.set_training_derivatives(xtrainK[m][n], gtrainK[m][n][:,i:i+1], i)
+        modelK.train()
+        errkrms[n] += (rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))/Nruns
+        errkmean[n] += (meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))/Nruns
+
 
 
 

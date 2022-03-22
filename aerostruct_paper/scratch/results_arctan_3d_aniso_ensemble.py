@@ -23,13 +23,13 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
-Nruns = 3
+Nruns = 5
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
-corr  = "squar_exp" #kriging correlation
+corr  = "abs_exp" #kriging correlation
 poly  = "linear"  #kriging regression 
 extra = 1           #gek extra points
-dim = 2          #problem dimension
+dim = 3          #problem dimension
 rho = 10            #POU parameter
 nt0  = dim*10     #initial design size
 ntr = dim*50      #number of points to add
@@ -49,7 +49,7 @@ perturb = True
 
 # Problem Settings
 alpha = 8.       #arctangent jump strength
-trueFunc = Rosenbrock(ndim=dim)#, alpha=alpha) #problem Sphere(ndim=dim)#
+trueFunc = MultiDimJump(ndim=dim, alpha=alpha) #problem Sphere(ndim=dim)#
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m') #initial design scheme
 
@@ -61,7 +61,7 @@ print("Refinement Type      : ", rtype)
 print("Correlation Function : ", corr)
 print("Regression Function  : ", poly)
 print("GEK Extra Points     : ", extra)
-print("Problem              : Rosenbrock")
+print("Problem              : MultiDimJump")
 print("Problem Dimension    : ", dim)
 print("Initial Sample Size  : ", nt0)
 print("Refined Points Size  : ", ntr)
@@ -110,8 +110,6 @@ for m in range(Nruns):
         gtrainK[m].append(np.zeros([nt0+n*int(batch*ntr),dim]))
         for i in range(dim):
             gtrainK[m][n][:,i:i+1] = trueFunc(xtrainK[m][n],i)
-
-
 
 print("Training Initial Surrogate ...")
 
@@ -173,6 +171,7 @@ for m in range(Nruns):
         errkmean[n] += (meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))/Nruns
 
 
+
 print("Initial Refinement Criteria ...")
 
 # Initial Refinement Criteria
@@ -226,7 +225,7 @@ plt.grid()
 # Plot Non-Adaptive Error
 #plt.loglog([samplehist[0], samplehist[-1]], [errkrms, errkrms], "k--")
 plt.loglog(samplehistK, errkrms, 'k--')
-plt.savefig("rosenbrock_2d_aniso_err_rms_ensemble.png")
+plt.savefig("arctan_3d_aniso_err_rms_ensemble.png")
 
 plt.clf()
 
@@ -238,7 +237,19 @@ plt.grid()
 
 #plt.loglog([samplehist[0], samplehist[-1]], [errkmean, errkmean], "k:")
 plt.loglog(samplehistK, errkmean, 'k--')
-plt.savefig("rosenbrock_2d_aniso_err_mean_ensemble.png")
+plt.savefig("arctan_3d_aniso_err_mean_ensemble.png")
 
 
 plt.clf()
+
+# Plot Training Points
+tr = modelf[0].training_points[None][0][0]
+fr = modelf[0].training_points[None][0][1]
+
+fig = plt.figure()
+ax = fig.add_subplot(111, projection='3d')
+ax.scatter(tr[0:nt0,0], tr[0:nt0,1], tr[0:nt0,2], "b")
+ax.scatter(tr[nt0:,0], tr[nt0:,1], tr[nt0:,2], "r")
+
+plt.savefig("arctan_3d_aniso_pts.png")
+pickle.dump(fig, open('FigureObject.fig.pickle', 'wb'))

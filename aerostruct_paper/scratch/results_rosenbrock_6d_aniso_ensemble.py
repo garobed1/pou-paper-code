@@ -23,13 +23,13 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
-Nruns = 3
+Nruns = 5
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
 corr  = "squar_exp" #kriging correlation
 poly  = "linear"  #kriging regression 
 extra = 1           #gek extra points
-dim = 2          #problem dimension
+dim = 6          #problem dimension
 rho = 10            #POU parameter
 nt0  = dim*10     #initial design size
 ntr = dim*50      #number of points to add
@@ -100,17 +100,12 @@ xtrainK = []
 ftrainK = []
 gtrainK = []
 samplehistK = np.linspace(nt0, ntot, int((ntot-nt0)/pperb)+1, dtype=int)
-for m in range(Nruns):
-    xtrainK.append([])
-    ftrainK.append([])
-    gtrainK.append([])
-    for n in range(len(samplehistK)):
-        xtrainK[m].append(sampling(nt0+n*int(batch*ntr)))
-        ftrainK[m].append(trueFunc(xtrainK[m][n]))
-        gtrainK[m].append(np.zeros([nt0+n*int(batch*ntr),dim]))
-        for i in range(dim):
-            gtrainK[m][n][:,i:i+1] = trueFunc(xtrainK[m][n],i)
-
+for n in range(len(samplehistK)):
+    xtrainK.append(sampling(nt0+n*int(batch*ntr)))
+    ftrainK.append(trueFunc(xtrainK[n]))
+    gtrainK.append(np.zeros([nt0+n*int(batch*ntr),dim]))
+    for i in range(dim):
+        gtrainK[n][:,i:i+1] = trueFunc(xtrainK[n],i)
 
 
 print("Training Initial Surrogate ...")
@@ -158,19 +153,17 @@ for n in range(Nruns):
 print("Computing Final Non-Adaptive Surrogate Error ...")
 
 # Non-Adaptive Model Error
-klen = len(samplehistK)
-errkrms = np.zeros(klen)
-errkmean = np.zeros(klen)
+errkrms = []
+errkmean = []
 modelK = copy.deepcopy(modelbase)
-for m in range(Nruns):
-    for n in range(klen):
-        modelK.set_training_values(xtrainK[m][n], ftrainK[m][n])
-        if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate)):
-            for i in range(dim):
-                modelK.set_training_derivatives(xtrainK[m][n], gtrainK[m][n][:,i:i+1], i)
-        modelK.train()
-        errkrms[n] += (rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))/Nruns
-        errkmean[n] += (meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))/Nruns
+for n in range(len(samplehistK)):
+    modelK.set_training_values(xtrainK[n], ftrainK[n])
+    if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate)):
+        for i in range(dim):
+            modelK.set_training_derivatives(xtrainK[n], gtrainK[n][:,i:i+1], i)
+    modelK.train()
+    errkrms.append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    errkmean.append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
 
 
 print("Initial Refinement Criteria ...")
@@ -226,7 +219,7 @@ plt.grid()
 # Plot Non-Adaptive Error
 #plt.loglog([samplehist[0], samplehist[-1]], [errkrms, errkrms], "k--")
 plt.loglog(samplehistK, errkrms, 'k--')
-plt.savefig("rosenbrock_2d_aniso_err_rms_ensemble.png")
+plt.savefig("rosenbrock_6d_aniso_err_rms_ensemble.png")
 
 plt.clf()
 
@@ -238,7 +231,7 @@ plt.grid()
 
 #plt.loglog([samplehist[0], samplehist[-1]], [errkmean, errkmean], "k:")
 plt.loglog(samplehistK, errkmean, 'k--')
-plt.savefig("rosenbrock_2d_aniso_err_mean_ensemble.png")
+plt.savefig("rosenbrock_6d_aniso_err_mean_ensemble.png")
 
 
 plt.clf()

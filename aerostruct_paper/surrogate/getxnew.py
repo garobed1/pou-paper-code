@@ -40,18 +40,28 @@ def getxnew(rcrit, x0, bounds, options=None):
         rx = None
         if(rcrit.opt): #for methods that don't use optimization
             x0, lbounds = rcrit.pre_asopt(bounds, dir=i)
+            m, n = x0.shape
             if(lbounds is not None):
                 bounds_used = lbounds
             args=(i,)
-            rcrit.condict["args"] = [i]
+            if(rcrit.condict is not None):
+                rcrit.condict["args"] = [i]
             jac = None
             if(rcrit.supports["obj_derivatives"]):
                 jac = rcrit.eval_grad
             if(options["localswitch"]):
-                results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="local", constraints=rcrit.condict, jac=jac, x0=x0)
+
+                # multistart
+                resx = np.zeros([m,n])
+                resy = np.zeros(m)
+                for j in range(m):
+                    results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="local", jac=jac, x0=x0[j,:])
+                    resx[j,:] = results.x
+                    resy[j] = results.fun
+                rx = resx[np.argmin(resy)]
             else:
                 results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="global", constraints=rcrit.condict)
-            rx = results.x
+                rx = results.x
         else:
             rx = None
 
