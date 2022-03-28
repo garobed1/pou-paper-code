@@ -385,7 +385,7 @@ class POUMetric():
             #     dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
             #     mindist = min(mindist,dist)
 
-            numer = 0
+            numer = np.zeros([dim, dim])
             denom = 0
 
             # evaluate the surrogate, requiring the distance from every point
@@ -396,13 +396,12 @@ class POUMetric():
                 expfac = np.exp(-rho*(dist-mindist))
                 numer += local*expfac
                 denom += expfac
-
             y[k,:,:] = numer/denom
 
         return y
 
 
-    def predict_derivatives(self, xt, kx):
+    def predict_derivatives(self, xt):
 
         xc = self.training_points[None][0][0]
         f = self.options["metric"]
@@ -412,37 +411,37 @@ class POUMetric():
         rho = self.options["rho"]
         
         # loop over rows in xt
-        y = np.zeros([xt.shape[0], dim, dim])
+        dydx = np.zeros([xt.shape[0], dim, dim, dim])
         for k in range(xt.shape[0]):
             x = xt[k,:]
-            # exhaustive search for closest sample point, for regularization
-            # mindist = 1e100
-            # dists = np.zeros(numsample)
-            # for i in range(numsample):
-            #     dists[i] = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
 
             # mindist = min(dists)
             mindist = min(cdist(np.array([x]),xc)[0])
 
-            # for i in range(numsample):
-            #     dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
-            #     mindist = min(mindist,dist)
-
-            numer = 0
+            numer = np.zeros([dim, dim])
+            dnumer = np.zeros([dim, dim, dim])
             denom = 0
+            ddenom = np.zeros([dim])
 
             # evaluate the surrogate, requiring the distance from every point
             for i in range(numsample):
                 work = x-xc[i]
                 dist = np.sqrt(np.dot(work,work) + delta)
+                ddist = (1./dist)*work
                 local = f[i]
                 expfac = np.exp(-rho*(dist-mindist))
+                dexpfac = -rho*expfac*ddist
+                for j in range(dim):
+                    dnumer[j,:,:] += local*dexpfac[j]
+                ddenom += dexpfac
                 numer += local*expfac
                 denom += expfac
-
-            y[k,:,:] = numer/denom
-
-        return y
+            
+            t2 = np.zeros([dim, dim, dim])
+            for j in range(dim):
+                t2[j,:,:] = ddenom[j]*numer
+            dydx[k,:,:,:] = (denom*dnumer - t2)/(denom**2)
+        return dydx
 
     def set_training_values(self, xt: np.ndarray, yt: np.ndarray, name=None) -> None:
         """

@@ -294,3 +294,51 @@ class MultiDimJump(Problem):
 
         return y
 
+
+
+# f(x) = arctan(alpha*(x dot t)) times e^(||x||^2)
+class MultiDimJumpTaper(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("alpha", 5., types=float)
+        self.options.declare("name", "MultiDimJump", types=str)
+
+        self.t = None
+
+    def _setup(self):
+        self.xlimits[:, 0] = -2.5
+        self.xlimits[:, 1] = 2.5
+
+        self.t = np.ones(self.options["ndim"])# np.random.normal(size=self.options["ndim"])
+        
+        self.t = self.t/np.linalg.norm(self.t)
+        self.alpha = self.options["alpha"]
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            work = np.dot(x[i,:], self.t)
+            if kx is None:
+                y[i,0] = np.arctan(self.alpha*work)*np.exp(-np.linalg.norm(x[i,:])**2)
+            else:
+                work2 = (1./(1.+work*work*self.alpha*self.alpha))*self.alpha
+                y[i,0] = work2*self.t[kx]*np.exp(-np.linalg.norm(x[i,:])**2) + \
+                        np.arctan(self.alpha*work)*np.exp(-np.linalg.norm(x[i,:])**2)*-2*x[i,kx]
+
+        return y

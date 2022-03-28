@@ -26,6 +26,7 @@ class ProblemDiffTest(unittest.TestCase):
         finitediff = (1./(2*h))*(fgp-fgm)
         analytic = np.dot(ga, xi)
         err = abs(analytic - finitediff)
+        import pdb; pdb.set_trace()
         self.assertTrue(err < 1.e-8)
 
 

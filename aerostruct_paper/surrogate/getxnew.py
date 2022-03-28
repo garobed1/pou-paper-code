@@ -1,4 +1,5 @@
 from optimizers import optimize
+from mpi4py import MPI
 import copy
 from defaults import DefaultOptOptions
 import numpy as np
@@ -6,6 +7,9 @@ from smt.surrogate_models import GEKPLS
 from pougrad import POUSurrogate
 from error import rmse, meane
 
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
 """
 The adaptive sampling routine. Given a refinement criteria, find its corresponding 
@@ -119,7 +123,7 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
 
         hist.append(copy.deepcopy(rcrit))
 
-        if(rcrit.options["print_iter"]):
+        if(rcrit.options["print_iter"] and rank == 0):
             print("Iteration: ", i)
 
         # replace criteria

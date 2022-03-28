@@ -8,6 +8,7 @@ sys.path.insert(1,"../beam/")
 import openmdao.api as om
 
 from mphys import Multipoint
+from shock_angle_comp import ShockAngleComp
 
 from mphys.scenario_aerostructural import ScenarioAeroStructural
 
@@ -78,8 +79,19 @@ class Top(Multipoint):
 
         # ivc to keep the top level DVs
         dvs = self.add_subsystem("dvs", om.IndepVarComp(), promotes=["*"])
-        dvs.add_output("mach", val=opt_options["mach"])
+        # dvs.add_output("shock_angle", opt_options["shock_angle"])
+        # dvs.add_output("M0", 3.0)
+        # dvs.add_output('P0', 2919.0)
+        # dvs.add_output('T0', 217.0)
+        # dvs.add_output('M1', impinge_setup.mach)
+        dvs.add_output('P1', impinge_setup.P)
+
+        #dvs.add_output("beta", impinge_setup.beta)
         dvs.add_output("dv_struct", struct_options["th"])
+        dvs.add_output("rsak", aero_options["SAConsts"][0])
+
+        # component to determine post-shock flow properties for ADFlow
+        self.add_subsystem("shock", ShockAngleComp())
 
         nonlinear_solver = om.NonlinearBlockGS(maxiter=2, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
         linear_solver = om.LinearBlockGS(maxiter=25, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
@@ -112,19 +124,47 @@ class Top(Multipoint):
             evalFuncs=["cd_def"],
         )    
 
-        #TODO: Need to find a way to do this for the SA constants
+        # ap.addDV("mach", name="mach")
+        #ap.addDV("beta", name="beta")
+        # ap.addDV("T", name="temp")
+        ap.addDV("P",  name="pressure")
 
-        ap.addDV("mach", value=impinge_setup.mach, name="mach")
 
         self.test.coupling.aero.mphys_set_ap(ap)
         self.test.aero_post.mphys_set_ap(ap)
 
+        self.connect("rsak", "test.coupling.aero.rsak")
         self.connect("dv_struct", f"test.dv_struct")
-        ##  EXTREMELY IMPORTANT TO CONNECT AP VARIABLES TO ALL OF THESE
-        self.connect("mach", "test.coupling.aero.mach")
-        self.connect("mach", "test.aero_post.mach")
+        # self.connect("beta", "test.coupling.aero.beta")
+        # self.connect("beta", "test.aero_post.beta")
+        # self.connect("shock_angle", "shock.shock_angle")
+        # self.connect("M0", "shock.mach0")
+        # self.connect("P0", "shock.P0")
+        # self.connect("T0", "shock.T0")
+        # # ##  EXTREMELY IMPORTANT TO CONNECT AP VARIABLES TO ALL OF THESE
+        # self.connect("shock.mach1", "test.coupling.aero.mach")
+        # self.connect("shock.mach1", "test.aero_post.mach")
+        # self.connect("shock.flow_angle", "test.coupling.aero.beta")
+        # self.connect("shock.flow_angle", "test.aero_post.beta")
+        # self.connect("shock.T1", "test.coupling.aero.temp")
+        # self.connect("shock.T1", "test.aero_post.temp")
+        # self.connect("shock.P1", "test.coupling.aero.pressure")
+        # self.connect("shock.P1", "test.aero_post.pressure")
         #self.add_design_var("mach", lower=2.0, upper=2.5)
-        self.add_design_var("dv_struct")
+        #self.add_design_var("dv_struct")
+        self.add_design_var("rsak")
+        #self.add_design_var("shock_angle")
+        #self.add_design_var("beta")
+        # self.add_design_var("shock.mach1")
+        # self.add_design_var("shock.flow_angle")
+        # self.add_design_var("shock.T1")
+        # self.add_design_var("shock.P1")
+        # self.connect("M1", "test.coupling.aero.mach")
+        # self.connect("M1", "test.aero_post.mach")
+        self.connect("P1", "test.coupling.aero.pressure")
+        self.connect("P1", "test.aero_post.pressure")
+        self.add_design_var("P1")
+        # self.add_design_var("M1")
         self.add_objective("test.aero_post.cd_def")
 
 
@@ -136,9 +176,11 @@ prob.model = Top()
 prob.setup(mode='rev')
 om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
 #prob.set_val("mach", 2.)
-prob.set_val("dv_struct", impinge_setup.structOptions["th"])
+#prob.set_val("dv_struct", impinge_setup.structOptions["th"])
+#prob.set_val("beta", 7.)
+#prob.set_val("shock_angle", 25.)
 prob.run_model()
-prob.check_totals()
+prob.check_totals(method='cs')
 #prob.check_partials()
 
 #prob.model.list_outputs()

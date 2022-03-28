@@ -19,23 +19,7 @@ dist = []
 gridFilesML = []
 
 optOptions = { #general optimization parameters
-    'prob_name':probName,
-    'NX':2, #number of x FFD points, not necessarily the number of design vars
-    'bumpBounds':[1.00, 2.00], #ends of the bump
-    'mach':mach, #inflow mach number
-    'Re':936000, #inflow reynolds number
-    'DVFraction':0.1, #fraction of NX on either side of bump control points not used as DVs
-    'DVUpperBound':2.0,  #upper bound for control point movement
-    'DVLowerBound':0.0,  #lower bound for control point movement (set to 0 when thickness constraints work)
-    'DVInit':0.0,  #uniform initial design state
-    'DCMinThick':0.01,  #uniform minimum thickness
-    'DCMinArea':1.0025,  #minimum surface area, if used
-    'DCThickFrac':0.75, #percentage of bump area to constrain
-    'constrain_opt':True,
-    'use_area_con':True,
-    'check_partials':False,  #check partial derivatives
-    'run_once':True, # run a single iteration of the model with given settings
-    'nRuns':1, # number of times to run the code, then print the average statistics for statistics runs
+    'shock_angle':25., #incoming shock angle
     'ro_shape':astar # shape variables 
 }
 
@@ -78,7 +62,8 @@ aeroOptions = { #ADflow aero solver options
     # [kappa, cb1,    cb2,   sigma,         cv1, cw2, cw3, ct1, ct2, ct3, ct4, rot]
     # [0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
     'SAConsts':[0.41,  0.1355, 0.6, 1.0, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
-    
+    'SAGrads':["rsak"],
+
     # Common Parameters
     "CFL": 1.5,
     "CFLCoarse": 1.25,
@@ -94,7 +79,7 @@ aeroOptions = { #ADflow aero solver options
     'ANKCoupledSwitchTol':1e-3,
     'ANKConstCFLStep':0.4,
     'ANKCFLLimit':1000000000.0,
-    "L2Convergence": 1e-12,
+    "L2Convergence": 1e-15,
     # "L2ConvergenceCoarse": 1e-2,
     # "L2ConvergenceRel": 1e-4,
     "forcesAsTractions": False,

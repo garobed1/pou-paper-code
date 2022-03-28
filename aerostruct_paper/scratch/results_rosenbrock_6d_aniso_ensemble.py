@@ -23,7 +23,8 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
-Nruns = 5
+Nruns = 1
+multistart = 3      #aniso opt multistart
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
 corr  = "squar_exp" #kriging correlation
@@ -32,7 +33,7 @@ extra = 1           #gek extra points
 dim = 6          #problem dimension
 rho = 10            #POU parameter
 nt0  = dim*10     #initial design size
-ntr = dim*50      #number of points to add
+ntr = dim*100      #number of points to add
 ntot = nt0 + ntr  #total number of points
 batch = 0.1   #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
@@ -171,7 +172,7 @@ print("Initial Refinement Criteria ...")
 # Initial Refinement Criteria
 RC0 = []
 for n in range(Nruns):
-    RC0.append(AnisotropicRefine(model0[n], gtrain0[n], improve=pperb, neval=neval, hessian=hess, interp=interp))
+    RC0.append(AnisotropicRefine(model0[n], gtrain0[n], improve=pperb, neval=neval, hessian=hess, interp=interp, multistart=multistart) )
 
 
 

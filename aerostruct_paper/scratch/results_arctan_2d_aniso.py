@@ -23,6 +23,7 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
+multistart = 4      #aniso opt multistart
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
 corr  = "abs_exp" #kriging correlation
@@ -33,7 +34,7 @@ rho = 10            #POU parameter
 nt0  = dim*10     #initial design size
 ntr = dim*50      #number of points to add
 ntot = nt0 + ntr  #total number of points
-batch = 0.05   #batch size for refinement, as a percentage of ntr
+batch = 0.1   #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = int(batch*ntr)
 if(pperb == 0):
@@ -148,7 +149,7 @@ errk = rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
 print("Initial Refinement Criteria ...")
 
 # Initial Refinement Criteria
-RC0 = AnisotropicRefine(model0, gtrain0, improve=pperb, neval=neval, hessian=hess, interp=interp) 
+RC0 = AnisotropicRefine(model0, gtrain0, improve=pperb, neval=neval, hessian=hess, interp=interp, multistart=multistart) 
 
 
 
@@ -156,6 +157,7 @@ print("Performing Adaptive Sampling ...")
 
 # Perform Adaptive Sampling
 modelF, RCF, hist, errh, errh2 = adaptivesampling(trueFunc, model0, RC0, xlimits, ntr, options=options)
+
 #modelf.options.update({"print_global":True})
 #modelF.train()
 

@@ -23,6 +23,7 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
+multistart = 1      #aniso opt multistart
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
 corr  = "squar_exp" #kriging correlation
@@ -146,7 +147,7 @@ errk = rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
 print("Initial Refinement Criteria ...")
 
 # Initial Refinement Criteria
-RC0 = AnisotropicRefine(model0, gtrain0, improve=pperb, neval=neval, hessian=hess, interp=interp) #looCV(gek, approx=False)
+RC0 = AnisotropicRefine(model0, gtrain0, improve=pperb, neval=neval, hessian=hess, interp=interp, multistart=multistart)  #looCV(gek, approx=False)
 
 
 

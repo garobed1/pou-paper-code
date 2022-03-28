@@ -373,10 +373,44 @@ def boxIntersect(xc, xdir, bounds):
 
     return p0, p1
 
-dim = 2
-trueFunc = MultiDimJump(ndim=dim)
-bounds = trueFunc.xlimits
-boxIntersect(np.array([-2.5, 0.5]), np.array([-.707,-.707]), bounds)
+def divide_cases(ncases, nprocs):
+    """
+    From parallel OpenMDAO beam problem example
+
+    Divide up adaptive sampling runs among available procs.
+
+    Parameters
+    ----------
+    ncases : int
+        Number of load cases.
+    nprocs : int
+        Number of processors.
+
+    Returns
+    -------
+    list of list of int
+        Integer case numbers for each proc.
+    """
+    data = []
+    for j in range(nprocs):
+        data.append([])
+
+    wrap = 0
+    for j in range(ncases):
+        idx = j - wrap
+        if idx >= nprocs:
+            idx = 0
+            wrap = j
+
+        data[idx].append(j)
+
+    return data
+
+
+# dim = 2
+# trueFunc = MultiDimJump(ndim=dim)
+# bounds = trueFunc.xlimits
+# boxIntersect(np.array([-2.5, 0.5]), np.array([-.707,-.707]), bounds)
 
 # dim = 2
 # trueFunc = RobotArm(ndim=dim)

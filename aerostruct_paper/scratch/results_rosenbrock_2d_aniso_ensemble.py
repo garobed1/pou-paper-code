@@ -23,6 +23,7 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
+multistart = 1      #aniso opt multistart
 Nruns = 3
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
@@ -178,7 +179,7 @@ print("Initial Refinement Criteria ...")
 # Initial Refinement Criteria
 RC0 = []
 for n in range(Nruns):
-    RC0.append(AnisotropicRefine(model0[n], gtrain0[n], improve=pperb, neval=neval, hessian=hess, interp=interp))
+    RC0.append(AnisotropicRefine(model0[n], gtrain0[n], improve=pperb, neval=neval, hessian=hess, interp=interp, multistart=multistart) )
 
 
 
