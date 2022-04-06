@@ -88,18 +88,22 @@ for i in range(nruns):
 
 # Plot Error History
 iters = len(ehr[0])
+itersk = len(ekr[0])
 
 samplehist = np.zeros(iters, dtype=int)
+samplehistk = np.zeros(itersk, dtype=int)
 
 for i in range(iters-1):
     samplehist[i] = hi[0][i].ntr
 samplehist[iters-1] = mf[0].training_points[None][0][0].shape[0]
+for i in range(itersk):
+    samplehistk[i] = len(xk[i])
 
 # Average out runs
 ehrm = np.zeros(iters)
 ehmm = np.zeros(iters)
-ekrm = np.zeros(iters)
-ekmm = np.zeros(iters)
+ekrm = np.zeros(itersk)
+ekmm = np.zeros(itersk)
 
 for i in range(nruns):
     ehrm += np.array(ehr[i]).T[0]/nruns
@@ -108,23 +112,54 @@ for i in range(nruns):
     ekmm += np.array(ekm[i]).T[0]/nruns
 
 for n in range(nruns):
-    plt.loglog(samplehist, ehr[n], "-")
-plt.loglog(samplehist, ekrm, 'k--')
-
-plt.grid()
+    plt.loglog(samplehist, ehr[n], "-", label=f'Adaptive Run {n}')
+plt.loglog(samplehistk, ekrm, 'k--', label='LHS Runs')
+plt.xlabel("Number of samples")
+plt.ylabel("NRMSE")
+plt.legend()
+# import matplotlib.ticker
+# ax = plt.gca()
+# ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+# ax.get_xaxis().set_minor_formatter(matplotlib.ticker.NullFormatter())
+# ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+# ax.get_yaxis().set_minor_formatter(matplotlib.ticker.NullFormatter())
+# plt.xticks(np.arange(min(samplehist), max(samplehist), 10))
+# plt.yticks(np.arange(0.04, 0.18, 0.01))
 plt.savefig(f"./{title}err_rms_ensemble.png")
 plt.clf()
 
 
 for n in range(nruns):
-    plt.loglog(samplehist, ehm[n], "-")
-plt.loglog(samplehist, ekmm, 'k--')
-
-plt.grid()
+    plt.loglog(samplehist, ehm[n], "-", label='Adaptive Runs')
+plt.loglog(samplehistk, ekmm, 'k--', label='LHS Runs')
+plt.xlabel("Number of samples")
+plt.ylabel("NRMSE")
+plt.legend()
 plt.savefig(f"./{title}err_mean_ensemble.png")
 plt.clf()
 
-import pdb; pdb.set_trace()
+
+
+trx = modelf[0][0].training_points[None][0][0]
+m, n = trx.shape
+normal = np.ones(dim)
+normal /= np.linalg.norm(normal)
+
+planedists = np.zeros(m)
+for i in range(m):
+    planedists[i] = abs(np.dot(trx[i,:],normal))
+
 
 # # Plot points
-# if(dim == 2):
+if(dim == 2):
+    plt.clf()
+    nt0 = samplehist[0]
+    # Plot Training Points
+    plt.plot(trx[0:nt0,0], trx[0:nt0,1], "bo", label='Initial Samples')
+    plt.plot(trx[nt0:,0], trx[nt0:,1], "ro", label='Adaptive Samples')
+    plt.xlabel("x")
+    plt.ylabel("y")
+    plt.legend()
+    plt.savefig(f"./{title}2d_aniso_pts.png")
+
+import pdb; pdb.set_trace()

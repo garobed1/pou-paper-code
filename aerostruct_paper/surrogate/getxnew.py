@@ -4,6 +4,7 @@ import copy
 from defaults import DefaultOptOptions
 import numpy as np
 from smt.surrogate_models import GEKPLS
+from scipy.stats import qmc
 from pougrad import POUSurrogate
 from error import rmse, meane
 
@@ -35,19 +36,21 @@ def getxnew(rcrit, x0, bounds, options=None):
     # set default options if None is provided
     if(options == None):
         options = DefaultOptOptions
-    
+    m, n = x0.shape
     xnew = []
     bounds_used = bounds
+    unit_bounds = np.zeros([n,2])
+    unit_bounds[:,1] = 1.
 
-    #gresults = optimize(rcrit.evaluate, args=(), bounds=bounds, type="global")
     for i in range(rcrit.nnew):
         rx = None
         if(rcrit.opt): #for methods that don't use optimization
             x0, lbounds = rcrit.pre_asopt(bounds, dir=i)
+            x0 = qmc.scale(x0, bounds_used[:,0], bounds_used[:,1], reverse=True)
             m, n = x0.shape
             if(lbounds is not None):
                 bounds_used = lbounds
-            args=(i,)
+            args=(bounds_used, i,)
             if(rcrit.condict is not None):
                 rcrit.condict["args"] = [i]
             jac = None
@@ -59,13 +62,17 @@ def getxnew(rcrit, x0, bounds, options=None):
                 resx = np.zeros([m,n])
                 resy = np.zeros(m)
                 for j in range(m):
-                    results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="local", jac=jac, x0=x0[j,:])
+                    
+                    results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0[j,:])
                     resx[j,:] = results.x
                     resy[j] = results.fun
                 rx = resx[np.argmin(resy)]
             else:
-                results = optimize(rcrit.evaluate, args=args, bounds=bounds_used, type="global", constraints=rcrit.condict)
+                results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="global", constraints=rcrit.condict)
                 rx = results.x
+            
+            rx = qmc.scale(np.array([rx]), bounds_used[:,0], bounds_used[:,1])
+            rx = rx[0]
         else:
             rx = None
 

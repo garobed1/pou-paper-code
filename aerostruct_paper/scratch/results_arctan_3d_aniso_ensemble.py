@@ -23,7 +23,7 @@ Error estimate for the arctangent jump problem
 """
 
 # Conditions
-multistart = 5      #aniso opt multistart
+multistart = 4      #aniso opt multistart
 Nruns = 1
 stype = "gekpls"    #surrogate type
 rtype = "hessian" #criteria type
