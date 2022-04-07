@@ -59,14 +59,25 @@ def getxnew(rcrit, x0, bounds, options=None):
             if(options["localswitch"]):
 
                 # multistart
-                resx = np.zeros([m,n])
-                resy = np.zeros(m)
-                for j in range(m):
+                # resx = np.zeros([m,n])
+                # resy = np.zeros(m)
+                # for j in range(m):
                     
-                    results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0[j,:])
-                    resx[j,:] = results.x
-                    resy[j] = results.fun
-                rx = resx[np.argmin(resy)]
+                #     results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0[j,:])
+                #     resx[j,:] = results.x
+                #     resy[j] = results.fun
+                # rx = resx[np.argmin(resy)]
+
+                # start at best point
+                x0b = None
+                y0 = np.zeros(m)
+                for j in range(m):
+                    y0[j] = rcrit.evaluate(x0[j], bounds_used, i)
+                ind = np.argmin(y0)
+                x0b = x0[ind]
+                results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0b)
+                rx = results.x
+
             else:
                 results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="global", constraints=rcrit.condict)
                 rx = results.x

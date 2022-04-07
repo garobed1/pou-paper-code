@@ -140,7 +140,7 @@ plt.clf()
 
 
 
-trx = modelf[0][0].training_points[None][0][0]
+trx = modelf[2][0].training_points[None][0][0]
 m, n = trx.shape
 normal = np.ones(dim)
 normal /= np.linalg.norm(normal)

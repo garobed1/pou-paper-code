@@ -201,7 +201,7 @@ class AnisotropicRefine(ASCriteria):
 
         # increase rho based on number of points, minimum distance
         #rho = 1.*self.dim*self.ntr#100.#self.ntr*100.#/(self.dim*1.)
-        rho = 0.1*(self.ntr/self.dim)
+        rho = 0.5*(self.ntr/self.dim)
 
         self.mmodel = POUMetric(rho=rho, metric=metric) # the metric are the actual training outputs, this is a bad workaround
         #self.mmodel.set_training_values(trx, np.ones(trx.shape[0]))
@@ -284,12 +284,14 @@ class AnisotropicRefine(ASCriteria):
             dist = np.matmul(np.matmul(work, mwork), work)
 
             if(self.options["objective"] == "inv"):
-                sum[i] = 1./(dist + 1e-10)            
+                sum[i] = 1./(dist + 1e-10)
+            elif(self.options["objective"] == "abs"):
+                sum[i] = -dist
             else:    
                 sum[i] = np.exp(-np.sqrt(dist))
             #sum += np.exp(-np.linalg.norm(work)**2)
 
-        ans = np.sum(sum)
+        ans = np.sum(sum)/m
         #ans = max(sum)# - np.linalg.norm(mwork)
 
         #ATTEMPT 1
@@ -305,20 +307,21 @@ class AnisotropicRefine(ASCriteria):
             #ATTEMPT 2
             #penalize distance to bound
             mb = len(self.bpts)
-            bsum = np.zeros(mb)
-            for i in range(mb):
-                bpts = qmc.scale(np.array([self.bpts[i]]), bounds[:,0], bounds[:,1], reverse=True)[0]
-                work = x - bpts
-                #dist = np.matmul(np.matmul(work, mwork), self.bnorms[i])
-                dist = abs(np.dot(work, self.bnorms[i]))
-                if(self.options["objective"] == "inv"):
-                    bsum[i] = 1./(dist**2 + 1e-10)
-                else:
-                    bsum[i] = np.exp(-dist)
-    
-            # if(len(bsum) > 0):
-            #     import pdb; pdb.set_trace()
-            ans += np.sum(bsum)
+            if(mb > 0):
+                bsum = np.zeros(mb)
+                for i in range(mb):
+                    #bpts = qmc.scale(np.array([self.bpts[i]]), bounds[:,0], bounds[:,1], reverse=True)[0]
+                    work = x - self.bpts[i]
+                    #dist = np.matmul(np.matmul(work, mwork), self.bnorms[i])
+                    dist = abs(np.dot(work, self.bnorms[i]))
+                    if(self.options["objective"] == "inv"):
+                        bsum[i] = 1./(dist**2 + 1e-10)
+                    elif(self.options["objective"] == "abs"):
+                        bsum[i] = -dist**2
+                    else:
+                        bsum[i] = np.exp(-dist)
+
+                ans += np.sum(bsum)/mb
 
         return ans 
 
@@ -352,10 +355,13 @@ class AnisotropicRefine(ASCriteria):
 
             if(self.options["objective"] == "inv"):
                 sum[i] = 1./(dist + 1e-10)    
-                dsum += (-1./((dist + 1e-10)**2))*ddist
+                dsum += (-1./((dist + 1e-10)**2))*ddist/m
+            elif(self.options["objective"] == "abs"):
+                sum[i] = -dist
+                dsum += -ddist/m
             else:
                 sum[i] = np.exp(-np.sqrt(dist))
-                dsum += np.exp(-np.sqrt(dist))*(-1./(2.*np.sqrt(dist)))*ddist
+                dsum += np.exp(-np.sqrt(dist))*(-1./(2.*np.sqrt(dist)))*ddist/m
 
         #ATTEMPT 1
         #penalize distance to bound
@@ -380,28 +386,32 @@ class AnisotropicRefine(ASCriteria):
             #ATTEMPT 2
             #penalize distance to bound
             mb = len(self.bpts)
-            bsum = np.zeros(mb)
-            dbsum = np.zeros(n)
-            for i in range(mb):
-                bpts = qmc.scale(np.array([self.bpts[i]]), bounds[:,0], bounds[:,1], reverse=True)[0]
-                work = x - bpts
+            if(mb > 0):
+                bsum = np.zeros(mb)
+                dbsum = np.zeros(n)
+                for i in range(mb):
+                    bpts = qmc.scale(np.array([self.bpts[i]]), bounds[:,0], bounds[:,1], reverse=True)[0]
+                    work = x - bpts
 
-                # leftprod = np.matmul(work, mwork)
-                # rightprod = np.matmul(mwork, self.bnorms[i])
-                #dist = np.matmul(np.matmul(work, mwork), self.bnorms[i])
-                dist = abs(np.dot(work, self.bnorms[i]))
-                ddist = np.zeros(n)
-                ddist += abs(self.bnorms[i])
-                # for j in range(n):
-                #     ddist[j] += np.matmul(np.matmul(work, dmwork[0,j,:,:]), self.bnorms[i])
+                    # leftprod = np.matmul(work, mwork)
+                    # rightprod = np.matmul(mwork, self.bnorms[i])
+                    #dist = np.matmul(np.matmul(work, mwork), self.bnorms[i])
+                    dist = abs(np.dot(work, self.bnorms[i]))
+                    ddist = np.zeros(n)
+                    ddist += abs(self.bnorms[i])
+                    # for j in range(n):
+                    #     ddist[j] += np.matmul(np.matmul(work, dmwork[0,j,:,:]), self.bnorms[i])
 
-                if(self.options["objective"] == "inv"):
-                    bsum[i] = 1./(dist**2 + 1e-10)
-                    dbsum += (-1./((dist**2 + 1e-10)**2))*ddist*2*dist
-                else:
-                    bsum[i] = np.exp(-dist)
-                    dbsum += np.exp(-dist)*(-1.)*ddist
-            dsum += dbsum
+                    if(self.options["objective"] == "inv"):
+                        bsum[i] = 1./(dist**2 + 1e-10)
+                        dbsum += (-1./((dist**2 + 1e-10)**2))*ddist*2*dist/mb
+                    elif(self.options["objective"] == "abs"):
+                        bsum[i] = -dist**2
+                        dbsum += -2*dist*ddist/mb
+                    else:
+                        bsum[i] = np.exp(-dist)
+                        dbsum += np.exp(-dist)*(-1.)*ddist/mb
+                dsum += dbsum
 
 
         return dsum 
@@ -463,7 +473,7 @@ class AnisotropicRefine(ASCriteria):
                 on_bound = True
 
             if(on_bound):
-                self.bpts.append(trx[i,:])
+                self.bpts.append(qmc.scale(np.array([trx[i,:]]), bounds[:,0], bounds[:,1], reverse=True)[0])
                 self.bnorms.append(np.zeros([n]))
                 for j in range(n):
                     if(abs(trx[i,j] - bounds[j ,0]) < 1e-8):
@@ -473,16 +483,18 @@ class AnisotropicRefine(ASCriteria):
                 co += 1
 
         # h = 1e-6
-        # zero = 0.5*np.ones([8])
-        # step = 0.5*np.ones([8])
+        # zero = 0.5*np.ones([2])
+        # step = 0.5*np.ones([2])
         # step[0] += h
         # ad = self.eval_grad(zero, bounds)
         # fd = (self.evaluate(step, bounds) - self.evaluate(zero, bounds))/h
         # import pdb; pdb.set_trace()
 
         # ndir = 150
-        # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
-        # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+        # # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+        # # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+        # x = np.linspace(0., 1., ndir)
+        # y = np.linspace(0., 1., ndir)
 
         # X, Y = np.meshgrid(x, y)
         # F  = np.zeros([ndir, ndir])
@@ -493,16 +505,18 @@ class AnisotropicRefine(ASCriteria):
         #         xi = np.zeros([2])
         #         xi[0] = x[i]
         #         xi[1] = y[j]
-        #         F[i,j]  = self.evaluate(xi)
+        #         F[i,j]  = self.evaluate(xi, bounds)
 
-        # cs = plt.contour(Y, X, F, levels = np.linspace(0.,3000.,50))
+        # cs = plt.contour(Y, X, F, levels = np.linspace(0.,500.,25))
         # plt.colorbar(cs)
-
+        # trxs = qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
+        # plt.plot(trxs[0:-2,0], trxs[0:-2,1], 'bo')
+        # plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
         # plt.savefig("refine_contour_2.png")
 
         # plt.clf()
 
-        # import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
 
         sampling = LHS(xlimits=bounds, criterion='m')
         ntries = self.options["multistart"]
@@ -523,7 +537,7 @@ class AnisotropicRefine(ASCriteria):
         # add x to trx, for constraint purposes when dealing with batches
         #import pdb; pdb.set_trace()
         self.trx = np.append(self.trx, np.array([x]), axis=0)
-    
+        #import pdb; pdb.set_trace()
         return x
 
 

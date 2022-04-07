@@ -31,17 +31,17 @@ Perform adaptive sampling and estimate error
 """
 
 # Conditions
+dim = 2       #problem dimension
 skip_LHS = False
 LHS_batch = 5
-Nruns = 3
-multistart = 3     #aniso opt multistart
+Nruns = 5
+multistart = 25*dim    #aniso opt multistart
 stype = "gekpls"    #surrogate type
 rtype = "aniso"     #criteria type
-corr  = "abs_exp" #kriging correlation
+corr  = "squar_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
-prob  = "arctan"    #problem
+prob  = "rosenbrock"    #problem
 extra = 1           #gek extra points
-dim = 2         #problem dimension
 rho = 10            #POU parameter
 nt0  = dim*10       #initial design size
 ntr = dim*50       #number of points to add
@@ -62,7 +62,7 @@ hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
 perturb = True
-bpen = True
+bpen = False
 obj = "inv"
 nmatch = dim
 opt = 'L-BFGS-B' #'SLSQP'#
