@@ -9,7 +9,7 @@ import openmdao.api as om
 
 from mphys import Multipoint
 from shock_angle_comp import ShockAngleComp
-
+from inflow_comp import InflowComp
 from mphys.scenario_aerostructural import ScenarioAeroStructural
 
 # these imports will be from the respective codes' repos rather than mphys
@@ -79,12 +79,13 @@ class Top(Multipoint):
 
         # ivc to keep the top level DVs
         dvs = self.add_subsystem("dvs", om.IndepVarComp(), promotes=["*"])
-        # dvs.add_output("shock_angle", opt_options["shock_angle"])
-        # dvs.add_output("M0", 3.0)
-        # dvs.add_output('P0', 2919.0)
-        # dvs.add_output('T0', 217.0)
-        # dvs.add_output('M1', impinge_setup.mach)
+        dvs.add_output("shock_angle", opt_options["shock_angle"])
+        dvs.add_output("M0", 3.0)
+        dvs.add_output('P0', 2919.0)
+        dvs.add_output('T0', 217.0)
+        dvs.add_output('M1', impinge_setup.mach)
         dvs.add_output('P1', impinge_setup.P)
+        dvs.add_output('T1', impinge_setup.T)
 
         #dvs.add_output("beta", impinge_setup.beta)
         dvs.add_output("dv_struct", struct_options["th"])
@@ -92,6 +93,9 @@ class Top(Multipoint):
 
         # component to determine post-shock flow properties for ADFlow
         self.add_subsystem("shock", ShockAngleComp())
+
+        # component to determine pre-shock flow properties for ADFlow
+        self.add_subsystem("upstream", InflowComp())
 
         nonlinear_solver = om.NonlinearBlockGS(maxiter=2, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
         linear_solver = om.LinearBlockGS(maxiter=25, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
@@ -124,11 +128,15 @@ class Top(Multipoint):
             evalFuncs=["cd_def"],
         )    
 
-        # ap.addDV("mach", name="mach")
-        #ap.addDV("beta", name="beta")
-        # ap.addDV("T", name="temp")
-        ap.addDV("P",  name="pressure")
+        ap.addDV("mach", name="mach1")
+        ap.addDV("beta", name="beta")
+        ap.addDV("T", name="temp1")
+        ap.addDV("P",  name="pressure1")
 
+        # set BC vars that are hard coded in the CGNS mesh, upstream properties
+        ap.setBCVar("Pressure", impinge_setup.P0, "inflow")
+        ap.setBCVar("Density",  impinge_setup.r0, "inflow")
+        ap.setBCVar("VelocityX", impinge_setup.VX, "inflow")
 
         self.test.coupling.aero.mphys_set_ap(ap)
         self.test.aero_post.mphys_set_ap(ap)
@@ -137,34 +145,45 @@ class Top(Multipoint):
         self.connect("dv_struct", f"test.dv_struct")
         # self.connect("beta", "test.coupling.aero.beta")
         # self.connect("beta", "test.aero_post.beta")
-        # self.connect("shock_angle", "shock.shock_angle")
-        # self.connect("M0", "shock.mach0")
-        # self.connect("P0", "shock.P0")
-        # self.connect("T0", "shock.T0")
+        self.connect("shock_angle", "shock.shock_angle")
+        self.connect("M0", "shock.mach0")
+        self.connect("P0", "shock.P0")
+        self.connect("T0", "shock.T0")
+        self.connect("M0", "upstream.mach0")
+        self.connect("P0", "upstream.P0")
+        self.connect("T0", "upstream.T0")
+        self.connect("upstream.VelocityX", "test.coupling.aero.VelocityX")
+        self.connect("upstream.Density", "test.coupling.aero.Density")
+        self.connect("upstream.Pressure", "test.coupling.aero.Pressure")
+        self.connect("upstream.VelocityX", "test.aero_post.VelocityX")
+        self.connect("upstream.Density", "test.aero_post.Density")
+        self.connect("upstream.Pressure", "test.aero_post.Pressure")
         # # ##  EXTREMELY IMPORTANT TO CONNECT AP VARIABLES TO ALL OF THESE
-        # self.connect("shock.mach1", "test.coupling.aero.mach")
-        # self.connect("shock.mach1", "test.aero_post.mach")
-        # self.connect("shock.flow_angle", "test.coupling.aero.beta")
-        # self.connect("shock.flow_angle", "test.aero_post.beta")
-        # self.connect("shock.T1", "test.coupling.aero.temp")
-        # self.connect("shock.T1", "test.aero_post.temp")
-        # self.connect("shock.P1", "test.coupling.aero.pressure")
-        # self.connect("shock.P1", "test.aero_post.pressure")
+        self.connect("shock.mach1", "test.coupling.aero.mach1")
+        self.connect("shock.mach1", "test.aero_post.mach1")
+        self.connect("shock.flow_angle", "test.coupling.aero.beta")
+        self.connect("shock.flow_angle", "test.aero_post.beta")
+        self.connect("shock.T1", "test.coupling.aero.temp1")
+        self.connect("shock.T1", "test.aero_post.temp1")
+        self.connect("shock.P1", "test.coupling.aero.pressure1")
+        self.connect("shock.P1", "test.aero_post.pressure1")
         #self.add_design_var("mach", lower=2.0, upper=2.5)
         #self.add_design_var("dv_struct")
-        self.add_design_var("rsak")
         #self.add_design_var("shock_angle")
         #self.add_design_var("beta")
         # self.add_design_var("shock.mach1")
         # self.add_design_var("shock.flow_angle")
         # self.add_design_var("shock.T1")
         # self.add_design_var("shock.P1")
-        # self.connect("M1", "test.coupling.aero.mach")
-        # self.connect("M1", "test.aero_post.mach")
-        self.connect("P1", "test.coupling.aero.pressure")
-        self.connect("P1", "test.aero_post.pressure")
-        self.add_design_var("P1")
-        # self.add_design_var("M1")
+        # self.connect("M1", "test.coupling.aero.mach1")
+        # self.connect("M1", "test.aero_post.mach1")
+        # self.connect("P1", "test.coupling.aero.pressure1")
+        # self.connect("P1", "test.aero_post.pressure1")
+        # self.connect("T1", "test.coupling.aero.temp1")
+        # self.connect("T1", "test.aero_post.temp1")
+        #self.add_design_var("P1")
+        self.add_design_var("rsak")
+        self.add_design_var("M0")
         self.add_objective("test.aero_post.cd_def")
 
 
@@ -178,11 +197,14 @@ om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
 #prob.set_val("mach", 2.)
 #prob.set_val("dv_struct", impinge_setup.structOptions["th"])
 #prob.set_val("beta", 7.)
-#prob.set_val("shock_angle", 25.)
+prob.set_val("M0", 3.0)
+#prob.model.approx_totals()
 prob.run_model()
-prob.check_totals(method='cs')
+totals1 = prob.compute_totals(wrt='rsak')
+prob.model.approx_totals()
+totals2 = prob.compute_totals(wrt='M0')
 #prob.check_partials()
-
+import pdb; pdb.set_trace()
 #prob.model.list_outputs()
 
 if MPI.COMM_WORLD.rank == 0:

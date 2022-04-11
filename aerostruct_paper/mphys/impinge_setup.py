@@ -7,12 +7,20 @@ outputDirectory = './results'
 aeroGridFile = f'../meshes/imp_mphys_73_73_25.cgns'
 alpha = 0. #
 beta = 7.2833969362749187
-mach = 2.6381157549933598 #3.0
+mach = 2.6381157549933598 #
 areaRef = 1.0
 chordRef = 1.0
 T = 254.02071103827234 #217.
 P = 4987.6905797938707 #2919.
 probName = 'impinge_mphys'
+
+#downstream defaults
+M0 = 3.0
+T0 = 217.
+P0 = 2919.
+r0 = P0/(287.055*T0)
+a = np.sqrt(1.4*P0/r0)
+VX = M0*a
 
 astar = [ 0.0,0.0]
 dist = []
@@ -61,7 +69,7 @@ aeroOptions = { #ADflow aero solver options
     'eddyVisInfRatio':3.0,
     # [kappa, cb1,    cb2,   sigma,         cv1, cw2, cw3, ct1, ct2, ct3, ct4, rot]
     # [0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0]
-    'SAConsts':[0.41,  0.1355, 0.6, 1.0, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
+    'SAConsts':[0.41,  0.1355, 0.622, 0.66666666667, 7.1, 0.3, 2.0, 1.0, 2.0, 1.2, 0.5, 2.0],
     'SAGrads':["rsak"],
 
     # Common Parameters
@@ -79,7 +87,7 @@ aeroOptions = { #ADflow aero solver options
     'ANKCoupledSwitchTol':1e-3,
     'ANKConstCFLStep':0.4,
     'ANKCFLLimit':1000000000.0,
-    "L2Convergence": 1e-15,
+    "L2Convergence": 1e-12,
     # "L2ConvergenceCoarse": 1e-2,
     # "L2ConvergenceRel": 1e-4,
     "forcesAsTractions": False,

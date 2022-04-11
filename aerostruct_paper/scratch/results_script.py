@@ -33,14 +33,14 @@ Perform adaptive sampling and estimate error
 # Conditions
 dim = 2       #problem dimension
 skip_LHS = False
-LHS_batch = 5
+LHS_batch = 10
 Nruns = 5
-multistart = 25*dim    #aniso opt multistart
+multistart = 25*dim     #aniso opt multistart
 stype = "gekpls"    #surrogate type
 rtype = "aniso"     #criteria type
-corr  = "squar_exp" #kriging correlation
+corr  = "abs_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
-prob  = "rosenbrock"    #problem
+prob  = "fuhgp8"    #problem
 extra = 1           #gek extra points
 rho = 10            #POU parameter
 nt0  = dim*10       #initial design size
@@ -62,8 +62,10 @@ hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
 perturb = True
-bpen = False
+bpen = True
 obj = "inv"
+rscale = 0.5 #0.5 for 2D
+nscale = 1.0 #1.0 for 2D
 nmatch = dim
 opt = 'L-BFGS-B' #'SLSQP'#
 
@@ -278,7 +280,7 @@ RC0 = []
 co = 0
 for n in cases[rank]:
     if(rtype == "aniso"):
-        RC0.append(AnisotropicRefine(model0[co], gtrain0[n], xlimits, improve=pperb, neval=neval, hessian=hess, interp=interp, bpen=bpen, objective=obj, multistart=multistart) )
+        RC0.append(AnisotropicRefine(model0[co], gtrain0[n], xlimits, rscale=rscale, nscale=nscale, improve=pperb, neval=neval, hessian=hess, interp=interp, bpen=bpen, objective=obj, multistart=multistart) )
     elif(rtype == "anisotransform"):
         RC0.append(AnisotropicTransform(model0[co], sequencer[n], gtrain0[n], improve=pperb, nmatch=nmatch, neval=neval, hessian=hess, interp=interp))
     else:
@@ -322,7 +324,7 @@ if rank == 0:
     print("Experiment Complete")
 
     if(rtype == "aniso"):
-        rstring = f'{rtype}{neval}{bpen}{obj}'
+        rstring = f'{rtype}{neval}{bpen}{obj}{rscale}r_{nscale}n'
     elif(rtype == "anisotransform"):
         rstring = f'{rtype}{neval}{nmatch}'
     else:
