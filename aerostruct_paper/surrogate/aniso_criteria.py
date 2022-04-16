@@ -11,7 +11,7 @@ from scipy.linalg import lstsq, eig
 from scipy.stats import qmc
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds
-from utils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
+from sutils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
 
 
 # Hessian estimation to generate an anisotropic mapping of the space
@@ -578,33 +578,33 @@ class AnisotropicRefine(ASCriteria):
         # fd = (self.evaluate(step, bounds) - self.evaluate(zero, bounds))/h
         # import pdb; pdb.set_trace()
 
-        # ndir = 100
-        # # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
-        # # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
-        # x = np.linspace(0., 1., ndir)
-        # y = np.linspace(0., 1., ndir)
+        ndir = 100
+        # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+        # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+        x = np.linspace(0., 1., ndir)
+        y = np.linspace(0., 1., ndir)
 
-        # X, Y = np.meshgrid(x, y)
-        # F  = np.zeros([ndir, ndir])
+        X, Y = np.meshgrid(x, y)
+        F  = np.zeros([ndir, ndir])
 
 
-        # for i in range(ndir):
-        #     for j in range(ndir):
-        #         xi = np.zeros([2])
-        #         xi[0] = x[i]
-        #         xi[1] = y[j]
-        #         F[i,j]  = self.evaluate(xi, bounds)
+        for i in range(ndir):
+            for j in range(ndir):
+                xi = np.zeros([2])
+                xi[0] = x[i]
+                xi[1] = y[j]
+                F[i,j]  = self.evaluate(xi, bounds)
 
-        # cs = plt.contour(Y, X, F, levels = np.linspace(0.,500.,25))
-        # plt.colorbar(cs)
-        # trxs = qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
-        # plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
-        # plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
-        # plt.savefig("refine_contour_2.png")
+        cs = plt.contour(Y, X, F, levels = np.linspace(0.,500.,25))
+        plt.colorbar(cs)
+        trxs = qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
+        plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
+        plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
+        plt.savefig("refine_contour_2.png")
 
-        # plt.clf()
+        plt.clf()
 
-        #import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
 
         sampling = LHS(xlimits=bounds, criterion='m')
         ntries = self.options["multistart"]

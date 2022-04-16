@@ -11,7 +11,7 @@ from aniso_criteria import AnisotropicRefine
 from aniso_transform import AnisotropicTransform
 from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
-from utils import divide_cases
+from sutils import divide_cases
 from error import rmse, meane
 
 from example_problems import MultiDimJump, MultiDimJumpTaper, FuhgP8
@@ -32,7 +32,7 @@ Perform adaptive sampling and estimate error
 
 # Conditions
 dim = 2       #problem dimension
-skip_LHS = False
+skip_LHS = True
 LHS_batch = 10
 Nruns = 5
 multistart = 25*dim     #aniso opt multistart
@@ -40,7 +40,7 @@ stype = "gekpls"    #surrogate type
 rtype = "aniso"     #criteria type
 corr  = "abs_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
-prob  = "fuhgp8"    #problem
+prob  = "arctan"    #problem
 extra = 1           #gek extra points
 rho = 10            #POU parameter
 nt0  = dim*10       #initial design size
@@ -62,7 +62,7 @@ hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
 perturb = True
-bpen = True
+bpen = False
 obj = "inv"
 rscale = 0.5 #0.5 for 2D
 nscale = 1.0 #1.0 for 2D

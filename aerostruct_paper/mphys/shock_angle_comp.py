@@ -11,7 +11,7 @@ class ShockAngleComp(om.ExplicitComponent):
 
     def setup(self):
         # This is the only one we can really control, the others are fixed to the mesh and not able to be differentiated by ADFlow as is
-        self.add_input('shock_angle', 25, desc="shock angle of origin")
+        self.add_input('shock_angle', 25., desc="shock angle of origin")
         
         self.add_input('mach0', 3.0, desc="upstream mach number")
         self.add_input('P0', 2919.0, desc="upstream pressure")

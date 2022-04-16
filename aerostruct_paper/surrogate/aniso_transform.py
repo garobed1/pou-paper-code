@@ -11,7 +11,7 @@ from scipy.linalg import lstsq, eig
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds, least_squares, root
 from scipy.stats import qmc
-from utils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
+from sutils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
 
 
 # Hessian estimation to generate an anisotropic mapping of the space

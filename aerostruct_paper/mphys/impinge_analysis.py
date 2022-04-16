@@ -182,31 +182,38 @@ class Top(Multipoint):
         # self.connect("T1", "test.coupling.aero.temp1")
         # self.connect("T1", "test.aero_post.temp1")
         #self.add_design_var("P1")
-        self.add_design_var("rsak")
-        self.add_design_var("M0")
-        self.add_objective("test.aero_post.cd_def")
+        # self.add_design_var("rsak")
+        # self.add_design_var("M0")
+        # self.add_design_var("shock_angle")
+        # self.add_objective("test.aero_post.cd_def")
 
 
-################################################################################
-# OpenMDAO setup
-################################################################################
-prob = om.Problem()
-prob.model = Top()
-prob.setup(mode='rev')
-om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
-#prob.set_val("mach", 2.)
-#prob.set_val("dv_struct", impinge_setup.structOptions["th"])
-#prob.set_val("beta", 7.)
-prob.set_val("M0", 3.0)
-#prob.model.approx_totals()
-prob.run_model()
-totals1 = prob.compute_totals(wrt='rsak')
-prob.model.approx_totals()
-totals2 = prob.compute_totals(wrt='M0')
-#prob.check_partials()
-import pdb; pdb.set_trace()
-#prob.model.list_outputs()
+# ################################################################################
+# # OpenMDAO setup
+# ################################################################################
+# prob = om.Problem()
+# prob.model = Top()
+# prob.setup(mode='rev')
+# om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
+# #prob.set_val("mach", 2.)
+# #prob.set_val("dv_struct", impinge_setup.structOptions["th"])
+# #prob.set_val("beta", 7.)
+# x = np.linspace(2.5, 3.5, 10)
 
-if MPI.COMM_WORLD.rank == 0:
-    print("cd = %.15f" % prob["test.aero_post.cd_def"])
-#     prob.model.
+# y = np.zeros(10)
+# for i in range(10):
+#     prob.set_val("M0", x[i])
+# #prob.model.approx_totals()
+#     prob.run_model()
+#     y[i] = prob["test.aero_post.cd_def"]
+# # totals1 = prob.compute_totals(wrt='rsak')
+# # prob.model.approx_totals()
+# #totals2 = prob.compute_totals(wrt='M0')
+# #prob.check_partials()
+# import pdb; pdb.set_trace()
+# #prob.model.list_outputs()
+
+# if MPI.COMM_WORLD.rank == 0:
+#     print("cd = %.15f" % prob["test.aero_post.cd_def"])
+#     print(y)
+# #     prob.model.

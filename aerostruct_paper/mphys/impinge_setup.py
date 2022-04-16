@@ -58,8 +58,8 @@ aeroOptions = { #ADflow aero solver options
     'gridFile':aeroGridFile,
     'outputDirectory':'../results/',
     'writeTecplotSurfaceSolution':False,
-    'writeSurfaceSolution':True,
-    'writeVolumeSolution':True,
+    'writeSurfaceSolution':False,
+    'writeVolumeSolution':False,
     
     # Physics Parameters
     'equationType':'RANS',
@@ -100,8 +100,8 @@ aeroOptions = { #ADflow aero solver options
     # Output
     'volumeVariables':['eddyratio','mach','cp','temp'],
     'surfaceVariables':['yplus','cf','cp','cfx','cfy','cfz'],
-    'printIterations':True,
-    'printTiming':True,
+    'printIterations':False,
+    'printTiming':False,
     'printWarnings':False,
     'setMonitor':False
     }
@@ -112,10 +112,10 @@ structOptions = {
     "name":probName,
     "Nelem":nelem,
     "L":0.254, #0.254, 
-    "E":10000,
+    "E":69000000000,
     "force":np.ones(nelem+1)*1.0,
     "Iyy":None,
-    "th":np.ones(nelem+1)*0.05,
+    "th":np.ones(nelem+1)*0.0005,
     "l_bound":2.0,
     "smax": 500,
     "get_funcs":["mass", "stresscon"]

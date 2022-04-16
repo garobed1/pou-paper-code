@@ -12,7 +12,7 @@ import openmdao.api as om
 from smt.problems.problem import Problem
 from impinge_analysis import Top
 import impinge_setup
-from utils import divide_cases
+from sutils import divide_cases
 
 # comm = MPI.COMM_WORLD
 # rank = comm.Get_rank()
@@ -24,9 +24,9 @@ class ImpingingShock(Problem):
         self.options.declare("name", "ImpingingShock", types=str)
         
         
-        self.options.declare("inputs", ["M0", "rsak"], types=list)
+        self.options.declare("inputs", ["shock_angle", "rsak"], types=list)
         self.options.declare("input_bounds", np.zeros([2,2]), types=np.ndarray)
-        self.options.declare("output", "test.aero_post.cd_def", types=str)
+        self.options.declare("output", ["test.aero_post.cd_def"], types=list) #surrogate only returns the first element but we'll store the others
 
         self.options.declare("comm", MPI.COMM_WORLD, types=MPI.Comm)
 
@@ -41,30 +41,32 @@ class ImpingingShock(Problem):
         assert(self.options["ndim"] == len(self.options["inputs"]))
 
         # list of inputs we would need to finite difference
-        self.fdlist = ['M0', 'P0', 'T0']
+        self.fdlist = ['M0', 'P0', 'T0', 'shock_angle']
 
         # list of inputs we can get exact derivatives for
-        self.adlist = self.options["inputs"]
-        remove = []
-        for i in range(len(self.adlist)):
-            key = self.adlist[i]
-            if((key == self.fdlist).any()):
-                remove.append(i)
-        for key in remove:
-            self.adlist.pop(key)
+        #self.adlist = self.options["inputs"]
+        self.adind = []
+        self.fdind = []
+        for i in range(len(self.options["inputs"])):
+            key = self.options["inputs"][i]
+            if(key in self.fdlist):
+                self.fdind.append(i)
+            else:
+                self.adind.append(i)
+
 
         # ensure we can get SA derivatives
         saconsts = ['rsak','rsacb1','rsacb2','rsacb3','rsacv1','rsacw2','rsacw3','rsact1','rsact2','rsact3','rsact4','rsacrot']
         salist = []
         for key in self.options["inputs"]:
             if(key in saconsts):
-                salist = salist + key
+                salist = salist + [key]
         impinge_setup.aeroOptions["SAGrads"] = salist
 
         self.xlimits[:, 0] = self.options["input_bounds"][:,0]
         self.xlimits[:, 1] = self.options["input_bounds"][:,1]
 
-        self.prob = om.Problem()
+        self.prob = om.Problem(comm=MPI.COMM_SELF)
         self.prob.model = Top()
 
         # set up model inputs
@@ -73,12 +75,13 @@ class ImpingingShock(Problem):
             self.prob.model.add_design_var(self.options["inputs"][i], \
                                     lower=self.xlimits[i,0], upper=self.xlimits[i,1])
 
-        self.prob.model.add_objective("output")
+        for i in range(len(self.options["output"])):
+            self.prob.model.add_objective(self.options["output"][i])
 
         self.prob.setup(mode='rev')
 
         # keep the current input state to avoid recomputing the gradient on subsequent calls
-        self.xcur = None
+        self.xcur = np.zeros([1])
         self.fcur = None
         self.gcur = None
 
@@ -99,23 +102,33 @@ class ImpingingShock(Problem):
         """
         ne, nx = x.shape
         y = np.zeros((ne, 1), complex)
+        h = 1e-6
 
-
-        if(x != self.xcur): # Don't recompute if we already have the answer for the given inputs
+        if(not np.array_equal(x, self.xcur)): # Don't recompute if we already have the answer for the given inputs
             self.xcur = x
             self.fcur = np.zeros((ne, 1), complex)
             self.gcur = np.zeros((ne, nx), complex)
             cases = divide_cases(ne, self.size)
             #for i in range(ne):
-            for i in cases:
+            for i in cases[self.rank]:
                 for j in range(nx):
                     self.prob.set_val(self.options["inputs"][j], x[i, j])
                 self.prob.run_model()
-                self.fcur[i] = self.prob.get_val(self.options["output"])
-                self.gcur[i] = self.prob.compute_totals(return_format="array")
+                self.fcur[i] = self.prob.get_val(self.options["output"][0])
+                #analytic
+                work = [self.options["inputs"][k] for k in self.adind]
+                adgrads = self.prob.compute_totals(of=self.options["output"][0], wrt=work, return_format="array")
+                self.gcur[i][self.adind] = adgrads[:,0]
+                #finite diff
+                for key in self.fdind:
+                    self.prob.set_val(self.options["inputs"][key], x[i, key] + h)
+                    self.prob.run_model()
+                    self.gcur[i][key] = (self.prob.get_val(self.options["output"][0]) - self.fcur[i])/h
+                    self.prob.set_val(self.options["inputs"][key], x[i, key])
 
-            self.comm.allreduce(self.fcur)
-            self.comm.allreduce(self.gcur)
+
+            self.fcur = self.comm.allreduce(self.fcur)
+            self.gcur = self.comm.allreduce(self.gcur)
 
         for i in range(ne):
             if kx is None:
