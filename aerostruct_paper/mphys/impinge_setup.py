@@ -4,7 +4,7 @@ import numpy as np
 #from tacs import TACS, elements, constitutive, functions
 
 outputDirectory = './results'
-aeroGridFile = f'../meshes/imp_mphys_73_73_25.cgns'
+aeroGridFile = f'../meshes/imp_mphys_145_145_25.cgns'
 alpha = 0. #
 beta = 7.2833969362749187
 mach = 2.6381157549933598 #
@@ -79,12 +79,12 @@ aeroOptions = { #ADflow aero solver options
     'nCycles':100000,
     'monitorvariables':["resrho", "resturb"],
     'useNKSolver':True,
-    'NKSwitchTol':1e-4,#e-1,
+    'NKSwitchTol':1e-6,#e-1,
     'NKSubspaceSize':50,
     'NKPCILUFill':3,
     'NKLS':'none',
     'useANKSolver':True,
-    'ANKCoupledSwitchTol':1e-3,
+    'ANKCoupledSwitchTol':1e-5,
     'ANKConstCFLStep':0.4,
     'ANKCFLLimit':1000000000.0,
     "L2Convergence": 1e-12,
@@ -107,7 +107,7 @@ aeroOptions = { #ADflow aero solver options
     }
 
 # Euler Bernoulli Structural Solver Options
-nelem = 30
+nelem = 60
 structOptions = {
     "name":probName,
     "Nelem":nelem,

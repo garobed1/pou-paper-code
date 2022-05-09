@@ -342,3 +342,102 @@ class MultiDimJumpTaper(Problem):
                         np.arctan(self.alpha*work)*np.exp(-np.linalg.norm(x[i,:])**2)*-2*x[i,kx]
 
         return y
+
+
+
+
+
+# From Fuhg (2021), Problem 9
+class FuhgP9(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("name", "FuhgP9", types=str)
+
+    def _setup(self):
+        self.xlimits[0, 0] = -2.0
+        self.xlimits[0, 1] = 2.0
+        self.xlimits[1, 0] = -1.0
+        self.xlimits[1, 1] = 1.0
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            X = x[i,:]
+            if kx is None:
+                y[i,0] = (4. - 2.1*X[0]*X[0] + X[0]*X[0]*X[0]*X[0]/3.)*X[0]*X[0]
+                y[i,0] += X[0]*X[1] + (-4. + 4.*X[1]*X[1])*X[1]*X[1]
+
+
+            elif(kx == 0):
+                y[i,0] = (8.*X[0] - 4*2.1*X[0]*X[0]*X[0] + 6*X[0]*X[0]*X[0]*X[0]*X[0]/3.)
+                y[i,0] += X[1] 
+
+            elif(kx == 1):
+                y[i,0] = X[0] + (-8.*X[1] + 16.*X[1]*X[1]*X[1])
+
+        return y
+
+
+# From Fuhg (2021), Problem 10
+class FuhgP10(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("name", "FuhgP10", types=str)
+
+    def _setup(self):
+        self.xlimits[:, 0] = -6.0
+        self.xlimits[:, 1] = 2.0
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            X = x[i,:]
+            if kx is None:
+                if(X[0] < -2.5 and X[1] < -2.5):
+                    for j in range(nx):
+                        y[i,0] += 0.2*X[j]*X[j]*X[j] - 10.*np.cos(2.*np.pi*X[j])
+                else:
+                    for j in range(nx):
+                        y[i,0] += 0.2*X[j]*X[j]*X[j] + 3.*np.abs(X[j]) - 30.*np.sin(np.pi*np.abs(X[j]))
+
+            else:
+                j = kx
+                if(X[0] < -2.5 and X[1] < -2.5):
+                    y[i,0] += 0.6*X[j]*X[j] + 20.*np.pi*np.sin(2.*np.pi*X[j])
+                else:
+                    y[i,0] += 0.6*X[j]*X[j] + np.sign(X[j])*3. - np.sign(X[j])*30.*np.pi*np.cos(np.pi*np.abs(X[j]))
+
+
+        return y

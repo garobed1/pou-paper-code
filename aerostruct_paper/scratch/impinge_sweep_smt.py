@@ -1,4 +1,3 @@
-import openmdao.api as om
 import sys, os
 sys.path.insert(1,"../surrogate")
 from sutils import divide_cases
@@ -16,7 +15,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-Ncase = 2
+Ncase = 70
 
 inputs = ["shock_angle", "rsak"]
 dim = len(inputs)
@@ -25,13 +24,23 @@ xlimits[0,:] = [23., 27.]
 xlimits[1,:] = [0.36, 0.51]
 sampling = LHS(xlimits=xlimits, criterion='m')
 x = sampling(Ncase)
+x = comm.bcast(x, root=0)
+#if rank == 0:
+title = f'{Ncase}_shock_results'
+#    if not os.path.isdir(title):
+#        os.mkdir(title)
+# with open(f'./{title}/x.pickle', 'rb') as f:
+#     x = pickle.load(f)
+
 func = ImpingingShock(ndim=dim, input_bounds=xlimits, inputs=inputs)
+sta = 0
+sto = 120
+y = func(x[sta:sto])
 
-y = func(x)
-
-g = np.zeros_like(x)
+g = np.zeros_like(x[sta:sto])
 for i in range(dim):
-    g[:,i:i+1] = func(x,i)
+    g[:,i:i+1] = func(x[sta:sto],i)
+
 
 # Y = comm.allreduce(y)
 # totals1 = prob.compute_totals(wrt='rsak')
@@ -42,15 +51,11 @@ for i in range(dim):
 #prob.check_partials()
 #import pdb; pdb.set_trace()
 #prob.model.list_outputs()
-import pdb; pdb.set_trace()
 if rank == 0:
     title = f'{Ncase}_shock_results'
-    if not os.path.isdir(title):
-        os.mkdir(title)
-    with open(f'./{title}/x.pickle', 'wb') as f:
+    with open(f'./{title}/x{sta}to{sto}.pickle', 'wb') as f:
         pickle.dump(x, f)
-
-    with open(f'./{title}/y.pickle', 'wb') as f:
+    with open(f'./{title}/y{sta}to{sto}.pickle', 'wb') as f:
         pickle.dump(y, f)
-    with open(f'./{title}/g.pickle', 'wb') as f:
+    with open(f'./{title}/g{sta}to{sto}.pickle', 'wb') as f:
         pickle.dump(g, f)

@@ -550,13 +550,16 @@ class TEAD(ASCriteria):
         
     def _init_options(self):
         #number of candidates to consider
-        self.options.declare("ncand", self.dim*10, types=int)
+        self.options.declare("ncand", self.dim*50, types=int)
+
+        #source of gradient
+        self.options.declare("gradexact", False, types=bool)
 
         #number of points to pick
         self.options.declare("improve", 0, types=int)
         
         #number of closest points to evaluate nonlinearity measure
-        self.options.declare("neval", self.dim*2, types=int)
+        self.options.declare("neval", 1, types=int)
 
     def initialize(self, model=None, grad=None):
         
@@ -576,12 +579,14 @@ class TEAD(ASCriteria):
         trx = self.model.training_points[None][0][0]
         trf = self.model.training_points[None][0][1]
         trg = np.zeros_like(trx)
-        trg = self.grad
-        if(isinstance(self.model, GEKPLS)):
+        if(self.options["gradexact"]):
+            trg = self.grad
+            if(isinstance(self.model, GEKPLS)):
+                for j in range(self.dim):
+                    trg[:,j] = self.model.training_points[None][j+1][1].flatten()
+        else:
             for j in range(self.dim):
-                trg[:,j] = self.model.training_points[None][j+1][1].flatten()
-        
-        
+                trg[:,j] = self.model.predict_derivatives(trx, j)[:,0]
         
 
         # 1. Generate candidate points, determine reference distances and neighborhoods

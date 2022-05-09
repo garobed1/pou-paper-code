@@ -6,16 +6,16 @@ sys.path.insert(1,"../surrogate")
 
 import numpy as np
 #import matplotlib.pyplot as plt
-from refinecriteria import looCV, HessianFit
+from refinecriteria import looCV, HessianFit, TEAD
 from aniso_criteria import AnisotropicRefine
 from aniso_transform import AnisotropicTransform
 from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
 from sutils import divide_cases
 from error import rmse, meane
-
-from example_problems import MultiDimJump, MultiDimJumpTaper, FuhgP8
-from smt.problems import Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
+from shock_problem import ImpingingShock
+from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10,
+from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
 from pougrad import POUSurrogate
@@ -29,9 +29,11 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
+prob  = "arctan"    #problem
+
 
 # Conditions
-dim = 2       #problem dimension
+dim = 3      #problem dimension
 skip_LHS = True
 LHS_batch = 10
 Nruns = 5
@@ -40,7 +42,6 @@ stype = "gekpls"    #surrogate type
 rtype = "aniso"     #criteria type
 corr  = "abs_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
-prob  = "arctan"    #problem
 extra = 1           #gek extra points
 rho = 10            #POU parameter
 nt0  = dim*10       #initial design size
@@ -77,10 +78,16 @@ elif(prob == "arctantaper"):
     trueFunc = MultiDimJumpTaper(ndim=dim, alpha=alpha)
 elif(prob == "rosenbrock"):
     trueFunc = Rosenbrock(ndim=dim)
+elif(prob == "branin"):
+    trueFunc = Branin(ndim=dim)
 elif(prob == "sphere"):
     trueFunc = Sphere(ndim=dim)
 elif(prob == "fuhgp8"):
     trueFunc = FuhgP8(ndim=dim)
+elif(prob == "fuhgp9"):
+    trueFunc = FuhgP9(ndim=dim)
+elif(prob == "fuhgp10"):
+    trueFunc = FuhgP10(ndim=dim)
 elif(prob == "waterflow"):
     trueFunc = WaterFlow(ndim=dim)
 elif(prob == "weldedbeam"):
@@ -89,6 +96,13 @@ elif(prob == "robotarm"):
     trueFunc = RobotArm(ndim=dim)
 elif(prob == "cantilever"):
     trueFunc = CantileverBeam(ndim=dim)
+elif(prob == "hadamard"):
+    trueFunc = QuadHadamard(ndim=dim)
+elif(prob == "shock"):
+    xlimits = np.zeros([dim,2])
+    xlimits[0,:] = [23., 27.]
+    xlimits[1,:] = [0.36, 0.51]
+    trueFunc = ImpingingShock(ndim=dim, input_bounds=xlimits, comm=MPI.COMM_SELF)
 else:
     raise ValueError("Given problem not valid.")
 xlimits = trueFunc.xlimits
@@ -270,8 +284,33 @@ if(not skip_LHS):
             errkrms[co].append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
             errkmean[co].append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
         co += 1
+    
+    if(rtype == "aniso"):
+        rstring = f'{rtype}{neval}{bpen}{obj}{rscale}r_{nscale}n'
+    elif(rtype == "anisotransform"):
+        rstring = f'{rtype}{neval}{nmatch}'
+    elif(rtype == "tead"):
+        rstring = f'{rtype}{neval}'
+    else:
+        rstring = f'{rtype}'
 
+    title = f'{prob}_{rstring}_{stype}_{corr}_{dim}d_{Nruns}runs_{nt0}to{ntot}pts_{batch}batch_{multistart}mstart_{opt}opt'
+    # LHS Data
+    with open(f'./{title}/xk.pickle', 'wb') as f:
+        pickle.dump(xtrainK, f)
 
+    with open(f'./{title}/fk.pickle', 'wb') as f:
+        pickle.dump(ftrainK, f)
+
+    with open(f'./{title}/gk.pickle', 'wb') as f:
+        pickle.dump(gtrainK, f)
+
+    with open(f'./{title}/errkrms.pickle', 'wb') as f:
+        pickle.dump(errkrms, f)
+
+    with open(f'./{title}/errkmean.pickle', 'wb') as f:
+        pickle.dump(errkmean, f)
+import pdb; pdb.set_trace()
 if rank == 0:
     print("Initial Refinement Criteria ...")
 
@@ -283,6 +322,8 @@ for n in cases[rank]:
         RC0.append(AnisotropicRefine(model0[co], gtrain0[n], xlimits, rscale=rscale, nscale=nscale, improve=pperb, neval=neval, hessian=hess, interp=interp, bpen=bpen, objective=obj, multistart=multistart) )
     elif(rtype == "anisotransform"):
         RC0.append(AnisotropicTransform(model0[co], sequencer[n], gtrain0[n], improve=pperb, nmatch=nmatch, neval=neval, hessian=hess, interp=interp))
+    elif(rtype == "tead"):
+        RC0.append(TEAD(model0[co], gtrain0[n], xlimits, gradexact=True))
     else:
         raise ValueError("Given criteria not valid.")
     co += 1
@@ -327,6 +368,8 @@ if rank == 0:
         rstring = f'{rtype}{neval}{bpen}{obj}{rscale}r_{nscale}n'
     elif(rtype == "anisotransform"):
         rstring = f'{rtype}{neval}{nmatch}'
+    elif(rtype == "tead"):
+        rstring = f'{rtype}{neval}'
     else:
         rstring = f'{rtype}'
 
