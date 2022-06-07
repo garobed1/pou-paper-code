@@ -23,9 +23,10 @@ import matplotlib.ticker as mticker
 from smt.sampling_methods import LHS
 
 # Give directory with desired results as argument
-usetead = True
 title = sys.argv[1]
-title2 = sys.argv[2]
+title2 = None
+if len(sys.argv) > 2:
+    title2 = sys.argv[2]
 
 if not os.path.isdir(title):
     os.mkdir(title)
@@ -232,6 +233,21 @@ for i in range(nruns):
 # plt.savefig(f"./{title}err_mean_ensemble.png", bbox_inches="tight")
 # plt.clf()
 
+
+# import pdb; pdb.set_trace()
+# print(rmse(mf[0], trueFunc))
+# #tfix = 50.0
+# #mf[0].options.update({"theta0":[tfix]})
+# mf[0].options.update({"theta_bounds":np.array([1, 1])})
+# # mf[0].options.update({"theta_bounds":np.array([tfix, tfix+1e-4])})
+# mf[0].options.update({"n_comp":2})
+# mf[0].options.update({"extra_points":2})
+# #mf[0].options.update({"hyper_opt":"COBYLA"})
+# mf[0].options.update({"delta_x":1e-2})
+# mf[0].train()
+# print(mf[0].optimal_theta)
+# print(rmse(mf[0], trueFunc))
+# import pdb; pdb.set_trace()
 #NRMSE
 ax = plt.gca()
 plt.loglog(samplehist, ehrm, "b-", label=f'AIGES NRMSE')

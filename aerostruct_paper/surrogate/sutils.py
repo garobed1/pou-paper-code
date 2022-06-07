@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.linalg import qr
 from scipy.linalg import lstsq, lu_factor, lu_solve, solve, inv, eig
+from scipy.spatial.distance import cdist
 from example_problems import Heaviside, MultiDimJump, Quad2D
 from smt.problems import RobotArm
 from smt.sampling_methods import LHS
@@ -406,6 +407,40 @@ def divide_cases(ncases, nprocs):
 
     return data
 
+
+def estimate_pou_volume(trx, bounds):
+    """
+    Estimate volume of partition-of-unity basis cells by counting closest randomly-distributed points
+
+    Parameters
+    ----------
+    trx: np.ndarray
+        list of training point locations
+
+    bounds: np.ndarray
+        bounds of the domain, expected to be unit hypercube
+
+    Returns
+    -------
+    dV: np.ndarray
+        list of cell volumes ordered like trx
+    """
+    m, n = trx.shape
+
+    dV = np.zeros(m)
+    sampling = LHS(xlimits=bounds)
+    vx = sampling(100*m)
+    ms, ns = vx.shape
+    dists = cdist(vx, trx)
+
+    # loop over the random points
+    for i in range(ms):
+        cind = np.argmin(dists[i])
+        dV[cind] += 1.
+
+    dV /= ms
+
+    return dV
 
 # dim = 2
 # trueFunc = MultiDimJump(ndim=dim)

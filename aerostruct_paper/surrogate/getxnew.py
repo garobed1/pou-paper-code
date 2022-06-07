@@ -42,6 +42,7 @@ def getxnew(rcrit, x0, bounds, options=None):
     unit_bounds = np.zeros([n,2])
     unit_bounds[:,1] = 1.
 
+    # loop over batch
     for i in range(rcrit.nnew):
         rx = None
         if(rcrit.opt): #for methods that don't use optimization
@@ -58,6 +59,7 @@ def getxnew(rcrit, x0, bounds, options=None):
                 jac = rcrit.eval_grad
             if(options["localswitch"]):
 
+                #TODO: Make these options
                 # multistart
                 # resx = np.zeros([m,n])
                 # resy = np.zeros(m)
@@ -108,9 +110,6 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         g0 = rcrit.grad
         nt, dim = t0.shape
         x0 = np.zeros([1, dim])
-        # if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
-        #     for i in range(dim):
-        #         g0.append(model.training_points[None][i+1][1])
 
         # get the new points
         xnew = np.array(getxnew(rcrit, x0, bounds, options))
@@ -127,8 +126,7 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
                 model.set_training_derivatives(t0, g0[:,j], j)
         model.train()
 
-
-        # evaluate error, rmse for now
+        # evaluate errors
         if(options["errorcheck"] is not None):
             xdata, fdata = options["errorcheck"]
             err = rmse(model, func, xdata=xdata, fdata=fdata)

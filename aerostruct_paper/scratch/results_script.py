@@ -8,13 +8,14 @@ import numpy as np
 #import matplotlib.pyplot as plt
 from refinecriteria import looCV, HessianFit, TEAD
 from aniso_criteria import AnisotropicRefine
+from taylor_criteria import TaylorRefine, TaylorExploreRefine
 from aniso_transform import AnisotropicTransform
 from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
 from sutils import divide_cases
 from error import rmse, meane
 from shock_problem import ImpingingShock
-from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10,
+from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
@@ -29,25 +30,25 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "arctan"    #problem
+prob  = "rosenbrock"    #problem
 
 
 # Conditions
-dim = 3      #problem dimension
-skip_LHS = True
+dim = 4      #problem dimension
+skip_LHS = False
 LHS_batch = 10
-Nruns = 5
+Nruns = 4
 multistart = 25*dim     #aniso opt multistart
 stype = "gekpls"    #surrogate type
-rtype = "aniso"     #criteria type
-corr  = "abs_exp" #kriging correlation
+rtype = "taylor"     #criteria type
+corr  = "squar_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
 extra = 1           #gek extra points
 rho = 10            #POU parameter
 nt0  = dim*10       #initial design size
-ntr = dim*50       #number of points to add
+ntr = dim*75       #number of points to add
 ntot = nt0 + ntr    #total number of points
-batch = 0.1         #batch size for refinement, as a percentage of ntr
+batch = 0.0         #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = int(batch*ntr)
 pperbk = int(ntr/LHS_batch)
@@ -66,7 +67,7 @@ perturb = True
 bpen = False
 obj = "inv"
 rscale = 0.5 #0.5 for 2D
-nscale = 1.0 #1.0 for 2D
+nscale = 10.0 #1.0 for 2D
 nmatch = dim
 opt = 'L-BFGS-B' #'SLSQP'#
 
@@ -216,6 +217,8 @@ if rank == 0:
 # Initial Design Surrogate
 if(stype == "gekpls"):
     modelbase = GEKPLS(xlimits=xlimits)
+    # modelbase.options.update({"hyper_opt":'TNC'})
+    modelbase.options.update({"n_comp":dim})
     modelbase.options.update({"extra_points":extra})
     modelbase.options.update({"corr":corr})
     modelbase.options.update({"poly":poly})
@@ -226,15 +229,22 @@ elif(stype == "pou"):
     modelbase.options.update({"rho":rho})
 elif(stype == "kpls"):
     modelbase = KPLS()
+    # modelbase.options.update({"hyper_opt":'TNC'})
+    modelbase.options.update({"n_comp":dim})
     modelbase.options.update({"corr":corr})
     modelbase.options.update({"poly":poly})
     modelbase.options.update({"n_start":5})
 else:
     modelbase = KRG()
+    # modelbase.options.update({"hyper_opt":'TNC'})
     modelbase.options.update({"corr":corr})
     modelbase.options.update({"poly":poly})
     modelbase.options.update({"n_start":5})
-modelbase.options.update({"print_global":False})
+# modelbase.options.update({"print_global":False})
+modelbase.options.update({"print_training":True})
+modelbase.options.update({"print_prediction":False})
+modelbase.options.update({"print_problem":True})
+modelbase.options.update({"print_solver":True})
 
 model0 = []
 co = 0
@@ -295,6 +305,8 @@ if(not skip_LHS):
         rstring = f'{rtype}'
 
     title = f'{prob}_{rstring}_{stype}_{corr}_{dim}d_{Nruns}runs_{nt0}to{ntot}pts_{batch}batch_{multistart}mstart_{opt}opt'
+    if not os.path.isdir(title):
+        os.mkdir(title)
     # LHS Data
     with open(f'./{title}/xk.pickle', 'wb') as f:
         pickle.dump(xtrainK, f)
@@ -310,7 +322,7 @@ if(not skip_LHS):
 
     with open(f'./{title}/errkmean.pickle', 'wb') as f:
         pickle.dump(errkmean, f)
-import pdb; pdb.set_trace()
+
 if rank == 0:
     print("Initial Refinement Criteria ...")
 
@@ -324,6 +336,10 @@ for n in cases[rank]:
         RC0.append(AnisotropicTransform(model0[co], sequencer[n], gtrain0[n], improve=pperb, nmatch=nmatch, neval=neval, hessian=hess, interp=interp))
     elif(rtype == "tead"):
         RC0.append(TEAD(model0[co], gtrain0[n], xlimits, gradexact=True))
+    elif(rtype == "taylor"):
+        RC0.append(TaylorRefine(model0[co], gtrain0[n], xlimits, volume_weight=perturb, rscale=rscale, improve=pperb, multistart=multistart) )
+    elif(rtype == "taylorexp"):
+        RC0.append(TaylorExploreRefine(model0[co], gtrain0[n], xlimits, rscale=rscale, improve=pperb, objective=obj, multistart=multistart) ) 
     else:
         raise ValueError("Given criteria not valid.")
     co += 1
@@ -370,6 +386,10 @@ if rank == 0:
         rstring = f'{rtype}{neval}{nmatch}'
     elif(rtype == "tead"):
         rstring = f'{rtype}{neval}'
+    elif(rtype == "taylor"):
+        rstring = f'{rtype}{perturb}'
+    elif(rtype == "taylorexp"):
+        rstring = f'{rtype}{neval}{obj}'
     else:
         rstring = f'{rtype}'
 
