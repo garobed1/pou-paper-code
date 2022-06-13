@@ -441,3 +441,64 @@ class FuhgP10(Problem):
 
 
         return y
+
+
+# Peaks function from Matlab
+class Peaks2D(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("name", "Peaks2D", types=str)
+
+    def _setup(self):
+        self.xlimits[0, 0] = -3.0
+        self.xlimits[0, 1] = 3.0
+        self.xlimits[1, 0] = -3.0
+        self.xlimits[1, 1] = 3.0
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            X = x[i,:]
+            C1 = 3*((1-X[0])**2)
+            C2 = -10*(X[0]/5. - X[0]**3 - X[1]**5)
+            C3 = -(1./3.)
+            if kx is None:
+                y[i,0] =  C1*np.exp(-X[0]**2 - (X[1]+1)**2)
+                y[i,0] += C2*np.exp(-X[0]**2 - X[1]**2)
+                y[i,0] += C3*np.exp(-(X[0]+1)**2 - X[1]**2)
+
+            elif(kx == 0):
+                dC1 = -6*(1-X[0])
+                dC2 = (-2. + 30.*X[0]**2)#-10*(x[0]/5. - x[0]**3 - x[1]**5)
+                dC3 = 0.
+
+                y[i,0] =  (dC1 + C1*(-2.*X[0]))*np.exp(-X[0]**2 - (X[1]+1)**2)
+                y[i,0] += (dC2 + C2*(-2.*X[0]))*np.exp(-X[0]**2 - X[1]**2)
+                y[i,0] += (dC3 + C3*(-2.*(X[0]+1)))*np.exp(-(X[0]+1)**2 - X[1]**2)
+
+            elif(kx == 1):
+                dC1 = 0.
+                dC2 = 50.*X[1]**4 #-10*(x[0]/5. - x[0]**3 - x[1]**5)
+                dC3 = 0.
+
+                y[i,0] =  (dC1 + C1*(-2.*(X[1]+1)))*np.exp(-X[0]**2 - (X[1]+1)**2)
+                y[i,0] += (dC2 + C2*(-2.*X[1]))*np.exp(-X[0]**2 - X[1]**2)
+                y[i,0] += (dC3 + C3*(-2.*X[1]))*np.exp(-(X[0]+1)**2 - X[1]**2)
+
+        return y

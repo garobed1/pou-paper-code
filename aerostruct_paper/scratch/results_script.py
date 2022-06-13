@@ -30,25 +30,25 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "rosenbrock"    #problem
+prob  = "fuhgp9"    #problem
 
 
 # Conditions
-dim = 4      #problem dimension
+dim = 2      #problem dimension
 skip_LHS = False
 LHS_batch = 10
-Nruns = 4
+Nruns = 5
 multistart = 25*dim     #aniso opt multistart
-stype = "gekpls"    #surrogate type
+stype = "kpls"    #surrogate type
 rtype = "taylor"     #criteria type
 corr  = "squar_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
-extra = 1           #gek extra points
+extra = dim           #gek extra points
 rho = 10            #POU parameter
 nt0  = dim*10       #initial design size
-ntr = dim*75       #number of points to add
+ntr = dim*50       #number of points to add
 ntot = nt0 + ntr    #total number of points
-batch = 0.0         #batch size for refinement, as a percentage of ntr
+batch = 0.05        #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = int(batch*ntr)
 pperbk = int(ntr/LHS_batch)
