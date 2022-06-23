@@ -24,21 +24,21 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "peaks"    #problem
+prob  = "arctantaper"    #problem
 plot  = -1
 
 # Conditions
-dim = 2      #problem dimension
+dim = 1      #problem dimension
 corr  = "squar_exp" #kriging correlation
-poly  = "quadratic"    #kriging regression 
+poly  = "constant"    #kriging regression 
 ncomp = dim
 extra = 2           #gek extra points
-nt0 = 6
-ntr = 80
-batch = 10
-t0 = [1e-2]
-tb = [1e-6, 20]
-tbg = [1e-6, 20]
+nt0 = 5
+ntr = 30
+batch = 5
+t0 = [100]
+tb = [100, 100]
+tbg = [100, 100]
 Nerr = 5000       #number of test points to evaluate the error
 dx = 1e-4
 nruns = int((ntr-nt0)/batch)+1
@@ -74,7 +74,7 @@ elif(prob == "hadamard"):
 elif(prob == "peaks"):
     trueFunc = Peaks2D(ndim=dim)
 elif(prob == "tensorexp"):
-    trueFunc = TensorProduct(ndim=dim, func="cos")
+    trueFunc = TensorProduct(ndim=dim, func="gaussian")
 elif(prob == "shock"):
     xlimits = np.zeros([dim,2])
     xlimits[0,:] = [23., 27.]
@@ -161,8 +161,7 @@ modeldge.set_training_values(xtrainK[0], ftrainK[0])
 for i in range(dim):
     modeldge.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
 modeldge.train()
-
-import pdb; pdb.set_trace()
+print(modeldge.predict_values(np.array([0])))
 
 if(dim > 1):
     modelgek = GEKPLS(xlimits=xlimits)
@@ -207,9 +206,11 @@ modelkrg.options.update({"print_prediction":False})
 errgek = []
 errkpl = []
 errkrg = []
+errdge = []
 mgek = []
 mkpl = []
 mkrg = []
+mdge = []
 for j in range(nruns):
     if(dim > 1):
         modelgek.set_training_values(xtrainK[j], ftrainK[j])
@@ -228,17 +229,26 @@ for j in range(nruns):
         modelgek.set_training_values(xtot, ftot)
         modelgek.train()
     mgek.append(copy.deepcopy(modelgek))
-
+    print("GEK Done")
     modelkpl.set_training_values(xtrainK[j], ftrainK[j])
     modelkpl.train()
     mkpl.append(copy.deepcopy(modelkpl))
-
+    print("KPL Done")
     modelkrg.set_training_values(xtrainK[j], ftrainK[j])
     modelkrg.train()
     errgek.append(rmse(modelgek, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     errkpl.append(rmse(modelkpl, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     errkrg.append(rmse(modelkrg, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     mkrg.append(copy.deepcopy(modelkrg))
+    print("KRG Done")
+
+    modeldge.set_training_values(xtrainK[j], ftrainK[j])
+    for i in range(dim):
+        modeldge.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
+    modeldge.train()
+    errdge.append(rmse(modeldge, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    mdge.append(copy.deepcopy(modeldge))
+    print("DGEK Done")
 
 print(errgek)
 print(modelgek.optimal_theta)
@@ -246,10 +256,13 @@ print(errkpl)
 print(modelkpl.optimal_theta)
 print(errkrg)
 print(modelkrg.optimal_theta)
+print(errdge)
+print(modeldge.optimal_theta)
 
 plt.loglog(nt, errgek, "k-", label=f'GEK')
 plt.loglog(nt, errkpl, 'b-', label='KPL')
 plt.loglog(nt, errkrg, 'r-', label='KRG')
+plt.loglog(nt, errdge, 'm-', label='KRG')
 plt.xlabel("Number of samples")
 plt.ylabel("NRMSE")
 plt.grid()
@@ -268,9 +281,11 @@ if(dim == 1):
     Zgek = np.zeros([ndir, ndir])
     Zkpl = np.zeros([ndir, ndir])
     Zkrg = np.zeros([ndir, ndir])
+    Zdge = np.zeros([ndir, ndir])
     Fgek = np.zeros([ndir, ndir])
     Fkpl = np.zeros([ndir, ndir])
     Fkrg = np.zeros([ndir, ndir])
+    Fdge = np.zeros([ndir, ndir])
     TF = np.zeros([ndir, ndir])
 
     for i in range(ndir):
@@ -280,15 +295,18 @@ if(dim == 1):
         Fgek[i] = mgek[plot].predict_values(xi)
         Fkpl[i] = mkpl[plot].predict_values(xi)
         Fkrg[i] = mkrg[plot].predict_values(xi)
+        Fdge[i] = mdge[plot].predict_values(xi)
         Zgek[i] = abs(Fgek[i] - TF[i])
         Zkpl[i] = abs(Fkpl[i] - TF[i])
         Zkrg[i] = abs(Fkrg[i] - TF[i])
+        Zdge[i] = abs(Fdge[i] - TF[i])
 
     # Plot Non-Adaptive Error
     plt.plot(x, TF, "-g")
     plt.plot(x, Fgek, "-k", label=f'GEK')
     plt.plot(x, Fkpl, "-b", label=f'KPL')
     plt.plot(x, Fkrg, "-r", label=f'KRG')
+    plt.plot(x, Fdge, "-m", label=f'DGEK')
     plt.xlabel(r"$x$")
     plt.ylabel(r"$f$")
     #plt.legend(loc=1)
