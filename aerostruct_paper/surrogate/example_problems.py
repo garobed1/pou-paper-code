@@ -344,6 +344,53 @@ class MultiDimJumpTaper(Problem):
         return y
 
 
+# f(x) = arctan(alpha*(x dot t))
+class MultiDimJumpTwist(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("alpha", 5., types=float)
+        self.options.declare("name", "MultiDimJump", types=str)
+
+        self.t = None
+
+    def _setup(self):
+        self.xlimits[:, 0] = -2.5
+        self.xlimits[:, 1] = 2.5
+
+        self.t = np.ones(self.options["ndim"])# np.random.normal(size=self.options["ndim"])
+        
+        self.t = self.t/np.linalg.norm(self.t)
+        self.alpha = self.options["alpha"]
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            work1 = x[i, :] - np.array([np.sin(x[i,0]), np.sin(x[i,1])])
+            work = np.dot(work1, self.t)
+            if kx is None:
+                y[i,0] = np.arctan(self.alpha*work)
+            else:
+                dwork1 = 1-np.cos(x[i,kx])
+                work2 = (1./(1.+work*work*self.alpha*self.alpha))*self.alpha
+                y[i,0] = work2*self.t[kx]*dwork1
+
+        return y
 
 
 
@@ -500,5 +547,62 @@ class Peaks2D(Problem):
                 y[i,0] =  (dC1 + C1*(-2.*(X[1]+1)))*np.exp(-X[0]**2 - (X[1]+1)**2)
                 y[i,0] += (dC2 + C2*(-2.*X[1]))*np.exp(-X[0]**2 - X[1]**2)
                 y[i,0] += (dC3 + C3*(-2.*X[1]))*np.exp(-(X[0]+1)**2 - X[1]**2)
+
+        return y
+
+
+# Emulated shock problem function
+class FakeShock(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("name", "FakeShock", types=str)
+
+    def _setup(self):
+        self.xlimits[0,:] = [23., 27.]
+        self.xlimits[1,:] = [0.36, 0.51]
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+        sc = 0.0004
+        bs = 0.0001
+        root = 24. + 83./500.
+
+        for i in range(ne):
+            X = x[i,:]
+            work = X[0] - 25.5
+            work2 = X[1] - self.xlimits[1,0]
+            if kx is None:
+                if(X[0] > root):
+                    y[i,0] = 0.2*(work**4) + work2
+                else:
+                    y[i,0] = -0.1*work + 0.5 + work2
+
+            elif(kx == 0):
+                if(X[0] > root):
+                    y[i,0] = 0.8*(work**3)
+                else:
+                    y[i,0] = -0.1
+            elif(kx == 1):
+                y[i,0] = 1.0
+        
+        y *= sc
+
+        if kx is None:
+            y += bs
 
         return y

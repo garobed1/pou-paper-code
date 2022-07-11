@@ -13,7 +13,7 @@ from defaults import DefaultOptOptions
 from sutils import divide_cases
 from error import rmse, meane
 
-from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10
+from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
@@ -32,7 +32,8 @@ if not os.path.isdir(title):
     os.mkdir(title)
 
 prob = title.split("_")[0]
-plt.rcParams['font.size'] = '12'
+#import pdb; pdb.set_trace()
+plt.rcParams['font.size'] = '14'
 
 if(title2):
     
@@ -148,6 +149,8 @@ elif(prob == "cantilever"):
     trueFunc = CantileverBeam(ndim=dim)
 elif(prob == "hadamard"):
     trueFunc = QuadHadamard(ndim=dim)
+elif(prob == "fakeshock"):
+    trueFunc = FakeShock(ndim=dim)
 else:
     raise ValueError("Given problem not valid.")
 
@@ -262,18 +265,19 @@ ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
 ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 
-plt.legend(loc=1)
+plt.legend(loc=3)
 plt.savefig(f"./{title}err_nrmse_ensemble.png", bbox_inches="tight")
 plt.clf()
 
 ax = plt.gca()
 plt.loglog(samplehist, ehmm, "b--", label='AIGES Mean' )
 plt.loglog(samplehistk, ekmm, 'k--', label='LHS Mean')
+if(title2):
+    plt.loglog(samplehist, ehmmt, "r--", label='TEAD Mean' )
 plt.loglog(samplehist, ehsm, "b-.", label='AIGES Std. Dev.' )
 plt.loglog(samplehistk, eksm, 'k-.', label='LHS Std. Dev.')
 if(title2):
-    plt.loglog(samplehist, ehmmt, "r--", label='AIGES Mean' )
-    plt.loglog(samplehist, ehsmt, "r-.", label='AIGES Std. Dev.' )
+    plt.loglog(samplehist, ehsmt, "r-.", label='TEAD Std. Dev.' )
 
 plt.xlabel("Number of samples")
 plt.ylabel("Relative error")
@@ -283,7 +287,7 @@ ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
 ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 
-plt.legend(loc=1)
+plt.legend(loc=3)
 plt.savefig(f"./{title}err_uq_ensemble.png", bbox_inches="tight")
 plt.clf()
 

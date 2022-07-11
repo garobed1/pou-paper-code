@@ -15,7 +15,7 @@ from defaults import DefaultOptOptions
 from sutils import divide_cases
 from error import rmse, meane
 from shock_problem import ImpingingShock
-from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10
+from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
@@ -30,25 +30,25 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "fuhgp9"    #problem
+prob  = "fakeshock"    #problem
 
 
 # Conditions
 dim = 2      #problem dimension
 skip_LHS = False
 LHS_batch = 10
-Nruns = 5
+Nruns = 8
 multistart = 25*dim     #aniso opt multistart
-stype = "kpls"    #surrogate type
+stype = "gekpls"    #surrogate type
 rtype = "taylor"     #criteria type
 corr  = "squar_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
 extra = dim           #gek extra points
 rho = 10            #POU parameter
-nt0  = dim*10       #initial design size
+nt0  = dim*20       #initial design size
 ntr = dim*50       #number of points to add
 ntot = nt0 + ntr    #total number of points
-batch = 0.05        #batch size for refinement, as a percentage of ntr
+batch = 0.1        #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = int(batch*ntr)
 pperbk = int(ntr/LHS_batch)
@@ -70,6 +70,9 @@ rscale = 0.5 #0.5 for 2D
 nscale = 10.0 #1.0 for 2D
 nmatch = dim
 opt = 'L-BFGS-B' #'SLSQP'#
+# thetafix = 10.
+# t0g = [thetafix, thetafix]
+# tbg = [thetafix, thetafix]
 
 # Problem Settings
 alpha = 8.       #arctangent jump strength
@@ -99,6 +102,8 @@ elif(prob == "cantilever"):
     trueFunc = CantileverBeam(ndim=dim)
 elif(prob == "hadamard"):
     trueFunc = QuadHadamard(ndim=dim)
+elif(prob == "fakeshock"):
+    trueFunc = FakeShock(ndim=dim)
 elif(prob == "shock"):
     xlimits = np.zeros([dim,2])
     xlimits[0,:] = [23., 27.]
@@ -218,6 +223,8 @@ if rank == 0:
 if(stype == "gekpls"):
     modelbase = GEKPLS(xlimits=xlimits)
     # modelbase.options.update({"hyper_opt":'TNC'})
+    # modelbase.options.update({"theta0":t0g})
+    # modelbase.options.update({"theta_bounds":tbg})
     modelbase.options.update({"n_comp":dim})
     modelbase.options.update({"extra_points":extra})
     modelbase.options.update({"corr":corr})
@@ -295,33 +302,33 @@ if(not skip_LHS):
             errkmean[co].append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
         co += 1
     
-    if(rtype == "aniso"):
-        rstring = f'{rtype}{neval}{bpen}{obj}{rscale}r_{nscale}n'
-    elif(rtype == "anisotransform"):
-        rstring = f'{rtype}{neval}{nmatch}'
-    elif(rtype == "tead"):
-        rstring = f'{rtype}{neval}'
-    else:
-        rstring = f'{rtype}'
+    # if(rtype == "aniso"):
+    #     rstring = f'{rtype}{neval}{bpen}{obj}{rscale}r_{nscale}n'
+    # elif(rtype == "anisotransform"):
+    #     rstring = f'{rtype}{neval}{nmatch}'
+    # elif(rtype == "tead"):
+    #     rstring = f'{rtype}{neval}'
+    # else:
+    #     rstring = f'{rtype}'
 
-    title = f'{prob}_{rstring}_{stype}_{corr}_{dim}d_{Nruns}runs_{nt0}to{ntot}pts_{batch}batch_{multistart}mstart_{opt}opt'
-    if not os.path.isdir(title):
-        os.mkdir(title)
-    # LHS Data
-    with open(f'./{title}/xk.pickle', 'wb') as f:
-        pickle.dump(xtrainK, f)
+    # title = f'{prob}_{rstring}_{stype}_{corr}_{dim}d_{Nruns}runs_{nt0}to{ntot}pts_{batch}batch_{multistart}mstart_{opt}opt'
+    # if not os.path.isdir(title):
+    #     os.mkdir(title)
+    # # LHS Data
+    # with open(f'./{title}/xk.pickle', 'wb') as f:
+    #     pickle.dump(xtrainK, f)
 
-    with open(f'./{title}/fk.pickle', 'wb') as f:
-        pickle.dump(ftrainK, f)
+    # with open(f'./{title}/fk.pickle', 'wb') as f:
+    #     pickle.dump(ftrainK, f)
 
-    with open(f'./{title}/gk.pickle', 'wb') as f:
-        pickle.dump(gtrainK, f)
+    # with open(f'./{title}/gk.pickle', 'wb') as f:
+    #     pickle.dump(gtrainK, f)
 
-    with open(f'./{title}/errkrms.pickle', 'wb') as f:
-        pickle.dump(errkrms, f)
+    # with open(f'./{title}/errkrms.pickle', 'wb') as f:
+    #     pickle.dump(errkrms, f)
 
-    with open(f'./{title}/errkmean.pickle', 'wb') as f:
-        pickle.dump(errkmean, f)
+    # with open(f'./{title}/errkmean.pickle', 'wb') as f:
+    #     pickle.dump(errkmean, f)
 
 if rank == 0:
     print("Initial Refinement Criteria ...")

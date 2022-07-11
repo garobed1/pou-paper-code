@@ -10,7 +10,48 @@ from smt.sampling_methods import LHS
 
 
 
+def getDirectCovariance(r, dr, d2r, theta, nt, ij):
+    """
+    Construct each block of the direct-gradient covariance matrix for direct gradient methods
 
+    Takes the block form [P Pg.T; Pg S]
+
+    Inputs: 
+        r - symmetric covariances
+        dr - symmetric covariance derivatives
+        d2r - symmetric covariance second derivatives
+        theta - hyperparameters
+        nt - number of training points
+        ij - symmetric indexing
+    Outputs:
+        P - Covariance matrix
+        Pg - Covariance Jacobian
+        S - Covariance Hessian
+    """
+    n_elem = r.shape[0]
+    nc = theta.shape[0]
+    
+    # P
+    P = np.eye(nt)
+    P[ij[:, 0], ij[:, 1]] = r[:, 0]
+    P[ij[:, 1], ij[:, 0]] = r[:, 0]
+
+    # Pg
+    Pg = np.zeros([nt*nc, nt])
+    for k in range(n_elem):
+        Pg[(ij[k,1]*nc):(ij[k,1]*nc+nc), ij[k,0]] = dr[k].T
+        Pg[(ij[k,0]*nc):(ij[k,0]*nc+nc), ij[k,1]] = -dr[k].T
+
+    # S
+    S = np.zeros([nt*nc, nt*nc])#*(2*theta)
+    for k in range(nt):
+        S[k*nc:(k+1)*nc, k*nc:(k+1)*nc] = np.diag(2*theta)
+
+    for k in range(n_elem):
+        S[(ij[k,0]*nc):(ij[k,0]*nc+nc), (ij[k,1]*nc):(ij[k,1]*nc+nc)] = d2r[k]
+        S[(ij[k,1]*nc):(ij[k,1]*nc+nc), (ij[k,0]*nc):(ij[k,0]*nc+nc)] = d2r[k]
+
+    return P, Pg, S
 
 def quadraticSolve(x, xn, f, fn, g, gn):
 

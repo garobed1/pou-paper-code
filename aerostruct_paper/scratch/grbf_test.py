@@ -25,21 +25,21 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "arctan"    #problem
+prob  = "arctantaper"    #problem
 plot  = -1
 
 # Conditions
 dim = 1      #problem dimension
 corr  = "squar_exp" #kriging correlation
-poly  = "constant"    #kriging regression 
+poly  = "linear"    #kriging regression 
 ncomp = dim
 extra = 2           #gek extra points
-nt0 = 5
+nt0 = 20
 ntr = 20
 batch = 5
-tval = 30
+tval = 100.
 t0 = [1e-2]
-t0g = [tval]
+t0g = [tval]#[tval, tval]
 tb = [1e-6, 100]
 tbg = [tval, tval]#[tval, tval]
 Nerr = 5000       #number of test points to evaluate the error
@@ -152,19 +152,31 @@ for j in range(nruns):
 # fd2 = (trueFunc(step) - trueFunc(zero))/h
 # import pdb; pdb.set_trace()
 
+# # DGEK
+# modeldge = DGEK(xlimits=xlimits)
+# modeldge.options.update({"theta0":t0g})
+# modeldge.options.update({"theta_bounds":tbg})
+# modeldge.options.update({"corr":corr})
+# modeldge.options.update({"poly":poly})
+# modeldge.options.update({"n_start":5})
+# modeldge.options.update({"print_prediction":False})
+# modeldge.set_training_values(xtrainK[0], ftrainK[0])
+# for i in range(dim):
+#     modeldge.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
+# modeldge.train()
+# print(modeldge.predict_values(np.array([0])))
 
-modeldge = DGEK(xlimits=xlimits)
-modeldge.options.update({"theta0":t0g})
-modeldge.options.update({"theta_bounds":tbg})
-modeldge.options.update({"corr":corr})
-modeldge.options.update({"poly":poly})
-modeldge.options.update({"n_start":5})
-modeldge.options.update({"print_prediction":False})
-modeldge.set_training_values(xtrainK[0], ftrainK[0])
+# GRBF
+modelgrb = GRBF()
+modelgrb.options.update({"t0":t0g})
+modelgrb.options.update({"corr":corr})
+modelgrb.options.update({"poly":poly})
+modelgrb.options.update({"compute_theta":False})
+modelgrb.options.update({"print_prediction":False})
+modelgrb.set_training_values(xtrainK[0], ftrainK[0])
 for i in range(dim):
-    modeldge.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
-modeldge.train()
-print(modeldge.predict_values(np.array([0])))
+    modelgrb.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
+modelgrb.train()
 
 if(dim > 1):
     modelgek = GEKPLS(xlimits=xlimits)
@@ -209,10 +221,12 @@ modelkrg.options.update({"print_prediction":False})
 errgek = []
 errkpl = []
 errkrg = []
+errgrb = []
 errdge = []
 mgek = []
 mkpl = []
 mkrg = []
+mgrb = []
 mdge = []
 for j in range(nruns):
     if(dim > 1):
@@ -245,13 +259,21 @@ for j in range(nruns):
     mkrg.append(copy.deepcopy(modelkrg))
     print("KRG Done")
 
-    modeldge.set_training_values(xtrainK[j], ftrainK[j])
+    # modeldge.set_training_values(xtrainK[j], ftrainK[j])
+    # for i in range(dim):
+    #     modeldge.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
+    # modeldge.train()
+    # errdge.append(rmse(modeldge, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    # mdge.append(copy.deepcopy(modeldge))
+    # print("DGEK Done")
+
+    modelgrb.set_training_values(xtrainK[j], ftrainK[j])
     for i in range(dim):
-        modeldge.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
-    modeldge.train()
-    errdge.append(rmse(modeldge, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-    mdge.append(copy.deepcopy(modeldge))
-    print("DGEK Done")
+        modelgrb.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
+    modelgrb.train()
+    errgrb.append(rmse(modelgrb, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    mgrb.append(copy.deepcopy(modelgrb))
+    print("GRBF Done")
 
 print(errgek)
 print(modelgek.optimal_theta)
@@ -259,18 +281,21 @@ print(errkpl)
 print(modelkpl.optimal_theta)
 print(errkrg)
 print(modelkrg.optimal_theta)
-print(errdge)
-print(modeldge.optimal_theta)
+print(errgrb)
+print(modelgrb.theta)
+# print(errdge)
+# print(modeldge.optimal_theta)
 
 plt.loglog(nt, errgek, "k-", label=f'GEK')
 plt.loglog(nt, errkpl, 'b-', label='KPL')
 plt.loglog(nt, errkrg, 'r-', label='KRG')
-plt.loglog(nt, errdge, 'm-', label='DGEK')
+# plt.loglog(nt, errdge, 'm-', label='DGEK')
+plt.loglog(nt, errgrb, 'c-', label='GRBF')
 plt.xlabel("Number of samples")
 plt.ylabel("NRMSE")
 plt.grid()
 plt.legend(loc=1)
-plt.savefig(f"./gek_test_err.png", bbox_inches="tight")
+plt.savefig(f"./grbf_test_err.png", bbox_inches="tight")
 plt.clf()
 
 
@@ -285,10 +310,12 @@ if(dim == 1):
     Zkpl = np.zeros([ndir, ndir])
     Zkrg = np.zeros([ndir, ndir])
     Zdge = np.zeros([ndir, ndir])
+    Zgrb = np.zeros([ndir, ndir])
     Fgek = np.zeros([ndir, ndir])
     Fkpl = np.zeros([ndir, ndir])
     Fkrg = np.zeros([ndir, ndir])
     Fdge = np.zeros([ndir, ndir])
+    Fgrb = np.zeros([ndir, ndir])
     TF = np.zeros([ndir, ndir])
 
     for i in range(ndir):
@@ -298,37 +325,42 @@ if(dim == 1):
         Fgek[i] = mgek[plot].predict_values(xi)
         Fkpl[i] = mkpl[plot].predict_values(xi)
         Fkrg[i] = mkrg[plot].predict_values(xi)
-        Fdge[i] = mdge[plot].predict_values(xi)
+        # Fdge[i] = mdge[plot].predict_values(xi)
+        Fgrb[i] = mgrb[plot].predict_values(xi)
         Zgek[i] = abs(Fgek[i] - TF[i])
         Zkpl[i] = abs(Fkpl[i] - TF[i])
         Zkrg[i] = abs(Fkrg[i] - TF[i])
-        Zdge[i] = abs(Fdge[i] - TF[i])
+        # Zdge[i] = abs(Fdge[i] - TF[i])
+        Zgrb[i] = abs(Fgrb[i] - TF[i])
 
     # Plot Non-Adaptive Error
     plt.plot(x, TF, "-g")
     plt.plot(x, Fgek, "-k", label=f'GEK')
     plt.plot(x, Fkpl, "-b", label=f'KPL')
     plt.plot(x, Fkrg, "-r", label=f'KRG')
-    plt.plot(x, Fdge, "-m", label=f'DGEK')
+    # plt.plot(x, Fdge, "-m", label=f'DGEK')
+    plt.plot(x, Fgrb, "-c", label=f'GRBF')
     plt.xlabel(r"$x$")
     plt.ylabel(r"$f$")
     #plt.legend(loc=1)
     plt.plot(xtrainK[plot][:,0], ftrainK[plot][:], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
 
-    plt.savefig(f"./gek_1dplot.png", bbox_inches="tight")
+    plt.savefig(f"./grbf_1dplot.png", bbox_inches="tight")
     plt.clf()
 
     # Plot Non-Adaptive Error
     plt.plot(x, Zgek, "-k", label=f'GEK')
     plt.plot(x, Zkpl, "-b", label=f'KPL')
     plt.plot(x, Zkrg, "-r", label=f'KRG')
-    plt.plot(x, Zdge, "-m", label=f'DGEK')
+    # plt.plot(x, Zdge, "-m", label=f'DGEK')
+    plt.plot(x, Zgrb, "-c", label=f'GRBF')
+
     plt.xlabel(r"$x$")
     plt.ylabel(r"$err$")
     #plt.legend(loc=1)
     plt.plot(xtrainK[plot][:,0], np.zeros(xtrainK[plot].shape[0]), "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
 
-    plt.savefig(f"./gek_1derr.png", bbox_inches="tight")
+    plt.savefig(f"./grbf_1derr.png", bbox_inches="tight")
 
     plt.clf()
 
@@ -348,6 +380,7 @@ if(dim == 2):
     Zgek = np.zeros([ndir, ndir])
     Zkpl = np.zeros([ndir, ndir])
     Zkrg = np.zeros([ndir, ndir])
+    Zgrb = np.zeros([ndir, ndir])
     Vk = np.zeros([ndir, ndir])
     Z0 = np.zeros([ndir, ndir])
     F  = np.zeros([ndir, ndir])
@@ -359,10 +392,10 @@ if(dim == 2):
             xi[0,0] = x[i]
             xi[0,1] = y[j]
             TF[j,i] = trueFunc(xi)
-            Zgek[j,i] = abs(modelgek.predict_values(xi) - TF[j,i])
-            Zkpl[j,i] = abs(modelkpl.predict_values(xi) - TF[j,i])
-            Zkrg[j,i] = abs(modelkrg.predict_values(xi) - TF[j,i])
-
+            Zgek[j,i] = abs(mgek[plot].predict_values(xi) - TF[j,i])
+            Zkpl[j,i] = abs(mkpl[plot].predict_values(xi) - TF[j,i])
+            Zkrg[j,i] = abs(mkrg[plot].predict_values(xi) - TF[j,i])
+            Zgrb[j,i] = abs(mgrb[plot].predict_values(xi) - TF[j,i])
     # Plot Non-Adaptive Error
     cs = plt.contour(X, Y, Zkpl, levels = 40)
     plt.colorbar(cs, aspect=20)
@@ -384,7 +417,15 @@ if(dim == 2):
 
     plt.clf()
 
-    
+    plt.contour(X, Y, Zgrb, levels = cs.levels)
+    plt.colorbar(cs, )
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    #plt.legend(loc=1)
+    plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+    plt.savefig(f"./grbf_errcona.png", bbox_inches="tight")
+
+    plt.clf()    
 
     plt.contour(X, Y, Zkrg, levels = cs.levels)
     plt.colorbar(cs, )

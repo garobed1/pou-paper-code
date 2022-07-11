@@ -252,7 +252,6 @@ class DGEK(KrgBased):
         Rinv[self.nt:, 0:self.nt] = -np.dot(Minv, PgPinv)
         Rinv[self.nt:, self.nt:] = Minv
         rho = Ya - np.dot(Fa, beta)
-
         # The determinant of R is equal to the squared product of the diagonal
         # elements of its Cholesky decomposition C
         #detR = (np.diag(C) ** (2.0 / self.nt)).prod()
@@ -332,7 +331,6 @@ class DGEK(KrgBased):
         #import pdb; pdb.set_trace()
         for i in range(n_eval):
             ra[i] = np.append(r[i], dr[i,:])
-        #import pdb; pdb.set_trace()
 
         y = np.zeros(full_size)
         ya = self.y_norma.copy()
@@ -347,7 +345,7 @@ class DGEK(KrgBased):
         # for i in range(n_eval):
         #     fa[i] = np.append(f[i], np.zeros([self.nt*n_features_x]))
         # Scaled predictor
-
+        
         #import pdb; pdb.set_trace()
         y_ = np.dot(f, self.optimal_par["beta"]) + np.dot(ra, self.optimal_par["gamma"])
         #y_ = np.dot(np.dot(ra, self.optimal_par["gamma"]), (ya - np.dot(f, self.optimal_par["beta"])))
