@@ -46,6 +46,12 @@ class DakotaKriging(SurrogateModel):
             types=(str),
         )
         declare(
+            "nugget",
+            None,
+            desc="Regression function type",
+            types=(float),
+        )
+        declare(
             "optimization_method",
             "global",
             values=("global", "local", "sampling", "none"),
@@ -69,72 +75,98 @@ class DakotaKriging(SurrogateModel):
     def _setup(self):
         options = self.options
 
-        self.dakota_file   = self.options["header"] + "smt_surrogate.in"
+        self.dakota_train_file   = self.options["header"] + "smt_train_surrogate.in"
+        self.dakota_predict_file   = self.options["header"] + "smt_predict_surrogate.in"
         self.training_file = self.options["header"] + "smt_training.dat"
         self.eval_file     = self.options["header"] + "smt_evaluate.dat"
         self.surrogate_file= self.options["header"] + "smt_saved_surr"
         self.output_file   = self.options["header"] + "smt_output.dat"
-        self.stdout_file   = self.options["header"] + "smt_stdout.dat"
-        self.stderr_file   = self.options["header"] + "smt_stderr.dat"
+        self.stdout_train_file   = self.options["header"] + "smt_stdout_train.dat"
+        self.stderr_train_file   = self.options["header"] + "smt_stderr_train.dat"
+        self.stdout_predict_file   = self.options["header"] + "smt_stdout_predict.dat"
+        self.stderr_predict_file   = self.options["header"] + "smt_stderr_predict.dat"
  
         self.ndim = self.training_points[None][0][0].shape[1]
         self.xlimits = self.options["xlimits"]
         # write out options in the dakota input file
 
+        # training and prediction files should be nearly identical
+
         # environment
-        with open(self.dakota_file, 'w') as the_file:
-            the_file.write('environment\n')
-            the_file.write('  method_pointer = \'EvalSurrogate\'\n')
-            the_file.write('  output_precision = 16\n')
-            the_file.write('  tabular_data\n')
-            the_file.write(f'    tabular_data_file = \'{self.output_file}\'\n')
-            the_file.write(f'      freeform\n')
-            the_file.write('\n')
-        # method
-            the_file.write('method\n')
-            the_file.write('  id_method = \'EvalSurrogate\'\n')
-            the_file.write('  model_pointer = \'SurrogateModel\'\n')
-            the_file.write('  list_parameter_study\n')
-            the_file.write(f'    import_points_file \'{self.eval_file}\'\n')
-            the_file.write('      freeform\n')
-            the_file.write('\n')
-        # model
-            the_file.write('model\n')
-            the_file.write('  id_model = \'SurrogateModel\'\n')
-            the_file.write('  surrogate global\n')
-            if(self.options["use_derivatives"]):
-                the_file.write("    use_derivatives\n")
-            the_file.write(f'    gaussian_process {self.options["implementation"]}\n')
-            the_file.write(f'    import_build_points \'{self.training_file}\'\n')
-            the_file.write('      freeform\n')
-            the_file.write('\n')
-        # process model keywords in options
-            the_file.write('    trend\n')
-            the_file.write(f'      {self.options["trend"]}\n')
-            # the_file.write(f'    optimization_method = \'{self.options["optimization_method"]}\'\n')
-            the_file.write('\n')
-            the_file.write('    export_model\n')
-            the_file.write(f'      filename_prefix = \'{self.surrogate_file}\'\n')
-            the_file.write(f'      formats\n')
-            the_file.write(f'        text_archive\n')
-            # the_file.write(f'    optimization_method = \'{self.options["optimization_method"]}\'\n')
-            the_file.write('\n')
-        # variables
-            the_file.write('variables\n')
-            the_file.write(f'  uniform_uncertain = {self.ndim}\n')
-            the_file.write('    lower_bounds    = ')
-            for i in range(self.ndim):
-                the_file.write(f' {self.xlimits[i][0]} ')
-            the_file.write('\n')
-            the_file.write('    upper_bounds    = ')
-            for i in range(self.ndim):
-                the_file.write(f' {self.xlimits[i][1]} ')
-            the_file.write('\n\n')
-        # responses
-            the_file.write('responses\n')
-            the_file.write('  response_functions = 1\n')
-            the_file.write('  analytic_gradients\n')
-            the_file.write('  no_hessians\n')
+        for file in [self.dakota_train_file, self.dakota_predict_file]:
+            with open(file, 'w') as the_file:
+                the_file.write('environment\n')
+                the_file.write('  method_pointer = \'EvalSurrogate\'\n')
+                the_file.write('  output_precision = 16\n')
+                the_file.write('  tabular_data\n')
+                the_file.write(f'    tabular_data_file = \'{self.output_file}\'\n')
+                the_file.write(f'      freeform\n')
+                the_file.write('\n')
+            # method
+                the_file.write('method\n')
+                the_file.write('  id_method = \'EvalSurrogate\'\n')
+                the_file.write('  model_pointer = \'SurrogateModel\'\n')
+                the_file.write('  list_parameter_study\n')
+                # if(file == self.dakota_train_file):
+                #     the_file.write(f'    list_of_points = ')
+                #     for i in range(self.ndim):
+                #         the_file.write(f' {self.xlimits[i][0]} ')
+                # else:
+                the_file.write(f'    import_points_file \'{self.eval_file}\'\n')
+                the_file.write('      freeform\n')
+                the_file.write('\n')
+            # model
+                the_file.write('model\n')
+                the_file.write('  id_model = \'SurrogateModel\'\n')
+                the_file.write('  surrogate global\n')
+                if(self.options["use_derivatives"]):
+                    the_file.write("    use_derivatives\n")
+                the_file.write(f'    gaussian_process {self.options["implementation"]}\n')
+                the_file.write(f'      import_build_points \'{self.training_file}\'\n')
+                the_file.write('        freeform\n')
+                the_file.write('\n')
+            # process model keywords in options
+                the_file.write('      trend\n')
+                the_file.write(f'        {self.options["trend"]}\n')
+                if(self.options["nugget"]):
+                    the_file.write('      nugget\n')
+                    the_file.write(f'        {self.options["nugget"]}\n')
+                the_file.write(f'      optimization_method = \'{self.options["optimization_method"]}\'\n')
+                the_file.write('\n')
+                if(file == self.dakota_train_file):
+                    the_file.write('      export_model\n')
+
+                else:
+                    the_file.write('      import_model\n')
+                the_file.write(f'        filename_prefix = \'{self.surrogate_file}\'\n')
+                if(file == self.dakota_train_file):
+                    the_file.write(f'        formats\n')
+                    the_file.write(f'          binary_archive\n')
+                else:                    
+                    the_file.write(f'      binary_archive\n')           
+                the_file.write('\n')
+            # variables
+                the_file.write('variables\n')
+                the_file.write(f'  uniform_uncertain = {self.ndim}\n')
+                the_file.write('    lower_bounds    = ')
+                for i in range(self.ndim):
+                    the_file.write(f' {self.xlimits[i][0]} ')
+                the_file.write('\n')
+                the_file.write('    upper_bounds    = ')
+                for i in range(self.ndim):
+                    the_file.write(f' {self.xlimits[i][1]} ')
+                the_file.write('\n')
+                the_file.write('    descriptors    = ')
+                for i in range(self.ndim):
+                    the_file.write(f' \'x{i}\' ')
+                the_file.write('\n\n')
+            # responses
+                the_file.write('responses\n')
+                the_file.write('  response_functions = 1\n')
+                the_file.write('    descriptors = \'fn\'\n')
+                the_file.write('  no_gradients\n')
+                the_file.write('  no_hessians\n')
+
 
     def _new_train(self):
         
@@ -150,6 +182,10 @@ class DakotaKriging(SurrogateModel):
                 the_file.write(f' {f[i][0]}')
                 the_file.write('\n')
 
+        command = f'dakota -input {self.dakota_train_file} -no_input_echo'
+        with open(self.stdout_train_file, "w") as file_out:
+            with open(self.stderr_train_file, "w") as error_out:
+                subprocess.call(command, shell=True, stdout=file_out, stderr=error_out)#, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True)
 
     def _train(self):
         """
@@ -181,9 +217,9 @@ class DakotaKriging(SurrogateModel):
                     the_file.write(f'{x[i][j]} ')
                 the_file.write('\n')
 
-        command = f'dakota -input {self.dakota_file} -no_input_echo'
-        with open(self.stdout_file, "w") as file_out:
-            with open(self.stderr_file, "w") as error_out:
+        command = f'dakota -input {self.dakota_predict_file} -no_input_echo'
+        with open(self.stdout_predict_file, "w") as file_out:
+            with open(self.stderr_predict_file, "w") as error_out:
                 subprocess.call(command, shell=True, stdout=file_out, stderr=error_out)#, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True)
 
 

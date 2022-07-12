@@ -24,7 +24,7 @@ corr  = "squar_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
 ncomp = dim
 extra = 2           #gek extra points
-nt0 = 16
+nt0 = 64
 ntr = 64
 batch = 16
 tval = 100.
@@ -102,6 +102,9 @@ for j in range(nruns):
 # DAKOTA GEK
 modeldk = DakotaKriging(xlimits=xlimits)
 modeldk.options.update({"trend":poly})
+modeldk.options.update({"optimization_method":"global"})
+modeldk.options.update({"print_prediction":False})
+#modeldk.options.update({"nugget":2e-14})
 modeldk.set_training_values(xtrainK[0], ftrainK[0])
 for i in range(dim):
     modeldk.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
@@ -123,7 +126,6 @@ mkrg = []
 errdgek = []
 mdgek = []
 for j in range(nruns):
-    modeldk = DakotaKriging(xlimits=xlimits)
     modeldk.set_training_values(xtrainK[j], ftrainK[j])
     for i in range(dim):
         modeldk.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
@@ -134,8 +136,8 @@ for j in range(nruns):
 
     modelkrg.set_training_values(xtrainK[j], ftrainK[j])
     modelkrg.train()
-    errkrg.append(rmse(modelkrg, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     mkrg.append(copy.deepcopy(modelkrg))
+    errkrg.append(rmse(modelkrg, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     print("KRG Done")
 
 print("Dakota Kriging")
@@ -159,117 +161,96 @@ plt.clf()
 
 
 
-# # # Plot points
-# if(dim == 1):  
+# # Plot points
+if(dim == 1):  
 
-#     ndir = 75
-#     xlimits = trueFunc.xlimits
-#     x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+    ndir = 75
+    xlimits = trueFunc.xlimits
+    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
 
-#     Zdkrg = np.zeros([ndir, ndir])
-#     Fdkrg = np.zeros([ndir, ndir])
-#     TF = np.zeros([ndir, ndir])
+    Zdkrg = np.zeros([ndir, ndir])
+    Fdkrg = np.zeros([ndir, ndir])
+    TF = np.zeros([ndir, ndir])
 
-#     for i in range(ndir):
-#         xi = np.zeros([1,1])
-#         xi[0] = x[i]
-#         TF[i] = trueFunc(xi)
-#         Fdkrg[i] = mdkrg[plot].value(xi)
-#         Zdkrg[i] = abs(Fdkrg[i] - TF[i])
+    for i in range(ndir):
+        xi = np.zeros([1,1])
+        xi[0] = x[i]
+        TF[i] = trueFunc(xi)
+        Fdkrg[i] = mdkrg[plot].value(xi)
+        Zdkrg[i] = abs(Fdkrg[i] - TF[i])
 
-#     # Plot Non-Adaptive Error
-#     plt.plot(x, TF, "-g")
-#     plt.plot(x, Fdkrg, "-c", label=f'Dakota Kriging')
-#     plt.xlabel(r"$x$")
-#     plt.ylabel(r"$f$")
-#     #plt.legend(loc=1)
-#     plt.plot(xtrainK[plot][:,0], ftrainK[plot][:], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+    # Plot Non-Adaptive Error
+    plt.plot(x, TF, "-g")
+    plt.plot(x, Fdkrg, "-c", label=f'Dakota Kriging')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$f$")
+    #plt.legend(loc=1)
+    plt.plot(xtrainK[plot][:,0], ftrainK[plot][:], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
 
-#     plt.savefig(f"./dkrg_1dplot.png", bbox_inches="tight")
-#     plt.clf()
+    plt.savefig(f"./dkrg_1dplot.png", bbox_inches="tight")
+    plt.clf()
 
-#     # Plot Non-Adaptive Error
-#     plt.plot(x, Zdkrg, "-c", label=f'Dakota Kriging')
+    # Plot Non-Adaptive Error
+    plt.plot(x, Zdkrg, "-c", label=f'Dakota Kriging')
 
-#     plt.xlabel(r"$x$")
-#     plt.ylabel(r"$err$")
-#     #plt.legend(loc=1)
-#     plt.plot(xtrainK[plot][:,0], np.zeros(xtrainK[plot].shape[0]), "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$err$")
+    #plt.legend(loc=1)
+    plt.plot(xtrainK[plot][:,0], np.zeros(xtrainK[plot].shape[0]), "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
 
-#     plt.savefig(f"./dkrg_1derr.png", bbox_inches="tight")
+    plt.savefig(f"./dkrg_1derr.png", bbox_inches="tight")
 
-#     plt.clf()
+    plt.clf()
 
-# # # Plot points
-# if(dim == 2):  
-#     # Plot Error Contour
-#     #Contour
-#     ndir = 75
-#     xlimits = trueFunc.xlimits
-#     x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
-#     y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
+# # Plot points
+if(dim == 2):  
+    # Plot Error Contour
+    #Contour
+    ndir = 75
+    xlimits = trueFunc.xlimits
+    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+    y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
 
-#     X, Y = np.meshgrid(x, y)
-#     Za = np.zeros([ndir, ndir])
-#     Va = np.zeros([ndir, ndir])
-#     V0 = np.zeros([ndir, ndir])
-#     Zgek = np.zeros([ndir, ndir])
-#     Zkpl = np.zeros([ndir, ndir])
-#     Zkrg = np.zeros([ndir, ndir])
-#     Zgrb = np.zeros([ndir, ndir])
-#     Vk = np.zeros([ndir, ndir])
-#     Z0 = np.zeros([ndir, ndir])
-#     F  = np.zeros([ndir, ndir])
-#     TF = np.zeros([ndir, ndir])
+    X, Y = np.meshgrid(x, y)
+    Za = np.zeros([ndir, ndir])
+    Va = np.zeros([ndir, ndir])
+    V0 = np.zeros([ndir, ndir])
+    Zgek = np.zeros([ndir, ndir])
+    Zkpl = np.zeros([ndir, ndir])
+    Zkrg = np.zeros([ndir, ndir])
+    Zdkrg = np.zeros([ndir, ndir])
+    Zgrb = np.zeros([ndir, ndir])
+    Vk = np.zeros([ndir, ndir])
+    Z0 = np.zeros([ndir, ndir])
+    F  = np.zeros([ndir, ndir])
+    TF = np.zeros([ndir, ndir])
 
-#     for i in range(ndir):
-#         for j in range(ndir):
-#             xi = np.zeros([1,2])
-#             xi[0,0] = x[i]
-#             xi[0,1] = y[j]
-#             TF[j,i] = trueFunc(xi)
-#             Zgek[j,i] = abs(mgek[plot].predict_values(xi) - TF[j,i])
-#             Zkpl[j,i] = abs(mkpl[plot].predict_values(xi) - TF[j,i])
-#             Zkrg[j,i] = abs(mkrg[plot].predict_values(xi) - TF[j,i])
-#             Zgrb[j,i] = abs(mgrb[plot].predict_values(xi) - TF[j,i])
-#     # Plot Non-Adaptive Error
-#     cs = plt.contour(X, Y, Zkpl, levels = 40)
-#     plt.colorbar(cs, aspect=20)
-#     plt.xlabel(r"$x_1$")
-#     plt.ylabel(r"$x_2$")
-#     #plt.legend(loc=1)
-#     plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
-#     plt.savefig(f"./kpl_errcona.png", bbox_inches="tight")
+    for i in range(ndir):
+        for j in range(ndir):
+            xi = np.zeros([1,2])
+            xi[0,0] = x[i]
+            xi[0,1] = y[j]
+            TF[j,i] = trueFunc(xi)
+            Zkrg[j,i] = abs(mkrg[plot].predict_values(xi) - TF[j,i])
+            Zdkrg[j,i] = abs(mdkrg[plot].predict_values(xi) - TF[j,i])
+    # Plot Non-Adaptive Error
+    cs = plt.contour(X, Y, Zkrg, levels = 40)
+    plt.colorbar(cs, )
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    #plt.legend(loc=1)
+    plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+    plt.savefig(f"./krg_errcona.png", bbox_inches="tight")
 
-#     plt.clf()
+    plt.clf()    
 
-#     plt.contour(X, Y, Zgek, levels = cs.levels)
-#     plt.colorbar(cs, )
-#     plt.xlabel(r"$x_1$")
-#     plt.ylabel(r"$x_2$")
-#     #plt.legend(loc=1)
-#     plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
-#     plt.savefig(f"./gek_errcona.png", bbox_inches="tight")
+    plt.contour(X, Y, Zdkrg, levels = cs.levels)
+    plt.colorbar(cs, )
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    #plt.legend(loc=1)
+    plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+    plt.savefig(f"./dkrg_errcona.png", bbox_inches="tight")
 
-#     plt.clf()
-
-#     plt.contour(X, Y, Zgrb, levels = cs.levels)
-#     plt.colorbar(cs, )
-#     plt.xlabel(r"$x_1$")
-#     plt.ylabel(r"$x_2$")
-#     #plt.legend(loc=1)
-#     plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
-#     plt.savefig(f"./grbf_errcona.png", bbox_inches="tight")
-
-#     plt.clf()    
-
-#     plt.contour(X, Y, Zkrg, levels = cs.levels)
-#     plt.colorbar(cs, )
-#     plt.xlabel(r"$x_1$")
-#     plt.ylabel(r"$x_2$")
-#     #plt.legend(loc=1)
-#     plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
-#     plt.savefig(f"./krg_errcona.png", bbox_inches="tight")
-
-#     plt.clf()
+    plt.clf()
 
