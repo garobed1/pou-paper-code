@@ -99,7 +99,7 @@ for j in range(nruns):
     for i in range(dim):
         gtrainK[j][:,i:i+1] = trueFunc(xtrainK[j],i)
 
-# DAKOTA GEK
+# DAKOTA KRG
 modeldk = DakotaKriging(xlimits=xlimits)
 modeldk.options.update({"trend":poly})
 modeldk.options.update({"optimization_method":"global"})
@@ -109,6 +109,19 @@ modeldk.set_training_values(xtrainK[0], ftrainK[0])
 for i in range(dim):
     modeldk.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
 modeldk.train()
+
+# DAKOTA GEK
+modeldgk = DakotaKriging(xlimits=xlimits)
+modeldgk.options.update({"trend":poly})
+modeldgk.options.update({"header":"py_dak_gek_"})
+modeldgk.options.update({"use_derivatives":True})
+modeldgk.options.update({"optimization_method":"global"})
+modeldgk.options.update({"print_prediction":False})
+#modeldgk.options.update({"nugget":2e-14})
+modeldgk.set_training_values(xtrainK[0], ftrainK[0])
+for i in range(dim):
+    modeldgk.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
+modeldgk.train()
 
 modelkrg = KRG()
 #modelkrg.options.update({"hyper_opt":"TNC"})
@@ -123,16 +136,22 @@ errdkg = []
 mdkrg = []
 errkrg = []
 mkrg = []
-errdgek = []
-mdgek = []
+errdgk = []
+mdgk = []
 for j in range(nruns):
     modeldk.set_training_values(xtrainK[j], ftrainK[j])
-    for i in range(dim):
-        modeldk.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
     modeldk.train()
     mdkrg.append(modeldk)
     errdkg.append(rmse(modeldk, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     print("Dakota Kriging Done")
+
+    modeldgk.set_training_values(xtrainK[j], ftrainK[j])
+    for i in range(dim):
+        modeldgk.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
+    modeldgk.train()
+    mdgk.append(modeldgk)
+    errdgk.append(rmse(modeldgk, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    print("Dakota GEK Done")
 
     modelkrg.set_training_values(xtrainK[j], ftrainK[j])
     modelkrg.train()

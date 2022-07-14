@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from error import rmse, meane
 from direct_gek import DGEK
 from grbf import GRBF
+from lsrbf import LSRBF
 from shock_problem import ImpingingShock
 from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, Peaks2D
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam, TensorProduct
@@ -36,8 +37,9 @@ ncomp = dim
 extra = 2           #gek extra points
 nt0 = 20
 ntr = 20
+ncent = 10
 batch = 5
-tval = 100.
+tval = 1.
 t0 = [1e-2]
 t0g = [tval]#[tval, tval]
 tb = [1e-6, 100]
@@ -87,6 +89,8 @@ else:
     raise ValueError("Given problem not valid.")
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m')
+csampling = LHS(xlimits=xlimits)
+centers = csampling(ncent)
 
 # Error
 xtest = None 
@@ -166,6 +170,19 @@ for j in range(nruns):
 # modeldge.train()
 # print(modeldge.predict_values(np.array([0])))
 
+# LSRBF
+modellrb = LSRBF()
+modellrb.options.update({"t0":t0g})
+modellrb.options.update({"corr":corr})
+modellrb.options.update({"basis_centers":centers})
+modellrb.options.update({"compute_theta":False})
+modellrb.options.update({"use_derivatives":False})
+modellrb.options.update({"print_prediction":False})
+modellrb.set_training_values(xtrainK[0], ftrainK[0])
+for i in range(dim):
+    modellrb.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
+modellrb.train()
+
 # GRBF
 modelgrb = GRBF()
 modelgrb.options.update({"t0":t0g})
@@ -218,11 +235,13 @@ modelkrg.options.update({"poly":poly})
 modelkrg.options.update({"n_start":5})
 modelkrg.options.update({"print_prediction":False})
 
+errlrb = []
 errgek = []
 errkpl = []
 errkrg = []
 errgrb = []
 errdge = []
+mlrb = []
 mgek = []
 mkpl = []
 mkrg = []
@@ -258,7 +277,11 @@ for j in range(nruns):
     errkrg.append(rmse(modelkrg, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     mkrg.append(copy.deepcopy(modelkrg))
     print("KRG Done")
-
+    modellrb.set_training_values(xtrainK[j], ftrainK[j])
+    modellrb.train()
+    mlrb.append(copy.deepcopy(modellrb))
+    errlrb.append(rmse(modellrb, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    print("LSRBF Done")
     # modeldge.set_training_values(xtrainK[j], ftrainK[j])
     # for i in range(dim):
     #     modeldge.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
@@ -283,6 +306,9 @@ print(errkrg)
 print(modelkrg.optimal_theta)
 print(errgrb)
 print(modelgrb.theta)
+print("LSRBF")
+print(errlrb)
+#import pdb; pdb.set_trace()
 # print(errdge)
 # print(modeldge.optimal_theta)
 

@@ -164,6 +164,9 @@ class DakotaKriging(SurrogateModel):
                 the_file.write('responses\n')
                 the_file.write('  response_functions = 1\n')
                 the_file.write('    descriptors = \'fn\'\n')
+                # if(self.options["use_derivatives"]):
+                #     the_file.write('  analytic_gradients\n')
+                # else:
                 the_file.write('  no_gradients\n')
                 the_file.write('  no_hessians\n')
 
@@ -181,6 +184,14 @@ class DakotaKriging(SurrogateModel):
                     the_file.write(f' {x[i][j]}')
                 the_file.write(f' {f[i][0]}')
                 the_file.write('\n')
+
+            # HOW TO DO THIS?
+            if(self.options["use_derivatives"]):
+                for i in range(npts):
+                    the_file.write(f'[')
+                    for j in range(self.ndim-1):
+                        the_file.write(f'{self.training_points[None][j+1][1][i][0]} ')
+                    the_file.write(f'{self.training_points[None][j+1][1][i][-1]}]\n')
 
         command = f'dakota -input {self.dakota_train_file} -no_input_echo'
         with open(self.stdout_train_file, "w") as file_out:
