@@ -26,24 +26,25 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "rosenbrock"    #problem
+prob  = "arctan"    #problem
 plot  = -1
 
 # Conditions
-dim = 2      #problem dimension
+dim = 1      #problem dimension
 corr  = "squar_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
 ncomp = dim
+tcomp = False
 extra = 2           #gek extra points
 nt0 = 5
-ntr = 25
-ncent = 10
+ntr = 30
+ncent = 10*dim
 batch = 5
-tval = 1.
-t0 = 1e-2
-t0g = tval#[tval, tval]
-tb = [1e-6, 100]
-tbg = [tval, tval]#[tval, tval]
+tval = 1e-2
+t0 = 20e-0
+t0g = [tval]#[tval, tval]
+tb = [1e-6, 20.]
+tbg = tb#[tval, tval]#[tval, tval]
 Nerr = 5000       #number of test points to evaluate the error
 dx = 1e-4
 nruns = int((ntr-nt0)/batch)+1
@@ -175,7 +176,7 @@ modellrb = LSRBF()
 modellrb.options.update({"t0":t0})
 modellrb.options.update({"corr":corr})
 modellrb.options.update({"basis_centers":centers})
-modellrb.options.update({"compute_theta":False})
+modellrb.options.update({"compute_theta":tcomp})
 modellrb.options.update({"use_derivatives":False})
 modellrb.options.update({"print_prediction":False})
 modellrb.set_training_values(xtrainK[0], ftrainK[0])
@@ -183,17 +184,18 @@ for i in range(dim):
     modellrb.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
 modellrb.train()
 
-# GRBF
-modelgrb = GRBF()
-modelgrb.options.update({"t0":t0g})
-modelgrb.options.update({"corr":corr})
-modelgrb.options.update({"poly":poly})
-modelgrb.options.update({"compute_theta":False})
-modelgrb.options.update({"print_prediction":False})
-modelgrb.set_training_values(xtrainK[0], ftrainK[0])
+# LSRBF G
+modellgb = LSRBF()
+modellgb.options.update({"t0":t0})
+modellgb.options.update({"corr":corr})
+modellgb.options.update({"basis_centers":centers})
+modellgb.options.update({"compute_theta":tcomp})
+modellgb.options.update({"use_derivatives":True})
+modellgb.options.update({"print_prediction":False})
+modellgb.set_training_values(xtrainK[0], ftrainK[0])
 for i in range(dim):
-    modelgrb.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
-modelgrb.train()
+    modellgb.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
+modellgb.train()
 
 if(dim > 1):
     modelgek = GEKPLS(xlimits=xlimits)
@@ -218,7 +220,7 @@ else:
 
 modelkpl = KPLS()
 #modelkpl.options.update({"hyper_opt":"TNC"})
-modelkpl.options.update({"theta0":t0})
+modelkpl.options.update({"theta0":[t0]})
 modelkpl.options.update({"theta_bounds":tb})
 modelkpl.options.update({"n_comp":ncomp})
 modelkpl.options.update({"corr":corr})
@@ -228,7 +230,7 @@ modelkpl.options.update({"print_prediction":False})
 
 modelkrg = KRG()
 #modelkrg.options.update({"hyper_opt":"TNC"})
-modelkrg.options.update({"theta0":t0})
+modelkrg.options.update({"theta0":[t0]})
 modelkrg.options.update({"theta_bounds":tb})
 modelkrg.options.update({"corr":corr})
 modelkrg.options.update({"poly":poly})
@@ -236,16 +238,16 @@ modelkrg.options.update({"n_start":5})
 modelkrg.options.update({"print_prediction":False})
 
 errlrb = []
+errlgb = []
 errgek = []
 errkpl = []
 errkrg = []
 errgrb = []
-errdge = []
 mlrb = []
+mlgb = []
 mgek = []
 mkpl = []
 mkrg = []
-mgrb = []
 mdge = []
 for j in range(nruns):
     if(dim > 1):
@@ -277,37 +279,47 @@ for j in range(nruns):
     errkrg.append(rmse(modelkrg, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     mkrg.append(copy.deepcopy(modelkrg))
     print("KRG Done")
+
+    #LSRBF
+    ncent = int(xtrainK[j].shape[0]/2)
+    centers = csampling(ncent)
+    modellrb.options.update({"basis_centers":centers})
     modellrb.set_training_values(xtrainK[j], ftrainK[j])
     modellrb.train()
     mlrb.append(copy.deepcopy(modellrb))
     errlrb.append(rmse(modellrb, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     print("LSRBF Done")
-    # modeldge.set_training_values(xtrainK[j], ftrainK[j])
-    # for i in range(dim):
-    #     modeldge.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
-    # modeldge.train()
-    # errdge.append(rmse(modeldge, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-    # mdge.append(copy.deepcopy(modeldge))
-    # print("DGEK Done")
-
-    modelgrb.set_training_values(xtrainK[j], ftrainK[j])
+    
+    ncent = int(xtrainK[j].shape[0]/2) + int(dim*xtrainK[j].shape[0]/2)
+    centers = csampling(ncent)
+    modellgb.options.update({"basis_centers":centers})
+    modellgb.set_training_values(xtrainK[j], ftrainK[j])
     for i in range(dim):
-        modelgrb.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
-    modelgrb.train()
-    errgrb.append(rmse(modelgrb, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-    mgrb.append(copy.deepcopy(modelgrb))
-    print("GRBF Done")
+        modellgb.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
+    modellgb.train()
+    mlgb.append(copy.deepcopy(modellgb))
+    errlgb.append(rmse(modellgb, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    print("LSRBF G Done")
 
+    
+
+
+print("GEK")
 print(errgek)
 print(modelgek.optimal_theta)
+print("KPL")
 print(errkpl)
 print(modelkpl.optimal_theta)
+print("KRG")
 print(errkrg)
 print(modelkrg.optimal_theta)
-print(errgrb)
-print(modelgrb.theta)
 print("LSRBF")
 print(errlrb)
+print(modellrb.theta)
+print("LSRBF G")
+print(errlgb)
+print(modellgb.theta)
+
 #import pdb; pdb.set_trace()
 # print(errdge)
 # print(modeldge.optimal_theta)
@@ -316,12 +328,12 @@ plt.loglog(nt, errgek, "k-", label=f'GEK')
 plt.loglog(nt, errkpl, 'b-', label='KPL')
 plt.loglog(nt, errkrg, 'r-', label='KRG')
 plt.loglog(nt, errlrb, 'm-', label='LSRBF (no g)')
-# plt.loglog(nt, errgrb, 'c-', label='GRBF')
+plt.loglog(nt, errlgb, 'c-', label='LSRBF (g)')
 plt.xlabel("Number of samples")
 plt.ylabel("NRMSE")
 plt.grid()
 plt.legend(loc=1)
-plt.savefig(f"./grbf_test_err.png", bbox_inches="tight")
+plt.savefig(f"./lsrbf_test_err.png", bbox_inches="tight")
 plt.clf()
 
 
@@ -336,12 +348,12 @@ if(dim == 1):
     Zkpl = np.zeros([ndir, ndir])
     Zkrg = np.zeros([ndir, ndir])
     Zlrb = np.zeros([ndir, ndir])
-    Zgrb = np.zeros([ndir, ndir])
+    Zlgb = np.zeros([ndir, ndir])
     Fgek = np.zeros([ndir, ndir])
     Fkpl = np.zeros([ndir, ndir])
     Fkrg = np.zeros([ndir, ndir])
     Flrb = np.zeros([ndir, ndir])
-    Fgrb = np.zeros([ndir, ndir])
+    Flgb = np.zeros([ndir, ndir])
     TF = np.zeros([ndir, ndir])
 
     for i in range(ndir):
@@ -351,14 +363,13 @@ if(dim == 1):
         Fgek[i] = mgek[plot].predict_values(xi)
         Fkpl[i] = mkpl[plot].predict_values(xi)
         Fkrg[i] = mkrg[plot].predict_values(xi)
-        # Fdge[i] = mdge[plot].predict_values(xi)
         Flrb[i] = mlrb[plot].predict_values(xi)
-        Fgrb[i] = mgrb[plot].predict_values(xi)
+        Flgb[i] = mlgb[plot].predict_values(xi)
         Zgek[i] = abs(Fgek[i] - TF[i])
         Zkpl[i] = abs(Fkpl[i] - TF[i])
         Zkrg[i] = abs(Fkrg[i] - TF[i])
         Zlrb[i] = abs(Flrb[i] - TF[i])
-        Zgrb[i] = abs(Fgrb[i] - TF[i])
+        Zlgb[i] = abs(Flgb[i] - TF[i])
 
     # Plot Non-Adaptive Error
     plt.plot(x, TF, "-g")
@@ -366,13 +377,13 @@ if(dim == 1):
     plt.plot(x, Fkpl, "-b", label=f'KPL')
     plt.plot(x, Fkrg, "-r", label=f'KRG')
     plt.plot(x, Flrb, "-m", label=f'LSRBF (no g)')
-    plt.plot(x, Fgrb, "-c", label=f'GRBF')
+    plt.plot(x, Flgb, "-c", label=f'LSRBF (g)')
     plt.xlabel(r"$x$")
     plt.ylabel(r"$f$")
     #plt.legend(loc=1)
     plt.plot(xtrainK[plot][:,0], ftrainK[plot][:], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
 
-    plt.savefig(f"./grbf_1dplot.png", bbox_inches="tight")
+    plt.savefig(f"./lsrbf_1dplot.png", bbox_inches="tight")
     plt.clf()
 
     # Plot Non-Adaptive Error
@@ -380,14 +391,14 @@ if(dim == 1):
     plt.plot(x, Zkpl, "-b", label=f'KPL')
     plt.plot(x, Zkrg, "-r", label=f'KRG')
     plt.plot(x, Zlrb, "-m", label=f'LSRBF (no g)')
-    plt.plot(x, Zgrb, "-c", label=f'GRBF')
+    plt.plot(x, Zlgb, "-c", label=f'LSRBF (g)')
 
     plt.xlabel(r"$x$")
     plt.ylabel(r"$err$")
     #plt.legend(loc=1)
     plt.plot(xtrainK[plot][:,0], np.zeros(xtrainK[plot].shape[0]), "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
 
-    plt.savefig(f"./grbf_1derr.png", bbox_inches="tight")
+    plt.savefig(f"./lsrbf_1derr.png", bbox_inches="tight")
 
     plt.clf()
 
@@ -408,7 +419,7 @@ if(dim == 2):
     Zkpl = np.zeros([ndir, ndir])
     Zkrg = np.zeros([ndir, ndir])
     Zlrb = np.zeros([ndir, ndir])
-    Zgrb = np.zeros([ndir, ndir])
+    Zlgb = np.zeros([ndir, ndir])
     Vk = np.zeros([ndir, ndir])
     Z0 = np.zeros([ndir, ndir])
     F  = np.zeros([ndir, ndir])
@@ -424,7 +435,8 @@ if(dim == 2):
             Zkpl[j,i] = abs(mkpl[plot].predict_values(xi) - TF[j,i])
             Zkrg[j,i] = abs(mkrg[plot].predict_values(xi) - TF[j,i])
             Zlrb[j,i] = abs(mlrb[plot].predict_values(xi) - TF[j,i])
-            Zgrb[j,i] = abs(mgrb[plot].predict_values(xi) - TF[j,i])
+            Zlgb[j,i] = abs(mlgb[plot].predict_values(xi) - TF[j,i])
+
     # Plot Non-Adaptive Error
     cs = plt.contour(X, Y, Zkpl, levels = 40)
     plt.colorbar(cs, aspect=20)
@@ -437,7 +449,7 @@ if(dim == 2):
     plt.clf()
 
     plt.contour(X, Y, Zgek, levels = cs.levels)
-    plt.colorbar(cs, )
+    plt.colorbar(cs)
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
@@ -447,7 +459,7 @@ if(dim == 2):
     plt.clf()
 
     plt.contour(X, Y, Zlrb, levels = cs.levels)
-    plt.colorbar(cs, )
+    plt.colorbar(cs)
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
@@ -456,18 +468,19 @@ if(dim == 2):
 
     plt.clf()  
 
-    plt.contour(X, Y, Zgrb, levels = cs.levels)
-    plt.colorbar(cs, )
+    plt.contour(X, Y, Zlgb, levels = cs.levels)
+    plt.colorbar(cs)
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
     plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
-    plt.savefig(f"./grbf_errcona.png", bbox_inches="tight")
+    plt.savefig(f"./lsrbfg_errcona.png", bbox_inches="tight")
 
-    plt.clf()    
+    plt.clf()  
+
 
     plt.contour(X, Y, Zkrg, levels = cs.levels)
-    plt.colorbar(cs, )
+    plt.colorbar(cs)
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
