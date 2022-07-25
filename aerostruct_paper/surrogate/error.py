@@ -47,7 +47,7 @@ def rmse(model, prob, N=5000, xdata=None, fdata=None):
     return err
 
 
-def meane(model, prob, N=5000, xdata=None, fdata=None):
+def meane(model, prob, N=5000, xdata=None, fdata=None, return_benchmark=False):
     """
     Compute the error of the mean value of the function.
     
@@ -76,15 +76,21 @@ def meane(model, prob, N=5000, xdata=None, fdata=None):
     else:
         tf = prob(tx)
 
+    # get benchmark values for mean and stdev
+    tmean = sum(tf)/N
+    tstdev = np.sqrt((sum(tf*tf)/N) - (sum(tf)/N)**2)
+
+    if(return_benchmark):
+        return tmean, tstdev
+
     # compute error of mean
     vals = model.predict_values(tx)
-    tmean = sum(tf)/N
     mmean = sum(vals)/N
-    tstdev = np.sqrt((sum(tf*tf)/N) - (sum(tf)/N)**2)
     mstdev = np.sqrt((sum(vals*vals)/N) - (sum(vals)/N)**2)
 
     serr = abs(tstdev - mstdev)
     merr = abs(tmean - mmean)
+
     # scale
     #err /= abs(tmean)
     

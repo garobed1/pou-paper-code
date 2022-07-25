@@ -26,22 +26,22 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "arctan"    #problem
+prob  = "branin"    #problem
 plot  = -1
 
 # Conditions
-dim = 1      #problem dimension
+dim = 2      #problem dimension
 corr  = "squar_exp" #kriging correlation
 poly  = "linear"    #kriging regression 
 ncomp = dim
 tcomp = False
 extra = 2           #gek extra points
-nt0 = 5
-ntr = 30
+nt0 = 10*dim
+ntr = 50*dim
 ncent = 10*dim
-batch = 5
+batch = 10
 tval = 1e-2
-t0 = 20e-0
+t0 = [4e-1, 3e-3]
 t0g = [tval]#[tval, tval]
 tb = [1e-6, 20.]
 tbg = tb#[tval, tval]#[tval, tval]
@@ -114,62 +114,6 @@ for j in range(nruns):
     for i in range(dim):
         gtrainK[j][:,i:i+1] = trueFunc(xtrainK[j],i)
 
-# add edge points
-# nc = 2
-# xc = np.zeros([nc, dim])
-# xc[0] = np.array([xlimits[0,0]])
-# xc[1] = np.array([xlimits[0,1]])
-# fc = trueFunc(xc)
-# gc = np.zeros([nc, dim])
-# for i in range(dim):
-#     gc[:,i:i+1] = trueFunc(xc,i)
-# for j in range(nruns):
-#     xtrainK[j] = np.append(xtrainK[j], xc, axis=0)
-#     ftrainK[j] = np.append(ftrainK[j], fc, axis=0)
-#     gtrainK[j] = np.append(gtrainK[j], gc, axis=0)
-
-# add corner points
-# nc = 2**dim
-# xc = np.zeros([nc, dim])
-# xc[0] = np.array([xlimits[0,0], xlimits[1,0]])
-# xc[1] = np.array([xlimits[0,0], xlimits[1,1]])
-# xc[2] = np.array([xlimits[0,1], xlimits[1,0]])
-# xc[3] = np.array([xlimits[0,1], xlimits[1,1]])
-# fc = trueFunc(xc)
-# gc = np.zeros([nc, dim])
-# for i in range(dim):
-#     gc[:,i:i+1] = trueFunc(xc,i)
-# xtrainK = np.append(xtrainK, xc, axis=0)
-# ftrainK = np.append(ftrainK, fc, axis=0)
-# gtrainK = np.append(gtrainK, gc, axis=0)
-
-
-### FD CHECK
-# h = 1e-6
-# zero = 0.5*np.ones([1,2])
-# step = 0.5*np.ones([1,2])
-# step[0,0] += h
-# ad1 = trueFunc(zero,0)
-# fd1 = (trueFunc(step) - trueFunc(zero))/h
-# step = 0.5*np.ones([1,2])
-# step[0,1] += h
-# ad2 = trueFunc(zero,1)
-# fd2 = (trueFunc(step) - trueFunc(zero))/h
-# import pdb; pdb.set_trace()
-
-# # DGEK
-# modeldge = DGEK(xlimits=xlimits)
-# modeldge.options.update({"theta0":t0g})
-# modeldge.options.update({"theta_bounds":tbg})
-# modeldge.options.update({"corr":corr})
-# modeldge.options.update({"poly":poly})
-# modeldge.options.update({"n_start":5})
-# modeldge.options.update({"print_prediction":False})
-# modeldge.set_training_values(xtrainK[0], ftrainK[0])
-# for i in range(dim):
-#     modeldge.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
-# modeldge.train()
-# print(modeldge.predict_values(np.array([0])))
 
 # LSRBF
 modellrb = LSRBF()
@@ -220,7 +164,7 @@ else:
 
 modelkpl = KPLS()
 #modelkpl.options.update({"hyper_opt":"TNC"})
-modelkpl.options.update({"theta0":[t0]})
+#modelkpl.options.update({"theta0":[t0]})
 modelkpl.options.update({"theta_bounds":tb})
 modelkpl.options.update({"n_comp":ncomp})
 modelkpl.options.update({"corr":corr})
@@ -230,7 +174,7 @@ modelkpl.options.update({"print_prediction":False})
 
 modelkrg = KRG()
 #modelkrg.options.update({"hyper_opt":"TNC"})
-modelkrg.options.update({"theta0":[t0]})
+#modelkrg.options.update({"theta0":[t0]})
 modelkrg.options.update({"theta_bounds":tb})
 modelkrg.options.update({"corr":corr})
 modelkrg.options.update({"poly":poly})
@@ -281,7 +225,7 @@ for j in range(nruns):
     print("KRG Done")
 
     #LSRBF
-    ncent = int(xtrainK[j].shape[0]/2)
+    ncent = nt[j]-1#int(xtrainK[j].shape[0]/2)
     centers = csampling(ncent)
     modellrb.options.update({"basis_centers":centers})
     modellrb.set_training_values(xtrainK[j], ftrainK[j])
@@ -290,7 +234,7 @@ for j in range(nruns):
     errlrb.append(rmse(modellrb, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     print("LSRBF Done")
     
-    ncent = int(xtrainK[j].shape[0]/2) + int(dim*xtrainK[j].shape[0]/2)
+    ncent = nt[j] + dim*nt[j] - 1#int(xtrainK[j].shape[0]/2) + int(dim*xtrainK[j].shape[0]/2)
     centers = csampling(ncent)
     modellgb.options.update({"basis_centers":centers})
     modellgb.set_training_values(xtrainK[j], ftrainK[j])

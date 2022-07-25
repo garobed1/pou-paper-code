@@ -1,6 +1,7 @@
 """
-Implementation of direct Gradient-Enhanced RBF with squar_exp in the SMT package
+Implementation of a (gradient-enhanced) RBF method with a finite number of shifted basis centers, coefficients solved in a least-squares sense
 """
+from re import L
 import numpy as np
 from scipy import linalg
 
@@ -22,22 +23,24 @@ from smt.utils.kriging_utils import (
     compute_n_param,
 )
 from sutils import getDirectCovariance
+from scipy.spatial.distance import pdist, squareform
 from scipy.stats import multivariate_normal as m_norm
 from smt.sampling_methods import LHS
+from optimizers import optimize
 
-class GRBF(SurrogateModel):
+
+class LSRBF(SurrogateModel):
 
     _regression_types = {"constant": constant, "linear": linear, "quadratic": quadratic}
 
     _basis_types = {
-        "squar_exp": squar_exp,
-        "matern32": matern32
+        "squar_exp": squar_exp
     }
 
-    name = "GRBF"
+    name = "LSRBF"
 
     def _initialize(self):
-        super(GRBF, self)._initialize()
+        super(LSRBF, self)._initialize()
         declare = self.options.declare
         declare(
             "t0",
@@ -46,17 +49,22 @@ class GRBF(SurrogateModel):
             desc="basis function scaling parameter in exp(-d^2 * t0), t0 = 1/d0**2",
         )
         declare(
+            "theta_bounds",
+            [1e-6, 2e1],
+            types=(list, np.ndarray),
+            desc="bounds for hyperparameters",
+        )
+        declare(
             "compute_theta",
             False,
             types=(bool),
             desc="choose to compute adaptive theta depending on average distances"
         )
         declare(
-            "poly",
-            "constant",
-            values=("constant", "linear", "quadratic"),
-            desc="Regression function type",
-            types=(str),
+            "basis_centers",
+            2,
+            types=(int, np.ndarray),
+            desc="independent radial basis functions to use. if int, generate random centers"
         )
         declare(
             "corr",
@@ -66,6 +74,12 @@ class GRBF(SurrogateModel):
             ),
             desc="Basis function type",
             types=(str),
+        )
+        declare(
+            "use_derivatives",
+            False,
+            types=(bool),
+            desc="use gradient information in the least-squares problem"
         )
 
 
@@ -82,15 +96,19 @@ class GRBF(SurrogateModel):
         if isinstance(options["t0"], (int, float)):
             options["t0"] = [options["t0"]] * nx
         options["t0"] = np.array(np.atleast_1d(options["t0"]), dtype=float)
-
         num = {}
         # number of inputs and outputs
         num["x"] = self.training_points[None][0][0].shape[1]
         num["y"] = self.training_points[None][0][1].shape[1]
 
-
-        self.num = num
         self.par = {}
+        self.num = num
+
+        #TODO: Random basis not implemented
+        if(isinstance(self.options["basis_centers"], int)):
+            return 1 #Do nothing for now
+        else:
+            self.xc = self.options["basis_centers"]
 
 
 
@@ -100,7 +118,10 @@ class GRBF(SurrogateModel):
 
         xt = self.training_points[None][0][0]
         yt = self.training_points[None][0][1]
+        
         self.nt = xt.shape[0]
+        self.nc = self.xc.shape[0]
+        ndim = self.num["x"]
 
         # Center and scale X and y
         (
@@ -112,96 +133,46 @@ class GRBF(SurrogateModel):
             self.y_std,
         ) = standardization(xt, yt)
 
-        # Calculate matrix of distances D between samples
-        D, self.ij = cross_distances(self.X_norma)
-        self.D = self._componentwise_distance(D)
+        # scale the centers as well
+        self.Xc_norma = (self.xc - self.X_offset)/self.X_scale
 
+        # Calculate matrix of distances D between samples and centers
+        D, self.ij = cross_distances(self.X_norma, self.Xc_norma)
+        self.D = self._componentwise_distance(D)
+    
         if np.min(np.sum(np.abs(self.D), axis=1)) == 0.0:
             print(
                 "Warning: multiple x input features have the same value (at least same row twice)."
             )
         ####
 
-        # Regression matrix and parameters
-        self.F = self._regression_types[self.options["poly"]](self.X_norma)
-        n_samples_F = self.F.shape[0]
-        if self.F.ndim > 1:
-            p = self.F.shape[1]
-        else:
-            p = 1
-        self._check_F(n_samples_F, p)
-
         # Determine theta, either by fixed values, or adaptively depending on average distance
+        self.theta = np.zeros(ndim)
         if self.options["compute_theta"]:
-            l_adapt = np.mean(self.D, axis=0)
-            t_adapt = 1./(l_adapt**2)
-            self.theta = t_adapt
-            import pdb; pdb.set_trace()
+            #l_adapt = np.min(self.D, axis=0)
+            # for j in range(ndim):
+            #     Ds = squareform(pdist(np.array([self.X_norma[:,j]]).T))
+            #     ind = np.argsort(Ds, axis=1)
+            #     l_adapt = 0
+            #     for i in range(self.nt):
+            #         l_adapt += Ds[i,ind[i,1]]/self.nt
+            #     t_adapt = 1./(2*(l_adapt**2))
+            #     self.theta[j] = 10*t_adapt/(10**ndim)
+
+            # Rippa's method
+            args = (D.copy(), True)
+            opt = optimize(self.looEstimate, args, bounds=[self.options["theta_bounds"]]*ndim, x0=self.options["t0"], type='local')
+            self.theta = opt["x"]
         else:
             self.theta = self.options["t0"]
 
-        # jac = np.empty(num["radial"] * num["dof"])
-        # #self.rbfc.compute_jac(num["radial"], xt.flatten(), jac)
-        # jac = jac.reshape((num["radial"], num["dof"]))
+        # get coefficients
+        sol = self.looEstimate(self.theta, D)
 
-        # Compute the GRBF covariance matrix
-        dx = differences(self.X_norma, self.X_norma)
-        dxx, ij = cross_distances(self.X_norma)
-        dd = self._componentwise_distance(
-            dxx, theta=self.theta, return_derivative=True
-        )
-        dx = self.D
-        dd = D.copy()
-        for j in range(dd.shape[1]):
-            dd[:,j] *= 2*self.theta[j]
+        self.par["gamma"] = sol[0][0:-1]
+        self.par["mean"] = sol[0][-1]
 
-        derivative_dic = {"dx": dx, "dd": dd}
-        hess_dic = {"dx": dx, "dd": dd}
-        r, dr = self._basis_types[self.options["corr"]](self.theta, self.D, derivative_params=derivative_dic)
-        d2r = self._basis_types[self.options["corr"]](self.theta, self.D, hess_params=hess_dic)
-
-        # get the covariance matrix and its inverse
-        P, Pg, S = getDirectCovariance(r, dr, d2r, self.theta, self.nt, self.ij)
-        
-        # invert R (Lockwood and Anitescu 2012)
-        #defs
-        Pinv = linalg.inv(P)
-        PgPinv = np.dot(Pg, Pinv)
-        PPginv = PgPinv.T
-        M = S - np.dot(PgPinv, Pg.T)
-        Minv = linalg.inv(M)
-
-        full_size = self.nt + self.nt*dd.shape[1]
-        Rinv = np.zeros([full_size, full_size])
-        Rinv[0:self.nt, 0:self.nt] = Pinv + np.dot(np.dot(PPginv, Minv), PgPinv)
-        Rinv[0:self.nt, self.nt:] = -np.dot(PPginv, Minv)
-        Rinv[self.nt:, 0:self.nt] = -np.dot(Minv, PgPinv)
-        Rinv[self.nt:, self.nt:] = Minv
-        R = np.zeros([full_size, full_size])
-        R[0:self.nt, 0:self.nt] = P
-        R[0:self.nt, self.nt:] = Pg.T
-        R[self.nt:, 0:self.nt] = Pg
-        R[self.nt:, self.nt:] = S
-        # Right hand side  
-        # augmented y vector w/ gradients
-        Ya = self.y_norma.copy()
-        for i in range(self.nt):
-            for j in range(dd.shape[1]):
-                Ya = np.append(Ya, -self.training_points[None][j+1][1][i]*(self.X_scale[j]/self.y_std))      
-        
-        # augmented regression matrix
-        Fa = self.F.copy()
-        for i in range(self.nt):
-            Fa = np.append(Fa, np.zeros([dd.shape[1], Fa.shape[1]]), axis=0)
-        
-        # solve the least squares problem
-        beta = linalg.lstsq(Fa, Ya)[0]
-        self.par["beta"] = beta
-
-        rhs = Ya - np.dot(Fa, beta)
         #import pdb; pdb.set_trace()
-
-        self.par["gamma"] = np.dot(Rinv, rhs)
 
     def _train(self):
         """
@@ -237,11 +208,13 @@ class GRBF(SurrogateModel):
         """
         # Initialization
         n_eval, n_features_x = x.shape
-        full_size = n_eval + n_eval*n_features_x
+        full_size = n_eval
+        if(self.options["use_derivatives"]):
+            full_size += n_eval*n_features_x
 
         X_cont = (x - self.X_offset) / self.X_scale
         # Get pairwise componentwise L1-distances to the input training set
-        dx = differences(X_cont, Y=self.X_norma.copy())
+        dx = differences(X_cont, Y=self.Xc_norma.copy())
         d = self._componentwise_distance(dx)
         dd = dx.copy()
         for j in range(dd.shape[1]):
@@ -249,24 +222,21 @@ class GRBF(SurrogateModel):
         derivative_dic = {"dx": dx, "dd": dd}
 
         # Compute the correlation function
-        r = self._basis_types[self.options["corr"]](self.theta, d
-        ).reshape(n_eval, self.nt)
-        dum, dr = self._basis_types[self.options["corr"]](self.theta, d, derivative_params=derivative_dic)
-        dr = dr.reshape(n_eval, self.nt*n_features_x)
-        ra = np.zeros([n_eval, self.nt + self.nt*n_features_x])
-        #import pdb; pdb.set_trace()
-        for i in range(n_eval):
-            ra[i] = np.append(r[i], dr[i,:])
+        r, dr = self._basis_types[self.options["corr"]](self.theta, d, derivative_params=derivative_dic)
+        r = r.reshape(n_eval, self.nc)
+        dr = dr.reshape(n_eval, self.nc*n_features_x)
         #import pdb; pdb.set_trace()
 
-        y = np.zeros(full_size)
-        ya = self.y_norma.copy()
-        for i in range(self.nt):
-            for j in range(n_features_x):
-                ya = np.append(ya, self.training_points[None][j+1][1][i]*(self.X_scale[j]/self.y_std))
+        ra = r
+        # if(self.options["use_derivatives"]):
+        #     #import pdb; pdb.set_trace()
+        #     ra = np.zeros([n_eval,self.nc + self.nc*n_features_x])
+        #     for i in range(n_eval):
+        #         ra[i,:] = np.append(r[i], dr[i,:])
+
         
         # Compute the regression function
-        f = self._regression_types[self.options["poly"]](X_cont)
+        f = self.par["mean"]*np.ones(n_eval)
         # fa = np.zeros([n_eval, self.nt + self.nt*n_features_x])
         # import pdb; pdb.set_trace()
         # for i in range(n_eval):
@@ -274,9 +244,10 @@ class GRBF(SurrogateModel):
         # Scaled predictor
 
         #import pdb; pdb.set_trace()
-        y_ = np.dot(f, self.par["beta"]) + np.dot(ra, self.par["gamma"])
+        y_ = f + np.dot(ra, self.par["gamma"])
         #y_ = np.dot(np.dot(ra, self.optimal_par["gamma"]), (ya - np.dot(f, self.optimal_par["beta"])))
         # Predictor
+
         y = (self.y_mean + self.y_std * y_).ravel()
         return y[0:n_eval]
 
@@ -340,23 +311,75 @@ class GRBF(SurrogateModel):
         )
         return y
 
-    def _check_F(self, n_samples_F, p):
-        """
-        This function check the F-parameters of the model.
-        """
 
-        if n_samples_F != self.nt:
-            raise Exception(
-                "Number of rows in F and X do not match. Most "
-                "likely something is going wrong with the "
-                "regression model."
-            )
-        if p > n_samples_F:
-            raise Exception(
-                (
-                    "Ordinary least squares problem is undetermined "
-                    "n_samples=%d must be greater than the "
-                    "regression model size p=%d."
-                )
-                % (self.nt, p)
-            )
+
+    '''
+    Objective function for RBF parameter tuning
+
+    min e_{loo} w.r.t. theta
+
+    e_{loo} \approx (ya^T R^-T R^-1 ya)/(N diag(R^-T R^-1))
+
+    '''
+    def looEstimate(self, theta, D, opt=False):
+
+        # import pdb; pdb.set_trace()
+        dx = 0
+        #dd, ij = cross_distances(self.X_norma)
+        dd = D.copy()
+        ndim = dd.shape[1]
+        for j in range(ndim):
+            dd[:,j] *= 2*theta[j]
+
+        derivative_dic = {"dx": dx, "dd": dd}
+        hess_dic = {"dx": dx, "dd": dd}
+        r, dr = self._basis_types[self.options["corr"]](theta, self.D, derivative_params=derivative_dic)
+        #d2r = self._basis_types[self.options["corr"]](self.theta, self.D, hess_params=hess_dic)
+
+        # get the covariance matrix
+        ntot = r.shape[0]
+        full_size = self.nt
+        if(self.options["use_derivatives"]):
+            full_size += ndim*self.nt
+
+        A = np.zeros([full_size, self.nc+1])
+        b = np.zeros(full_size)
+        for k in range(ntot):
+            A[self.ij[k][0],self.ij[k][1]] = r[k]
+
+            if(self.options["use_derivatives"]):
+                # now the derivatives 
+                for j in range(ndim):
+                    A[(j+1)*self.nt + self.ij[k][0],self.ij[k][1]] = dr[k,j]
+            
+
+            
+        for i in range(self.nt):
+            A[i,-1] = 1
+            b[i] = self.y_norma[i]
+
+            if(self.options["use_derivatives"]):
+                # now the derivatives
+                for j in range(ndim):
+                    b[(j+1)*self.nt+i] = self.training_points[None][j+1][1][i]*self.X_scale[j]/self.y_std
+
+        #linalg.lstsq(A, b)
+        #print("cond = ", np.linalg.cond(A))
+        # if(self.options["use_derivatives"]):
+        #     import pdb; pdb.set_trace()
+        sol = linalg.lstsq(A, b)
+
+        cond = np.linalg.cond(A)
+        if(self.options["use_derivatives"]):
+            print("grad cond = ", cond)
+        else:
+            print("no g cond = ", cond)
+
+
+        # import pdb; pdb.set_trace()
+        if(opt == True):
+            Ainv2 = linalg.inv(np.dot(A.T, A))
+            eloo = np.dot(sol[0], sol[0])/(self.nt*np.diag(Ainv2))
+            return np.sum(np.abs(eloo))
+        else:
+            return sol

@@ -32,11 +32,11 @@ class DGEK(KrgBased):
     def _initialize(self):
         super(DGEK, self)._initialize()
         declare = self.options.declare
-        # DGEK used only with "abs_exp" and "squar_exp" correlations
+
         declare(
             "corr",
             "squar_exp",
-            values=("abs_exp", "squar_exp"),
+            values=("abs_exp", "squar_exp", "matern32"),
             desc="Correlation function type",
             types=(str),
         )
@@ -59,15 +59,7 @@ class DGEK(KrgBased):
 
     # No PLS used here
     def _compute_pls(self, X, y):
-
-        # npts = X.shape[0]
-        # ndim = X.shape[1]
-
-        # # append gradients to the y vector
-        # for i in range(ndim):
-        #     y = np.append(y, self.training_points[None][i+1][1], axis=0)
-        #     X = np.append(X, X, axis=0) #necessary?
-        
+   
 
         return X, y
 
@@ -108,8 +100,8 @@ class DGEK(KrgBased):
             Q, G
             QR decomposition of the matrix Ft.
         """
+        
         # Initialize output
-
         reduced_likelihood_function_value = -np.inf
         par = {}
         # Set up R
@@ -122,23 +114,41 @@ class DGEK(KrgBased):
         noise = self.noise0
         tmp_var = theta
 
-        # dx, ij = cross_distances(self.X_norma)
-        # dd = self._componentwise_distance(
-        #     dx, theta=self.optimal_theta, return_derivative=True
-        # )
-        dx = 0
-        dd, ij = cross_distances(self.X_norma)
-        for j in range(dd.shape[1]):
-            dd[:,j] *= 2*theta[j]
 
-        derivative_dic = {"dx": dx, "dd": dd}
-        hess_dic = {"dx": dx, "dd": dd}
+        # Compute correlation kernels
+        dx = differences(self.X_norma, self.X_norma)
+        dxx, ij = cross_distances(self.X_norma)
+        dd = self._componentwise_distance(
+            dxx, theta=theta, return_derivative=True
+        )
+        dx = self.D
+        # dx = 0
+        # dd, ij = cross_distances(self.X_norma)
+        # for j in range(dd.shape[1]):
+        #     dd[:,j] *= 2*theta[j]
+
+        derivative_dic = {"dx": dxx, "dd": dd}
+        hess_dic = {"dx": dxx, "dd": dd}
         r = self._correlation_types[self.options["corr"]](theta, self.D).reshape(
             -1, 1
         )
         r, dr = self._correlation_types[self.options["corr"]](theta, self.D, derivative_params=derivative_dic)
-        d2r = self._correlation_types[self.options["corr"]](theta, self.D, hess_params=hess_dic)
+        d2r = self._correlation_types[self.options["corr"]](theta, self.D, derivative_params=derivative_dic, hess_params=hess_dic)
 
+
+        #check derivs
+        # h = 1e-6
+        # # self.D[0] = 0.
+        # self.D[0][0] += h
+        # rf = self._correlation_types[self.options["corr"]](theta, self.D)
+        # self.D[0][0] -= 2*h
+        # rb = self._correlation_types[self.options["corr"]](theta, self.D)
+        # d2rfd = (rf[0] - 2*r[0] + rb[0])/(h*h)
+        # print(d2rfd)
+        # print(d2r[0])
+        # import pdb; pdb.set_trace()
+
+        # Assemble augmented correlation matrix
         n_elem = dd.shape[0]
         n_comp = dd.shape[1]
         full_size = self.nt + self.nt*n_comp
@@ -146,132 +156,138 @@ class DGEK(KrgBased):
         R = np.zeros([full_size, full_size])
         P = np.eye(self.nt)
         Pg = np.zeros([self.nt*n_comp, self.nt])
-        S = np.eye(self.nt*n_comp)*(2*theta)
+        R[0:self.nt, 0:self.nt] = np.eye(self.nt) #* (1.0 + nugget + noise)
 
-        R[0:self.nt, 0:self.nt] = np.eye(self.nt) * (1.0 + nugget + noise)
+
+        if(self.options["corr"] == "squar_exp"):
+            S = np.eye(self.nt*n_comp)*(-2*theta)
+        if(self.options["corr"] == "matern32"):
+            S = np.eye(self.nt*n_comp)
+            for j in range(n_comp):
+                S[j::n_comp] *= (3*(theta[j]**2))
+                R[self.nt + j::n_comp, self.nt + j::n_comp] = (3*(theta[j]**2))
+        else:
+            raise ValueError("Not available for this correlation kernel")
+
+        #R[self.nt:(self.nt+self.nt*n_comp), self.nt:(self.nt+self.nt*n_comp)] = np.eye(self.nt)*(3*theta*theta)
         R[self.ij[:, 0], self.ij[:, 1]] = r[:, 0]
         R[self.ij[:, 1], self.ij[:, 0]] = r[:, 0]
         P[self.ij[:, 0], self.ij[:, 1]] = r[:, 0]
         P[self.ij[:, 1], self.ij[:, 0]] = r[:, 0]
 
-        R[self.nt:, self.nt:] = S.copy()
+        # R[self.nt:, self.nt:] = S.copy()
 
         # hessian
         for k in range(n_elem):
-            R[(self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp), (self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp)] = d2r[k]
-            R[(self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp), (self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp)] = d2r[k]
+            R[(self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp), (self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp)] = -d2r[k]
+            R[(self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp), (self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp)] = -d2r[k]
 
-            S[(self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp), (self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp)] = d2r[k]
-            S[(self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp), (self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp)] = d2r[k]
+            S[(self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp), (self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp)] = -d2r[k]
+            S[(self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp), (self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp)] = -d2r[k].T
         
         # upper and lower grad
         for k in range(n_elem):
-            R[self.ij[k,0], (self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp)] = dr[k]
-            R[self.ij[k,1], (self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp)] = -dr[k]
-            R[(self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp), self.ij[k,0]] = dr[k].T
-            R[(self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp), self.ij[k,1]] = -dr[k].T
+            R[self.ij[k,0], (self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp)] = -dr[k]
+            R[self.ij[k,1], (self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp)] = dr[k]
+            R[(self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp), self.ij[k,0]] = -dr[k].T
+            R[(self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp), self.ij[k,1]] = dr[k].T
 
-            Pg[(self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp), self.ij[k,0]] = dr[k].T
-            Pg[(self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp), self.ij[k,1]] = -dr[k].T
+            Pg[(self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp), self.ij[k,0]] = -dr[k].T
+            Pg[(self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp), self.ij[k,1]] = dr[k].T
 
+
+
+
+        # Assemble the right hand side and the regresssion
         # augmented y vector w/ gradients
         Ya = self.y_norma.copy()
         for i in range(self.nt):
             for j in range(n_comp):
-                Ya = np.append(Ya, -self.training_points[None][j+1][1][i]*(self.X_scale[j]/self.y_std))
+                Ya = np.append(Ya, self.training_points[None][j+1][1][i]*(self.X_scale[j]/self.y_std))
 
-        Rinv = linalg.inv(R)
+        # Rinv = linalg.inv(R)
         Oa = np.ones(full_size)
         Oa[self.nt:] = 0
 
+        
+
+
+
+        # Invert the augmented covariance matrix R (Lockwood and Anitescu 2012)
+        #defs
+        # PC = linalg.cholesky(P)
+        # Pinv = linalg.inv(P)
+        # PgPinv = np.dot(Pg, Pinv)
+        # PPginv = PgPinv.T
+        # M = S - np.dot(PgPinv, Pg.T)
+        # Minv = linalg.inv(M)
+        # # MC = linalg.cholesky(M)
+
+        # detP = linalg.det(P)
+        # detM = linalg.det(M)
+        # detR = detP*detM
+        # Rinv = np.zeros([full_size, full_size])
+        # Rinv[0:self.nt, 0:self.nt] = Pinv + np.dot(np.dot(PPginv, Minv), PgPinv)
+        # Rinv[0:self.nt, self.nt:] = -np.dot(PPginv, Minv)
+        # Rinv[self.nt:, 0:self.nt] = -np.dot(Minv, PgPinv)
+        # Rinv[self.nt:, self.nt:] = Minv
+        C = linalg.cholesky(R, lower=True)
+        detR = (np.diag(C) ** (2.0 / full_size)).prod()
+
+        # Rinv2 = linalg.inv(R)
+
+        # Get generalized least squared solution
         # augmented regression matrix
         Fa = self.F.copy()
         for i in range(self.nt):
             Fa = np.append(Fa, np.zeros([n_comp, Fa.shape[1]]), axis=0)
+        # Ft = linalg.solve_triangular(L, Fa, lower=True)
+        # Q, G = linalg.qr(Ft, mode="economic")
+        # sv = linalg.svd(G, compute_uv=False)
+        # rcondG = sv[-1] / sv[0]
+        # if rcondG < 1e-10:
+        #     # Check F
+        #     sv = linalg.svd(self.F, compute_uv=False)
+        #     condF = sv[0] / sv[-1]
+        #     if condF > 1e15:
+        #         raise Exception(
+        #             "F is too ill conditioned. Poor combination "
+        #             "of regression model and observations."
+        #         )
 
+        #     else:
+        #         # Ft is too ill conditioned, get out (try different theta)
+        #         return reduced_likelihood_function_value, par
+        
+        # regression coeffs
+        beta = linalg.lstsq(Fa, Ya)[0]
+        rho = Ya - np.dot(Fa, beta)
+        rhos = self.y_norma.reshape(self.nt) - np.dot(self.F, beta)
+        rhot = linalg.solve_triangular(C, rho, lower=True)
 
-        # invert R (Lockwood and Anitescu 2012)
-        #defs
-        Pinv = linalg.inv(P)
-        PgPinv = np.dot(Pg, Pinv)
-        #PPginv = np.dot(Pinv, Pg.T)
-        PPginv = PgPinv.T
-        L = np.eye(full_size)
-        L[self.nt:, 0:self.nt] = PgPinv
-        M = S - np.dot(PgPinv, Pg.T)
-        U = np.zeros_like(R)
-        U[0:self.nt, 0:self.nt] = P
-        U[0:self.nt, self.nt:] = Pg.T
-        U[self.nt:, self.nt:] = M
-        Minv = linalg.inv(M)
-
-        detR = linalg.det(P)*linalg.det(M)
-
-
-        Rinv = linalg.inv(R)
-        Oa = np.ones(full_size)
-        Oa[self.nt:] = 0
-
-        # muh = 1./(np.dot(np.dot(Oa.T, Rinv), Oa))
-        # muh *= np.dot(np.dot(Oa.T, Rinv), Ya)
-
-        # sigma2 = (1./self.nt)*np.dot(np.dot((Ya - muh*Oa).T, Rinv), (Ya - muh*Oa))
-        # detR = linalg.det(R)
         # import pdb; pdb.set_trace()
 
-        # try:
-        #     C = linalg.cholesky(R, lower=True)
-        # except (linalg.LinAlgError, ValueError) as e:
-        #     print("exception : ", e)
-        #     return reduced_likelihood_function_value, par
 
-        # Get generalized least squared solution
-        Ft = linalg.solve_triangular(L, Fa, lower=True)
-        Q, G = linalg.qr(Ft, mode="economic")
-        sv = linalg.svd(G, compute_uv=False)
-        rcondG = sv[-1] / sv[0]
-        if rcondG < 1e-10:
-            # Check F
-            sv = linalg.svd(self.F, compute_uv=False)
-            condF = sv[0] / sv[-1]
-            if condF > 1e15:
-                raise Exception(
-                    "F is too ill conditioned. Poor combination "
-                    "of regression model and observations."
-                )
-
-            else:
-                # Ft is too ill conditioned, get out (try different theta)
-                return reduced_likelihood_function_value, par
-
-        #Yt = linalg.solve(U, Ya)
-        beta = linalg.lstsq(Fa, Ya)[0]
-        Rinv = np.zeros_like(R)
-        Rinv[0:self.nt, 0:self.nt] = Pinv + np.dot(np.dot(PPginv, Minv), PgPinv)
-        Rinv[0:self.nt, self.nt:] = -np.dot(PPginv, Minv)
-        Rinv[self.nt:, 0:self.nt] = -np.dot(Minv, PgPinv)
-        Rinv[self.nt:, self.nt:] = Minv
-        rho = Ya - np.dot(Fa, beta)
-        # The determinant of R is equal to the squared product of the diagonal
-        # elements of its Cholesky decomposition C
-        #detR = (np.diag(C) ** (2.0 / self.nt)).prod()
         # Compute/Organize output
         p = 0
         q = 0
         if self.name in ["MFK", "MFKPLS", "MFKPLSK"]:
             p = self.p
             q = self.q
-        sigma2 = np.dot(np.dot(rho, Rinv), rho) / (self.nt - p - q)
+        #sigma2 = np.dot(np.dot(rho, Rinv), rho) / (self.nt - p - q)
+        sigma2 = np.dot(rhot, rhot) / (self.nt - p - q)
         reduced_likelihood_function_value = -(self.nt - p - q) * np.log10(
             sigma2.sum()
         ) - self.nt * np.log10(detR)
+        #if(sigma2 < 0):
+        # import pdb; pdb.set_trace()
         par["sigma2"] = sigma2 * self.y_std ** 2.0
         par["beta"] = beta
-        par["gamma"] = np.dot(Rinv, rho)
-        par["C"] = U
-        par["Ft"] = Ft
-        par["G"] = G
-        par["Q"] = Q
+        par["gamma"] = linalg.solve_triangular(C.T, rhot)#np.dot(Rinv, rho)
+        par["C"] = 0
+        par["Ft"] = 0#Ft
+        par["G"] = 0#G
+        par["Q"] = 0#Q
         #import pdb; pdb.set_trace()
         if self.name in ["MGP"]:
             reduced_likelihood_function_value += self._reduced_log_prior(theta)
@@ -292,7 +308,14 @@ class DGEK(KrgBased):
             self._thetaMemory = np.array(tmp_var)
         if reduced_likelihood_function_value > 1e15:
             reduced_likelihood_function_value = 1e15
+        # print(sigma2)
+        # print(np.linalg.cond(R))
+        # print(reduced_likelihood_function_value)
+        # print(np.linalg.cond(R))
         return reduced_likelihood_function_value, par
+
+
+
 
 
     def _predict_values(self, x):
@@ -330,7 +353,7 @@ class DGEK(KrgBased):
         ra = np.zeros([n_eval, self.nt + self.nt*n_features_x])
         #import pdb; pdb.set_trace()
         for i in range(n_eval):
-            ra[i] = np.append(r[i], dr[i,:])
+            ra[i] = np.append(r[i], -dr[i,:])
 
         y = np.zeros(full_size)
         ya = self.y_norma.copy()
@@ -350,6 +373,7 @@ class DGEK(KrgBased):
         y_ = np.dot(f, self.optimal_par["beta"]) + np.dot(ra, self.optimal_par["gamma"])
         #y_ = np.dot(np.dot(ra, self.optimal_par["gamma"]), (ya - np.dot(f, self.optimal_par["beta"])))
         # Predictor
+        # import pdb; pdb.set_trace()
         y = (self.y_mean + self.y_std * y_).ravel()
         return y[0:n_eval]
 

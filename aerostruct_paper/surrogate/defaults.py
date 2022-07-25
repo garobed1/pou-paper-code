@@ -24,7 +24,7 @@ DefaultOptOptions = {
     "strategy":'best1bin', 
     "lmethod":'SLSQP', 
     "lstrategy":None,
-    "giter":100, 
+    "giter":10, 
     "gpop":15, 
     "gtol":0.01,
     "liter":100,
