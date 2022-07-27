@@ -4,6 +4,7 @@ import copy
 from defaults import DefaultOptOptions
 import numpy as np
 from smt.surrogate_models import GEKPLS
+from direct_gek import DGEK
 from scipy.stats import qmc
 from pougrad import POUSurrogate
 from error import rmse, meane
@@ -113,7 +114,7 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
 
         # get the new points
         xnew = np.array(getxnew(rcrit, x0, bounds, options))
-
+        # import pdb; pdb.set_trace()
         # add the new points to the model
         t0 = np.append(t0, xnew, axis=0)
         f0 = np.append(f0, func(xnew), axis=0)
@@ -121,7 +122,7 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         for j in range(dim):
             g0[nt:,j] = func(xnew, j)[:,0]
         model.set_training_values(t0, f0)
-        if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate)):
+        if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate) or isinstance(model0, DGEK)):
             for j in range(dim):
                 model.set_training_derivatives(t0, g0[:,j], j)
         model.train()

@@ -103,7 +103,7 @@ class TaylorRefine(ASCriteria):
         m, n = trx.shape
         N = self.numer
 
-        ans = -self.tmodel.predict_values(np.array([x]), self.model)*(10**n)
+        ans = -self.tmodel.predict_values(np.array([x]), self.model)#*(10**n)
 
         # for batches, loop over already added points to prevent clustering
         for i in range(dir):
@@ -122,7 +122,7 @@ class TaylorRefine(ASCriteria):
         m, n = trx.shape
         N = self.numer
 
-        ans = -self.tmodel.predict_derivatives(np.array([x]), self.model)*(10**n)
+        ans = -self.tmodel.predict_derivatives(np.array([x]), self.model)#*(10**n)
 
         # for batches, loop over already added points to prevent clustering
         for i in range(dir):
@@ -157,31 +157,47 @@ class TaylorRefine(ASCriteria):
         # fd = [fd1[0], fd2[0]]
         # import pdb; pdb.set_trace()
 
-        # ndir = 75
-        # # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
-        # # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
-        # x = np.linspace(0., 1., ndir)
-        # y = np.linspace(0., 1., ndir)
-
-        # X, Y = np.meshgrid(x, y)
-        # F  = np.zeros([ndir, ndir])
-
-
-        # for i in range(ndir):
-        #     for j in range(ndir):
-        #         xi = np.zeros([2])
+        # if(n == 1):
+        #     ndir = 75
+        #     # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+        #     # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+        #     x = np.linspace(0., 1., ndir)
+        #     F  = np.zeros([ndir]) 
+        #     for i in range(ndir):
+        #         xi = np.zeros([1])
         #         xi[0] = x[i]
-        #         xi[1] = y[j]
-        #         F[i,j]  = self.evaluate(xi, bounds, dir=dir)
+        #         F[i]  = self.evaluate(xi, bounds, dir=dir)    
+        #     plt.plot(x, F)
+        #     plt.ylim(top=0.1)
+        #     plt.ylim(bottom=np.min(F))
+        #     trxs = qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
+        #     plt.plot(trxs[0:-1,0], np.zeros(trxs[0:-1,0].shape[0]), 'bo')
+        #     plt.plot(trxs[-1,0], [0], 'ro')
+        #     plt.savefig("taylor_rc_1d.png")    
+        #     plt.clf()
+        # import pdb; pdb.set_trace()
 
-        # cs = plt.contour(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
-        # plt.colorbar(cs)
-        # trxs = qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
-        # plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
-        # plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
-        # plt.savefig("taylor_rc.png")
-
-        # plt.clf()
+        # if(n == 2):
+        #     ndir = 75
+        #     # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+        #     # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+        #     x = np.linspace(0., 1., ndir)
+        #     y = np.linspace(0., 1., ndir)   
+        #     X, Y = np.meshgrid(x, y)
+        #     F  = np.zeros([ndir, ndir]) 
+        #     for i in range(ndir):
+        #         for j in range(ndir):
+        #             xi = np.zeros([2])
+        #             xi[0] = x[i]
+        #             xi[1] = y[j]
+        #             F[i,j]  = self.evaluate(xi, bounds, dir=dir)    
+        #     cs = plt.contour(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
+        #     plt.colorbar(cs)
+        #     trxs = qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
+        #     plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
+        #     plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
+        #     plt.savefig("taylor_rc_2d.png")    
+        #     plt.clf()
 
         sampling = LHS(xlimits=bounds, criterion='m')
         ntries = self.options["multistart"]

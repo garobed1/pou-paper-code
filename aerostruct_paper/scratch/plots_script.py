@@ -31,8 +31,7 @@ if len(sys.argv) > 2:
 if not os.path.isdir(title):
     os.mkdir(title)
 
-prob = title.split("_")[0]
-#import pdb; pdb.set_trace()
+prob = title.split("_")[-2]
 plt.rcParams['font.size'] = '14'
 
 if(title2):
@@ -50,17 +49,6 @@ if(title2):
     with open(f'./{title2}/errhmean.pickle', 'rb') as f:
         errhmeant = pickle.load(f)
 
-# LHS Data
-with open(f'./{title}/xk.pickle', 'rb') as f:
-    xtrainK = pickle.load(f)
-with open(f'./{title}/fk.pickle', 'rb') as f:
-    ftrainK = pickle.load(f)
-with open(f'./{title}/gk.pickle', 'rb') as f:
-    gtrainK = pickle.load(f)
-with open(f'./{title}/errkrms.pickle', 'rb') as f:
-    errkrms = pickle.load(f)
-with open(f'./{title}/errkmean.pickle', 'rb') as f:
-    errkmean = pickle.load(f)
 # Adaptive Data
 with open(f'./{title}/modelf.pickle', 'rb') as f:
     modelf = pickle.load(f)
@@ -74,7 +62,18 @@ with open(f'./{title}/errhrms.pickle', 'rb') as f:
     errhrms = pickle.load(f)
 with open(f'./{title}/errhmean.pickle', 'rb') as f:
     errhmean = pickle.load(f)
-
+# import pdb; pdb.set_trace()
+# LHS Data
+with open(f'./{title}/xk.pickle', 'rb') as f:
+    xtrainK = pickle.load(f)
+with open(f'./{title}/fk.pickle', 'rb') as f:
+    ftrainK = pickle.load(f)
+with open(f'./{title}/gk.pickle', 'rb') as f:
+    gtrainK = pickle.load(f)
+with open(f'./{title}/errkrms.pickle', 'rb') as f:
+    errkrms = pickle.load(f)
+with open(f'./{title}/errkmean.pickle', 'rb') as f:
+    errkmean = pickle.load(f)
 
 # Concatenate lists
 xk = []
@@ -161,7 +160,8 @@ for i in range(nruns):
     if(title2):
         ehrt[i] = [e0rt[i]] + ehrt[i] #[errf] #errh
         ehmt[i] = [e0mt[i]] + ehmt[i]
-
+# ekr = [ekr]
+# ekm = [ekm]
 
 # Plot Error History
 iters = len(ehr[0])
@@ -210,55 +210,17 @@ for i in range(nruns):
         ehmmt += np.array(ehmt[i]).T[0][0]/nruns
         ehsmt += np.array(ehmt[i]).T[0][1]/nruns
 
-# plt.loglog(samplehist, ehrm, "-", label=f'Adaptive Runs Ensemble')
-# plt.loglog(samplehistk, ekrm, 'k--', label='LHS Runs Ensemble')
-# plt.xlabel("Number of samples")
-# plt.ylabel("NRMSE")
-# plt.legend(loc=1)
-# # import matplotlib.ticker
-# # ax = plt.gca()
-# # ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-# # ax.get_xaxis().set_minor_formatter(matplotlib.ticker.NullFormatter())
-# # ax.get_yaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-# # ax.get_yaxis().set_minor_formatter(matplotlib.ticker.NullFormatter())
-# plt.xticks(np.arange(min(samplehist), max(samplehist), 10))
-# plt.ticklabel_format(style='plain', axis='x')
-# # plt.yticks(np.arange(0.04, 0.18, 0.01))
-# plt.savefig(f"./{title}err_rms_ensemble.png", bbox_inches="tight")
-# plt.clf()
 
 
-# plt.loglog(samplehist, ehmm, "-", label='Adaptive Runs Ensemble' )
-# plt.loglog(samplehistk, ekmm, 'k--', label='LHS Runs Ensemble')
-# plt.xlabel("Number of samples")
-# plt.ylabel("Relative Mean Error")
-# plt.legend(loc=1)
-# plt.savefig(f"./{title}err_mean_ensemble.png", bbox_inches="tight")
-# plt.clf()
 
-
-# import pdb; pdb.set_trace()
-# print(rmse(mf[0], trueFunc))
-# #tfix = 50.0
-# #mf[0].options.update({"theta0":[tfix]})
-# mf[0].options.update({"theta_bounds":np.array([1, 1])})
-# # mf[0].options.update({"theta_bounds":np.array([tfix, tfix+1e-4])})
-# mf[0].options.update({"n_comp":2})
-# mf[0].options.update({"extra_points":2})
-# #mf[0].options.update({"hyper_opt":"COBYLA"})
-# mf[0].options.update({"delta_x":1e-2})
-# mf[0].train()
-# print(mf[0].optimal_theta)
-# print(rmse(mf[0], trueFunc))
-# import pdb; pdb.set_trace()
 #NRMSE
 ax = plt.gca()
-plt.loglog(samplehist, ehrm, "b-", label=f'AIGES NRMSE')
-plt.loglog(samplehistk, ekrm, 'k-', label='LHS NRMSE')
+plt.loglog(samplehist, ehrm, "b-", label=f'Adaptive')
+plt.loglog(samplehistk, ekrm, 'k-', label='LHS')
 if(title2):
     plt.loglog(samplehist, ehrmt, "r-", label=f'TEAD NRMSE')
 plt.xlabel("Number of samples")
-plt.ylabel("Relative error")
+plt.ylabel("NRMSE")
 plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
 plt.grid()
 ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -266,7 +228,7 @@ ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 
 plt.legend(loc=3)
-plt.savefig(f"./{title}err_nrmse_ensemble.png", bbox_inches="tight")
+plt.savefig(f"./{title}/err_nrmse_ensemble.png", bbox_inches="tight")
 plt.clf()
 
 ax = plt.gca()
@@ -280,7 +242,7 @@ if(title2):
     plt.loglog(samplehist, ehsmt, "r-.", label='TEAD Std. Dev.' )
 
 plt.xlabel("Number of samples")
-plt.ylabel("Relative error")
+plt.ylabel("Error")
 plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
 plt.grid()
 ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -288,10 +250,11 @@ ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 
 plt.legend(loc=3)
-plt.savefig(f"./{title}err_uq_ensemble.png", bbox_inches="tight")
+plt.savefig(f"./{title}/err_uq_ensemble.png", bbox_inches="tight")
 plt.clf()
 
 trx = mf[0].training_points[None][0][0]
+trf = mf[0].training_points[None][0][1]
 m, n = trx.shape
 normal = np.ones(dim)
 normal /= np.linalg.norm(normal)
@@ -302,14 +265,23 @@ for i in range(m):
 
 
 # # Plot points
+
+if(dim == 1):
+    plt.clf()
+    nt0 = samplehist[0]
+    # Plot Training Points
+    plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", label='Initial Samples')
+    plt.plot(trx[nt0:,0], trf[nt0:,0], "ro", label='Adaptive Samples')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$f$")
+    #plt.legend(loc=1)
+    plt.savefig(f"./{title}/1d_aniso_pts.png", bbox_inches="tight")#"tight")
+    plt.clf()
+    
+
+
 if(dim == 2):
-    bbox = Bbox([[0.0, 0], [6.5, 4.3]])
-    mk = copy.deepcopy(mf[0])
-    mk.set_training_values(xtrainK[0][-1], ftrainK[0][-1])
-    if(isinstance(mk, GEKPLS) or isinstance(mk, POUSurrogate)):
-        for i in range(dim):
-            mk.set_training_derivatives(xtrainK[0][-1], gtrainK[0][-1][:,i:i+1], i)
-    mk.train()
+
     plt.clf()
     nt0 = samplehist[0]
     # Plot Training Points
@@ -318,7 +290,7 @@ if(dim == 2):
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
-    plt.savefig(f"./{title}2d_aniso_pts.png", bbox_inches="tight")#"tight")
+    plt.savefig(f"./{title}/2d_aniso_pts.png", bbox_inches="tight")#"tight")
     plt.clf()
     
     # Plot Error Contour
@@ -356,58 +328,58 @@ if(dim == 2):
     #plt.legend(loc=1)
     plt.plot(trx[0:nt0,0], trx[0:nt0,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
     plt.plot(trx[nt0:,0], trx[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
-    plt.savefig(f"./{title}2d_errcona.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/2d_errcona.png", bbox_inches="tight")
 
     plt.clf()
 
-    # Plot Non-Adaptive Error
-    tk = mk.training_points[None][0][0]
-    plt.contour(X, Y, Zk, levels = cs.levels)
-    plt.colorbar(cs, )
-    plt.xlabel(r"$x_1$")
-    plt.ylabel(r"$x_2$")
-    plt.plot(tk[:,0], tk[:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='LHS Samples')
-    plt.savefig(f"./{title}2d_errconk.png", bbox_inches="tight")
+    # # Plot Non-Adaptive Error
+    # tk = mk.training_points[None][0][0]
+    # plt.contour(X, Y, Zk, levels = cs.levels)
+    # plt.colorbar(cs, )
+    # plt.xlabel(r"$x_1$")
+    # plt.ylabel(r"$x_2$")
+    # plt.plot(tk[:,0], tk[:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='LHS Samples')
+    # plt.savefig(f"./{title}/2d_errconk.png", bbox_inches="tight")
 
-    plt.clf()
+    # plt.clf()
 
-Nerr = 5000
-sampling = LHS(xlimits=trueFunc.xlimits, criterion='m')
-xtest = sampling(Nerr)
-ftest = trueFunc(xtest)
-meantrue = sum(ftest)/Nerr
-stdtrue = np.sqrt((sum(ftest*ftest)/Nerr) - (sum(ftest)/Nerr)**2)
+# Nerr = 5000
+# sampling = LHS(xlimits=trueFunc.xlimits, criterion='m')
+# xtest = sampling(Nerr)
+# ftest = trueFunc(xtest)
+# meantrue = sum(ftest)/Nerr
+# stdtrue = np.sqrt((sum(ftest*ftest)/Nerr) - (sum(ftest)/Nerr)**2)
 
-meanlhstrue = sum(fk[0])/fk[0].shape[0]
-stdlhstrue = np.sqrt((sum(fk[0]*fk[0])/fk[0].shape[0]) - (sum(fk[0])/fk[0].shape[0])**2)
+# meanlhstrue = sum(fk[0])/fk[0].shape[0]
+# stdlhstrue = np.sqrt((sum(fk[0]*fk[0])/fk[0].shape[0]) - (sum(fk[0])/fk[0].shape[0])**2)
 
-faiges = mf[0].predict_values(xtest)
-meanaiges = sum(faiges)/Nerr
-stdaiges = np.sqrt((sum(faiges*faiges)/Nerr) - (sum(faiges)/Nerr)**2)
+# faiges = mf[0].predict_values(xtest)
+# meanaiges = sum(faiges)/Nerr
+# stdaiges = np.sqrt((sum(faiges*faiges)/Nerr) - (sum(faiges)/Nerr)**2)
 
-ftead = mft[0].predict_values(xtest)
-meantead = sum(ftead)/Nerr
-stdtead = np.sqrt((sum(ftead*ftead)/Nerr) - (sum(ftead)/Nerr)**2)
-
-
-mf[0].set_training_values(xk[0], fk[0])
-if(isinstance(mf[0], GEKPLS) or isinstance(mf[0], POUSurrogate)):
-    for i in range(dim):
-        mf[0].set_training_derivatives(xk[0], gk[0][:,i:i+1], i)
-mf[0].train()
-flhs = mf[0].predict_values(xtest)
-
-meanlhs = sum(flhs)/Nerr
-stdlhs  = np.sqrt((sum(flhs*flhs)/Nerr) - (sum(flhs)/Nerr)**2)
+# ftead = mft[0].predict_values(xtest)
+# meantead = sum(ftead)/Nerr
+# stdtead = np.sqrt((sum(ftead*ftead)/Nerr) - (sum(ftead)/Nerr)**2)
 
 
-print("True Mean: ", meantrue)
-print("True LHS Mean: ", meanlhstrue)
-print("LHS Mean: ", meanlhs)
-print("AIGES Mean: ", meanaiges)
-print("TEAD Mean: ", meantead)
-print("True std: ", stdtrue)
-print("True LHS std: ", stdlhstrue)
-print("LHS std: ", stdlhs)
-print("AIGES std: ", stdaiges)
-print("TEAD std: ", stdtead)
+# mf[0].set_training_values(xk[0], fk[0])
+# if(isinstance(mf[0], GEKPLS) or isinstance(mf[0], POUSurrogate)):
+#     for i in range(dim):
+#         mf[0].set_training_derivatives(xk[0], gk[0][:,i:i+1], i)
+# mf[0].train()
+# flhs = mf[0].predict_values(xtest)
+
+# meanlhs = sum(flhs)/Nerr
+# stdlhs  = np.sqrt((sum(flhs*flhs)/Nerr) - (sum(flhs)/Nerr)**2)
+
+
+# print("True Mean: ", meantrue)
+# print("True LHS Mean: ", meanlhstrue)
+# print("LHS Mean: ", meanlhs)
+# print("AIGES Mean: ", meanaiges)
+# print("TEAD Mean: ", meantead)
+# print("True std: ", stdtrue)
+# print("True LHS std: ", stdlhstrue)
+# print("LHS std: ", stdlhs)
+# print("AIGES std: ", stdaiges)
+# print("TEAD std: ", stdtead)

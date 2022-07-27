@@ -216,23 +216,23 @@ class DGEK(KrgBased):
         # Invert the augmented covariance matrix R (Lockwood and Anitescu 2012)
         #defs
         # PC = linalg.cholesky(P)
-        # Pinv = linalg.inv(P)
-        # PgPinv = np.dot(Pg, Pinv)
-        # PPginv = PgPinv.T
-        # M = S - np.dot(PgPinv, Pg.T)
-        # Minv = linalg.inv(M)
-        # # MC = linalg.cholesky(M)
+        Pinv = linalg.inv(P)
+        PgPinv = np.dot(Pg, Pinv)
+        PPginv = PgPinv.T
+        M = S - np.dot(PgPinv, Pg.T)
+        Minv = linalg.inv(M)
+        # MC = linalg.cholesky(M)
 
-        # detP = linalg.det(P)
-        # detM = linalg.det(M)
-        # detR = detP*detM
-        # Rinv = np.zeros([full_size, full_size])
-        # Rinv[0:self.nt, 0:self.nt] = Pinv + np.dot(np.dot(PPginv, Minv), PgPinv)
-        # Rinv[0:self.nt, self.nt:] = -np.dot(PPginv, Minv)
-        # Rinv[self.nt:, 0:self.nt] = -np.dot(Minv, PgPinv)
-        # Rinv[self.nt:, self.nt:] = Minv
-        C = linalg.cholesky(R, lower=True)
-        detR = (np.diag(C) ** (2.0 / full_size)).prod()
+        detP = linalg.det(P)
+        detM = linalg.det(M)
+        detR = detP*detM
+        Rinv = np.zeros([full_size, full_size])
+        Rinv[0:self.nt, 0:self.nt] = Pinv + np.dot(np.dot(PPginv, Minv), PgPinv)
+        Rinv[0:self.nt, self.nt:] = -np.dot(PPginv, Minv)
+        Rinv[self.nt:, 0:self.nt] = -np.dot(Minv, PgPinv)
+        Rinv[self.nt:, self.nt:] = Minv
+        # C = linalg.cholesky(R, lower=True)
+        # detR = (np.diag(C) ** (2.0 / full_size)).prod()
 
         # Rinv2 = linalg.inv(R)
 
@@ -263,27 +263,25 @@ class DGEK(KrgBased):
         beta = linalg.lstsq(Fa, Ya)[0]
         rho = Ya - np.dot(Fa, beta)
         rhos = self.y_norma.reshape(self.nt) - np.dot(self.F, beta)
-        rhot = linalg.solve_triangular(C, rho, lower=True)
+        # rhot = linalg.solve_triangular(C, rho, lower=True)
 
         # import pdb; pdb.set_trace()
 
 
         # Compute/Organize output
-        p = 0
-        q = 0
-        if self.name in ["MFK", "MFKPLS", "MFKPLSK"]:
-            p = self.p
-            q = self.q
-        #sigma2 = np.dot(np.dot(rho, Rinv), rho) / (self.nt - p - q)
-        sigma2 = np.dot(rhot, rhot) / (self.nt - p - q)
-        reduced_likelihood_function_value = -(self.nt - p - q) * np.log10(
-            sigma2.sum()
-        ) - self.nt * np.log10(detR)
+        sigma2 = np.dot(np.dot(rho, Rinv), rho) /self.nt
+        # sigma2 = np.dot(rhot, rhot) / (self.nt)
+        work1 = -full_size*np.log(sigma2) 
+        work2 = -np.log(detR)#**(1/full_size)
+        reduced_likelihood_function_value = work1 + work2
+        # work = detR**(1/full_size)
+        # reduced_likelihood_function_value = -sigma2*(work)
         #if(sigma2 < 0):
         # import pdb; pdb.set_trace()
         par["sigma2"] = sigma2 * self.y_std ** 2.0
         par["beta"] = beta
-        par["gamma"] = linalg.solve_triangular(C.T, rhot)#np.dot(Rinv, rho)
+        # par["gamma"] = linalg.solve_triangular(C.T, rhot)#np.dot(Rinv, rho)
+        par["gamma"] = np.dot(Rinv, rho)#
         par["C"] = 0
         par["Ft"] = 0#Ft
         par["G"] = 0#G
@@ -310,8 +308,13 @@ class DGEK(KrgBased):
             reduced_likelihood_function_value = 1e15
         # print(sigma2)
         # print(np.linalg.cond(R))
-        # print(reduced_likelihood_function_value)
-        # print(np.linalg.cond(R))
+        # print(theta)
+        # print(sigma2)
+        # print(detR)
+        # print(work1)
+        # print(work2)
+        # print(np.linalg.cond(P))
+        # print(np.linalg.cond(M))
         return reduced_likelihood_function_value, par
 
 
@@ -395,20 +398,41 @@ class DGEK(KrgBased):
         """
         # Initialization
         n_eval, n_features_x = x.shape
+        full_size = n_eval + n_eval*n_features_x
+        full_size_t = self.nt*(1+n_features_x)
 
-        x = (x - self.X_offset) / self.X_scale
+        X_cont = (x - self.X_offset) / self.X_scale
+        
         # Get pairwise componentwise L1-distances to the input training set
-        dx = differences(x, Y=self.X_norma.copy())
+        dx = differences(X_cont, Y=self.X_norma.copy())
         d = self._componentwise_distance(dx)
+        dd = dx.copy()
+        for j in range(dd.shape[1]):
+            dd[:,j] *= 2*self.optimal_theta[j]
+        derivative_dic = {"dx": dx, "dd": dd}
+        hess_dic = {"dx": dx, "dd": dd}
+
         # Compute the correlation function
         r = self._correlation_types[self.options["corr"]](
             self.optimal_theta, d
         ).reshape(n_eval, self.nt)
+        dum, dr = self._correlation_types[self.options["corr"]](self.optimal_theta, d, derivative_params=derivative_dic)
+        # dr = dr.reshape(n_eval, self.nt*n_features_x)
+        d2r = self._correlation_types[self.options["corr"]](self.optimal_theta, d, derivative_params=derivative_dic, hess_params=hess_dic)
 
-        if self.options["corr"] != "squar_exp":
-            raise ValueError(
-                "The derivative is only available for squared exponential kernel"
-            )
+        dra = np.zeros([n_eval, full_size_t])
+
+        #dr/dx_k
+        for i in range(n_eval):
+            dra[i][0:self.nt] = dr[:, kx]
+        # import pdb; pdb.set_trace()
+        #d2r/dx_k dx
+        for i in range(n_eval):
+            for j in range(self.nt):
+                dra[i][(self.nt + n_features_x*j):(self.nt + n_features_x*(j+1))] = -d2r[j][:,kx]
+        # dra[:, self.nt:] = d2r[]
+
+
         if self.options["poly"] == "constant":
             df = np.zeros((1, self.nx))
         elif self.options["poly"] == "linear":
@@ -424,13 +448,10 @@ class DGEK(KrgBased):
         beta = self.optimal_par["beta"]
         gamma = self.optimal_par["gamma"]
         df_dx = np.dot(df.T, beta)
-        d_dx = x[:, kx].reshape((n_eval, 1)) - self.X_norma[:, kx].reshape((1, self.nt))
-        if self.name != "Kriging" and "KPLSK" not in self.name:
-            theta = np.sum(self.optimal_theta * self.coeff_pls ** 2, axis=1)
-        else:
-            theta = self.optimal_theta
+        # d_dx = X_cont[:, kx].reshape((n_eval, 1)) - self.X_norma[:, kx].reshape((1, self.nt))
+        theta = self.optimal_theta
         y = (
-            (df_dx[kx] - 2 * theta[kx] * np.dot(d_dx * r, gamma))
+            (df_dx[kx] + np.dot(dra, gamma))
             * self.y_std
             / self.X_scale[kx]
         )

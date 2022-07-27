@@ -1,4 +1,5 @@
 import sys, os
+import shutil
 import copy
 import pickle
 from mpi4py import MPI
@@ -18,6 +19,7 @@ from shock_problem import ImpingingShock
 from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
 from smt.surrogate_models import KPLS, GEKPLS, KRG
+from direct_gek import DGEK
 #from smt.surrogate_models.rbf import RBF
 from pougrad import POUSurrogate
 from smt.sampling_methods import LHS
@@ -30,52 +32,21 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "fakeshock"    #problem
 
+# All variables not initialized come from this import
+from results_settings import *
 
-# Conditions
-dim = 2      #problem dimension
-skip_LHS = False
-LHS_batch = 10
-Nruns = 8
-multistart = 25*dim     #aniso opt multistart
-stype = "gekpls"    #surrogate type
-rtype = "taylor"     #criteria type
-corr  = "squar_exp" #kriging correlation
-poly  = "linear"    #kriging regression 
-extra = dim           #gek extra points
-rho = 10            #POU parameter
-nt0  = dim*20       #initial design size
-ntr = dim*50       #number of points to add
-ntot = nt0 + ntr    #total number of points
-batch = 0.1        #batch size for refinement, as a percentage of ntr
-Nerr = 5000       #number of test points to evaluate the error
-pperb = int(batch*ntr)
-pperbk = int(ntr/LHS_batch)
-if(pperb == 0):
-    pperb = 1
+Nruns = size*runs_per_proc
 
-# Fan out parallel cases
-cases = divide_cases(Nruns, size)
-
-# Refinement Settings
-neval = 1+2*dim
-hess  = "neighborhood"
-interp = "honly"
-criteria = "distance"
-perturb = True
-bpen = False
-obj = "inv"
-rscale = 0.5 #0.5 for 2D
-nscale = 10.0 #1.0 for 2D
-nmatch = dim
-opt = 'L-BFGS-B' #'SLSQP'#
-# thetafix = 10.
-# t0g = [thetafix, thetafix]
-# tbg = [thetafix, thetafix]
+# Generate results folder and list of inputs
+title = f"{header}_{prob}_{dim}D"
+if rank == 0:
+    if not os.path.isdir(title):
+        os.mkdir(title)
+    shutil.copy("./results_settings.py", f"./{title}/settings.py")
 
 # Problem Settings
-alpha = 8.       #arctangent jump strength
+alpha = 12.       #arctangent jump strength
 if(prob == "arctan"):
     trueFunc = MultiDimJump(ndim=dim, alpha=alpha)
 elif(prob == "arctantaper"):
@@ -118,6 +89,9 @@ if(rtype == 'anisotransform'):
     for n in range(Nruns):
         sequencer.append(qmc.Halton(d=dim))
 
+# Fan out parallel cases
+cases = divide_cases(Nruns, size)
+
 # Error
 xtest = None 
 ftest = None
@@ -152,7 +126,7 @@ if rank == 0:
     print("Initial Sample Size  : ", nt0)
     print("Refined Points Size  : ", ntr)
     print("Total Points         : ", ntot)
-    print("Points Per Iteration : ", int(batch*ntr))
+    print("Points Per Iteration : ", batch)
     print("RMSE Size            : ", Nerr)
     print("\n")
 
@@ -230,7 +204,14 @@ if(stype == "gekpls"):
     modelbase.options.update({"corr":corr})
     modelbase.options.update({"poly":poly})
     modelbase.options.update({"n_start":5})
-
+elif(stype == "dgek"):
+    modelbase = DGEK(xlimits=xlimits)
+    # modelbase.options.update({"hyper_opt":'TNC'})
+    modelbase.options.update({"corr":corr})
+    modelbase.options.update({"poly":poly})
+    modelbase.options.update({"n_start":5})
+    modelbase.options.update({"theta0":t0})
+    modelbase.options.update({"theta_bounds":tb})
 elif(stype == "pou"):
     modelbase = POUSurrogate()
     modelbase.options.update({"rho":rho})
@@ -259,7 +240,7 @@ co = 0
 for n in cases[rank]: #range(Nruns):
     model0.append(copy.deepcopy(modelbase))
     model0[co].set_training_values(xtrain0[n], ftrain0[n])
-    if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate)):
+    if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK)):
         for i in range(dim):
             model0[co].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
     model0[co].train()
@@ -294,13 +275,16 @@ if(not skip_LHS):
         errkmean.append([])
         for m in range(len(samplehistK)):
             modelK.set_training_values(xtrainK[n][m], ftrainK[n][m])
-            if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate)):
+            if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate) or isinstance(model0[co], DGEK)):
                 for i in range(dim):
                     modelK.set_training_derivatives(xtrainK[n][m], gtrainK[n][m][:,i:i+1], i)
             modelK.train()
             errkrms[co].append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
             errkmean[co].append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
         co += 1
+
+    errkrms = comm.gather(errkrms, root=0)
+    errkmean = comm.gather(errkmean, root=0)
     
     # if(rtype == "aniso"):
     #     rstring = f'{rtype}{neval}{bpen}{obj}{rscale}r_{nscale}n'
@@ -314,21 +298,22 @@ if(not skip_LHS):
     # title = f'{prob}_{rstring}_{stype}_{corr}_{dim}d_{Nruns}runs_{nt0}to{ntot}pts_{batch}batch_{multistart}mstart_{opt}opt'
     # if not os.path.isdir(title):
     #     os.mkdir(title)
-    # # LHS Data
-    # with open(f'./{title}/xk.pickle', 'wb') as f:
-    #     pickle.dump(xtrainK, f)
+    # LHS Data
+    with open(f'./{title}/xk.pickle', 'wb') as f:
+        pickle.dump(xtrainK, f)
 
-    # with open(f'./{title}/fk.pickle', 'wb') as f:
-    #     pickle.dump(ftrainK, f)
+    with open(f'./{title}/fk.pickle', 'wb') as f:
+        pickle.dump(ftrainK, f)
 
-    # with open(f'./{title}/gk.pickle', 'wb') as f:
-    #     pickle.dump(gtrainK, f)
+    with open(f'./{title}/gk.pickle', 'wb') as f:
+        pickle.dump(gtrainK, f)
 
-    # with open(f'./{title}/errkrms.pickle', 'wb') as f:
-    #     pickle.dump(errkrms, f)
+    with open(f'./{title}/errkrms.pickle', 'wb') as f:
+        pickle.dump(errkrms, f)
 
-    # with open(f'./{title}/errkmean.pickle', 'wb') as f:
-    #     pickle.dump(errkmean, f)
+    with open(f'./{title}/errkmean.pickle', 'wb') as f:
+        pickle.dump(errkmean, f)
+        
 
 if rank == 0:
     print("Initial Refinement Criteria ...")
@@ -374,9 +359,6 @@ for n in cases[rank]:
 modelf = comm.gather(modelf, root=0)
 RCF = comm.gather(RCF, root=0)
 hist = comm.gather(hist, root=0)
-if(not skip_LHS):
-    errkrms = comm.gather(errkrms, root=0)
-    errkmean = comm.gather(errkmean, root=0)
 err0rms = comm.gather(err0rms, root=0)
 err0mean = comm.gather(err0mean, root=0)
 errhrms = comm.gather(errhrms, root=0)
@@ -386,40 +368,6 @@ errhmean = comm.gather(errhmean, root=0)
 if rank == 0:
     print("\n")
     print("Experiment Complete")
-
-    if(rtype == "aniso"):
-        rstring = f'{rtype}{neval}{bpen}{obj}{rscale}r_{nscale}n'
-    elif(rtype == "anisotransform"):
-        rstring = f'{rtype}{neval}{nmatch}'
-    elif(rtype == "tead"):
-        rstring = f'{rtype}{neval}'
-    elif(rtype == "taylor"):
-        rstring = f'{rtype}{perturb}'
-    elif(rtype == "taylorexp"):
-        rstring = f'{rtype}{neval}{obj}'
-    else:
-        rstring = f'{rtype}'
-
-    title = f'{prob}_{rstring}_{stype}_{corr}_{dim}d_{Nruns}runs_{nt0}to{ntot}pts_{batch}batch_{multistart}mstart_{opt}opt'
-    if not os.path.isdir(title):
-        os.mkdir(title)
-    if(not skip_LHS):
-        # LHS Data
-        with open(f'./{title}/xk.pickle', 'wb') as f:
-            pickle.dump(xtrainK, f)
-
-        with open(f'./{title}/fk.pickle', 'wb') as f:
-            pickle.dump(ftrainK, f)
-
-        with open(f'./{title}/gk.pickle', 'wb') as f:
-            pickle.dump(gtrainK, f)
-
-        with open(f'./{title}/errkrms.pickle', 'wb') as f:
-            pickle.dump(errkrms, f)
-
-        with open(f'./{title}/errkmean.pickle', 'wb') as f:
-            pickle.dump(errkmean, f)
-
 
     # Adaptive Data
     with open(f'./{title}/modelf.pickle', 'wb') as f:
