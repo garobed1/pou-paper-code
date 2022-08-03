@@ -13,7 +13,7 @@ from defaults import DefaultOptOptions
 from sutils import divide_cases
 from error import rmse, meane
 
-from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
+from example_problems import Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
@@ -99,6 +99,7 @@ for i in range(nprocs):
     xk = xk + xtrainK[i][:]
     fk = fk + ftrainK[i][:]
     gk = gk + gtrainK[i][:]
+    import pdb; pdb.set_trace()
     ekr = ekr + errkrms[i][:]
     ekm = ekm + errkmean[i][:]
     mf = mf + modelf[i][:]
@@ -128,6 +129,8 @@ elif(prob == "arctantaper"):
     trueFunc = MultiDimJumpTaper(ndim=dim, alpha=alpha)
 elif(prob == "rosenbrock"):
     trueFunc = Rosenbrock(ndim=dim)
+elif(prob == "peaks"):
+    trueFunc = Peaks2D(ndim=dim)
 elif(prob == "branin"):
     trueFunc = Branin(ndim=dim)
 elif(prob == "sphere"):
@@ -277,7 +280,45 @@ if(dim == 1):
     #plt.legend(loc=1)
     plt.savefig(f"./{title}/1d_aniso_pts.png", bbox_inches="tight")#"tight")
     plt.clf()
-    
+
+    ndir = 75
+    xlimits = trueFunc.xlimits
+    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+
+    Z = np.zeros([ndir, ndir])
+    F = np.zeros([ndir, ndir])
+    TF = np.zeros([ndir, ndir])
+
+    for i in range(ndir):
+        xi = np.zeros([1,1])
+        xi[0] = x[i]
+        TF[i] = trueFunc(xi)
+        F[i] = mf[0].predict_values(xi)
+        Z[i] = abs(F[i] - TF[i])
+
+    # Plot Non-Adaptive Error
+    plt.plot(x, TF, "-k", label=f'True')
+    # plt.plot(x, Fgek, "-m", label=f'IGEK')
+    plt.plot(x, F, "-b", label=f'AS')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$f$")
+    #plt.legend(loc=1)
+    plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", label='Initial Samples')
+    plt.plot(trx[nt0:,0], trf[nt0:,0], "ro", label='Adaptive Samples')
+    plt.savefig(f"./{title}/1dplot.png", bbox_inches="tight")
+    plt.clf()
+
+    # Plot Non-Adaptive Error
+    # plt.plot(x, Zgek, "-m", label=f'IGEK')
+    plt.plot(x, Z, "-b", label=f'AS')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$err$")
+    #plt.legend(loc=1)
+    plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", label='Initial Samples')
+    plt.plot(trx[nt0:,0], trf[nt0:,0], "ro", label='Adaptive Samples')
+    plt.savefig(f"./{title}/1derr.png", bbox_inches="tight")
+
+    plt.clf()
 
 
 if(dim == 2):

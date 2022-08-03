@@ -1,19 +1,19 @@
 import numpy as np
+import time
+
 from smt.surrogate_models.surrogate_model import SurrogateModel
 from smt.utils.options_dictionary import OptionsDictionary
 from collections import defaultdict
+from scipy.spatial import KDTree
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.stats import qmc
-from sutils import estimate_pou_volume
-
+from sutils import estimate_pou_volume, innerMatrixProduct, quadraticSolveHOnly, symMatfromVec
+from sutils import standardization2
 
 
 """
 Gradient-Enhanced Partition-of-Unity Surrogate model
 """
-# Might be worth making a generic base class
-# Also, need to add some asserts just in case
-
 class POUSurrogate(SurrogateModel): 
     name = "POU"
     """
@@ -38,6 +38,13 @@ class POUSurrogate(SurrogateModel):
         # initialize data and parameters
         super(POUSurrogate, self)._initialize()
         declare = self.options.declare
+
+        declare(
+            "bounds",
+            None,
+            types=(list, np.ndarray),
+            desc="Domain boundaries"
+        )
 
         declare(
             "rho",
@@ -74,47 +81,182 @@ class POUSurrogate(SurrogateModel):
     """
     def _predict_values(self, xt):
 
-        xc = self.training_points[None][0][0]
-        f = self.training_points[None][0][1]
-        g = np.zeros([xc.shape[0],xc.shape[1]])
+        X_cont = (xt - self.X_offset) / self.X_scale
+        xc = self.X_norma
+        f = self.y_norma
         numsample = xc.shape[0]
         dim = xc.shape[1]
         delta = self.options["delta"]
         rho = self.options["rho"]
 
-        for i in range(xc.shape[1]):
-            g[:,[i]] = self.training_points[None][i+1][1]
-        
         # loop over rows in xt
-        y = np.zeros(xt.shape[0])
+        y_ = np.zeros(xt.shape[0])
         for k in range(xt.shape[0]):
-            x = xt[k,:]
+            x = X_cont[k,:]
+
             # exhaustive search for closest sample point, for regularization
-            mindist = 1e100
-            dists = np.zeros(numsample)
-            for i in range(numsample):
-                dists[i] = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
-
-            mindist = min(dists)
-
-            # for i in range(numsample):
-            #     dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
-            #     mindist = min(mindist,dist)
+            D = cdist(np.array([x]),xc)
+            mindist = min(D[0])
 
             numer = 0
             denom = 0
 
             # evaluate the surrogate, requiring the distance from every point
+            # for i in range(numsample):
+            dist = D[0][:] + delta#np.sqrt(D[0][i] + delta)
+            expfac = np.exp(-rho*(dist-mindist))
+            local = np.zeros(numsample)
             for i in range(numsample):
-                dist = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
-                local = f[i] + np.dot(g[i], x-xc[i]) # locally linear approximation
-                expfac = np.exp(-rho*(dist-mindist))
-                numer += local*expfac
-                denom += expfac
+                local[i] = f[i] + self.higher_terms(x, i)#np.dot(g[i], x-xc[i]) # locally linear approximation
+            numer = np.dot(local, expfac)
+            denom = np.sum(expfac)
+            # t2 = time.time()
 
-            y[k] = numer/denom
+            # exec1 += t1-t0
+            # exec2 += t2-t1
+            
+
+            y_[k] = numer/denom
+
+        y = (self.y_mean + self.y_std * y_).ravel()
+        # print("mindist  = ", exec1)
+        # print("evaluate = ", exec2)
 
         return y
+
+
+    def higher_terms(self, x, i):
+        return np.dot(self.g_norma[i], x-self.X_norma[i])
+
+
+    def _train(self):
+        xc = self.training_points[None][0][0]
+        f = self.training_points[None][0][1]
+
+        # Center and scale X and y
+        (
+            self.X_norma,
+            self.y_norma,
+            self.X_offset,
+            self.y_mean,
+            self.X_scale,
+            self.y_std,
+        ) = standardization2(xc, f, self.options["bounds"])
+
+        self.g_norma = np.zeros([xc.shape[0], xc.shape[1]])
+        
+        for i in range(self.xc.shape[1]):
+            self.g_norma[:,[i]] = self.training_points[None][i+1][1]*(self.X_scale[i]/self.y_std)
+
+        
+
+'''
+First-order POU surrogate with Hessian estimation
+'''
+class POUHessian(POUSurrogate):
+    name = "POUHessian"
+    def _initialize(self):
+        # initialize data and parameters
+        super(POUHessian, self)._initialize()
+        declare = self.options.declare
+
+        declare(
+            "bounds",
+            None,
+            types=(list, np.ndarray),
+            desc="Domain boundaries"
+        )
+
+        declare(
+            "rho",
+            10,
+            types=(int, float),
+            desc="Distance scaling parameter"
+        )
+
+        declare(
+            "delta",
+            1e-10,
+            types=(int, float),
+            desc="Regularization parameter"
+        )
+        
+        declare(
+            "neval", 
+            3, 
+            types=int,
+            desc="number of closest points to evaluate hessian estimate")
+
+        self.supports["training_derivatives"] = True
+
+    def higher_terms(self, x, i):
+        work = x - self.X_norma[i]
+        terms = np.dot(self.g_norma[i], work)
+        terms += 0.5*innerMatrixProduct(self.h[i], work)
+        return terms
+
+
+    def _train(self):
+        xc = self.training_points[None][0][0]
+        f = self.training_points[None][0][1]
+
+        self.dim = xc.shape[1]
+        self.ntr = xc.shape[0]
+
+        # Center and scale X and y
+        (
+            self.X_norma,
+            self.y_norma,
+            self.X_offset,
+            self.y_mean,
+            self.X_scale,
+            self.y_std,
+        ) = standardization2(xc, f, self.options["bounds"])
+
+        self.g_norma = np.zeros([xc.shape[0], xc.shape[1]])
+        
+        for i in range(self.dim):
+            self.g_norma[:,[i]] = self.training_points[None][i+1][1]*(self.X_scale[i]/self.y_std)
+        # hessian estimate
+        indn = []
+        nstencil = self.options["neval"]
+        tree = KDTree(self.X_norma)
+        # dists = pdist(self.xc)
+        # dists = squareform(dists)
+        # mins = np.zeros(self.ntr)
+        for i in range(self.ntr):
+            dists, ind = tree.query(self.X_norma[i], nstencil)
+            indn.append(ind)
+        hess = []
+
+        for i in range(self.ntr):
+            Hh = quadraticSolveHOnly(self.X_norma[i,:], self.X_norma[indn[i][1:nstencil],:], \
+                                     self.y_norma[i], self.y_norma[indn[i][1:nstencil]], \
+                                     self.g_norma[i,:], self.g_norma[indn[i][1:nstencil],:])
+
+            hess.append(np.zeros([self.dim, self.dim]))
+            for j in range(self.dim):
+                for k in range(self.dim):
+                    hess[i][j,k] = Hh[symMatfromVec(j,k,self.dim)]
+
+        self.h = hess
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -278,6 +420,7 @@ class POUMetric():
             #     dists[i] = np.sqrt(np.dot(x-xc[i],x-xc[i]) + delta)
 
             # mindist = min(dists)
+            
             mindist = min(cdist(np.array([x]),xc)[0])
 
             # for i in range(numsample):
@@ -316,6 +459,8 @@ class POUMetric():
 
             # mindist = min(dists)
             mindist = min(cdist(np.array([x]),xc)[0])
+
+            t1 = time.time()
 
             numer = np.zeros([dim, dim])
             dnumer = np.zeros([dim, dim, dim])
@@ -493,6 +638,7 @@ class POUError():
             x = xt[k,:]
             xscale = qmc.scale(np.array([x]), bounds[:,0], bounds[:,1])
             
+
             # exhaustive search for closest sample point, for regularization
             mindist = min(cdist(np.array([x]),xc)[0])
 

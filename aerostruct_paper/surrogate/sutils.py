@@ -6,9 +6,67 @@ from example_problems import Heaviside, MultiDimJump, Quad2D
 from smt.problems import RobotArm
 from smt.sampling_methods import LHS
 
+def standardization2(X, y, bounds):
 
+    """
 
+    Scale X and y, X according to its bounds, and y according to its mean and standard 
+    deviation
 
+    Parameters
+    ----------
+
+    X: np.ndarray [n_obs, dim]
+            - The input variables.
+
+    y: np.ndarray [n_obs, 1]
+            - The output variable.
+
+    bounds: np.ndarray [dim, 2]
+
+    Returns
+    -------
+
+    X: np.ndarray [n_obs, dim]
+          The standardized input matrix.
+
+    y: np.ndarray [n_obs, 1]
+          The standardized output vector.
+
+    X_offset: list(dim)
+            The mean (or the min if scale_X_to_unit=True) of each input variable.
+
+    y_mean: list(1)
+            The mean of the output variable.
+
+    X_scale:  list(dim)
+            The standard deviation (or the difference between the max and the
+            min if scale_X_to_unit=True) of each input variable.
+
+    y_std:  list(1)
+            The standard deviation of the output variable.
+
+    """
+
+    X_offset = bounds[:,0]
+    X_max = bounds[:,1]
+    X_scale = X_max - X_offset
+
+    X_scale[X_scale == 0.0] = 1.0
+    y_mean = np.mean(y, axis=0)
+    y_std = y.std(axis=0, ddof=1)
+    y_std[y_std == 0.0] = 1.0
+
+    # scale X and y
+    X = (X - X_offset) / X_scale
+    y = (y - y_mean) / y_std
+    return X, y, X_offset, y_mean, X_scale, y_std
+
+def innerMatrixProduct(A, x):
+    """
+    Return scalar result of x^T A x
+    """
+    return np.dot(np.dot(x.T, A), x)
 
 def getDirectCovariance(r, dr, d2r, theta, nt, ij):
     """

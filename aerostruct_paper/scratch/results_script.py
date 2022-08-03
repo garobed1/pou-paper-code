@@ -10,18 +10,19 @@ import numpy as np
 from refinecriteria import looCV, HessianFit, TEAD
 from aniso_criteria import AnisotropicRefine
 from taylor_criteria import TaylorRefine, TaylorExploreRefine
+from hess_criteria import HessianRefine
 from aniso_transform import AnisotropicTransform
 from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
 from sutils import divide_cases
 from error import rmse, meane
 from shock_problem import ImpingingShock
-from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
+from example_problems import Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 from direct_gek import DGEK
 #from smt.surrogate_models.rbf import RBF
-from pougrad import POUSurrogate
+from pougrad import POUSurrogate, POUHessian
 from smt.sampling_methods import LHS
 from scipy.stats import qmc
 
@@ -46,11 +47,13 @@ if rank == 0:
     shutil.copy("./results_settings.py", f"./{title}/settings.py")
 
 # Problem Settings
-alpha = 12.       #arctangent jump strength
+alpha = 8.       #arctangent jump strength
 if(prob == "arctan"):
     trueFunc = MultiDimJump(ndim=dim, alpha=alpha)
 elif(prob == "arctantaper"):
     trueFunc = MultiDimJumpTaper(ndim=dim, alpha=alpha)
+elif(prob == "peaks"):
+    trueFunc = Peaks2D(ndim=dim)
 elif(prob == "rosenbrock"):
     trueFunc = Rosenbrock(ndim=dim)
 elif(prob == "branin"):
@@ -104,7 +107,6 @@ if rank == 0:
 xtest = comm.bcast(xtest, root=0)
 ftest = comm.bcast(ftest, root=0)
 testdata = comm.bcast(testdata, root=0)
-
 # Adaptive Sampling Conditions
 options = DefaultOptOptions
 options["localswitch"] = True
@@ -215,6 +217,10 @@ elif(stype == "dgek"):
 elif(stype == "pou"):
     modelbase = POUSurrogate()
     modelbase.options.update({"rho":rho})
+elif(stype == "pouhess"):
+    modelbase = POUHessian(bounds=xlimits)
+    modelbase.options.update({"rho":rho})
+    modelbase.options.update({"neval":neval})
 elif(stype == "kpls"):
     modelbase = KPLS()
     # modelbase.options.update({"hyper_opt":'TNC'})
@@ -230,7 +236,7 @@ else:
     modelbase.options.update({"n_start":5})
 # modelbase.options.update({"print_global":False})
 modelbase.options.update({"print_training":True})
-modelbase.options.update({"print_prediction":False})
+modelbase.options.update({"print_prediction":True})
 modelbase.options.update({"print_problem":True})
 modelbase.options.update({"print_solver":True})
 
@@ -332,6 +338,8 @@ for n in cases[rank]:
         RC0.append(TaylorRefine(model0[co], gtrain0[n], xlimits, volume_weight=perturb, rscale=rscale, improve=pperb, multistart=multistart) )
     elif(rtype == "taylorexp"):
         RC0.append(TaylorExploreRefine(model0[co], gtrain0[n], xlimits, rscale=rscale, improve=pperb, objective=obj, multistart=multistart) ) 
+    elif(rtype == "hess"):
+        RC0.append(HessianRefine(model0[co], gtrain0[n], xlimits, neval=neval, rscale=rscale, improve=pperb, multistart=multistart) )
     else:
         raise ValueError("Given criteria not valid.")
     co += 1

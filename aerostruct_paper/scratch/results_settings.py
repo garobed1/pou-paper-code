@@ -1,29 +1,29 @@
 
-header = "first_dgek_test"
+header = "pou_hess_test"
 skip_LHS = False
 LHS_batch = 4
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "branin"    #problem
-dim = 2      #problem dimension
+prob  = "arctan"    #problem
+dim = 3     #problem dimension
 
 
 # Surrogate Settings
-stype = "dgek"    #surrogate type
-rtype = "taylor"     #criteria type
+stype = "pouhess"    #surrogate type
+rtype = "hess"     #criteria type
 corr  = "matern32"  #kriging correlation
 poly  = "linear"    #kriging regression 
 extra = dim           #gek extra points
 t0 = [1e-0]
 tb = [1e-2, 2e+1]
-rho = 10            #POU parameter
+rho = 120            #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*5       #initial design size
-ntr = dim*20       #number of points to add
+ntr = dim*30       #number of points to add
 ntot = nt0 + ntr    #total number of points
-batch = dim*2        #batch size for refinement, as a percentage of ntr
+batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = batch
 pperbk = int(ntr/LHS_batch)
