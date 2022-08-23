@@ -18,7 +18,7 @@ from sutils import divide_cases
 from error import rmse, meane
 from shock_problem import ImpingingShock
 from example_problems import Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
-from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
+from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam, WingWeight
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 from direct_gek import DGEK
 #from smt.surrogate_models.rbf import RBF
@@ -76,6 +76,10 @@ elif(prob == "cantilever"):
     trueFunc = CantileverBeam(ndim=dim)
 elif(prob == "hadamard"):
     trueFunc = QuadHadamard(ndim=dim)
+elif(prob == "lpnorm"):
+    trueFunc = LpNorm(ndim=dim)
+elif(prob == "wingweight"):
+    trueFunc = WingWeight(ndim=dim)
 elif(prob == "fakeshock"):
     trueFunc = FakeShock(ndim=dim)
 elif(prob == "shock"):
@@ -109,8 +113,9 @@ ftest = comm.bcast(ftest, root=0)
 testdata = comm.bcast(testdata, root=0)
 # Adaptive Sampling Conditions
 options = DefaultOptOptions
-options["localswitch"] = True
+options["local"] = False
 options["errorcheck"] = testdata
+options["multistart"] = mstarttype
 options["lmethod"] = opt
 
 # Print Conditions
@@ -246,7 +251,7 @@ co = 0
 for n in cases[rank]: #range(Nruns):
     model0.append(copy.deepcopy(modelbase))
     model0[co].set_training_values(xtrain0[n], ftrain0[n])
-    if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK)):
+    if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK) or isinstance(model0[co], POUHessian)):
         for i in range(dim):
             model0[co].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
     model0[co].train()
@@ -292,18 +297,6 @@ if(not skip_LHS):
     errkrms = comm.gather(errkrms, root=0)
     errkmean = comm.gather(errkmean, root=0)
     
-    # if(rtype == "aniso"):
-    #     rstring = f'{rtype}{neval}{bpen}{obj}{rscale}r_{nscale}n'
-    # elif(rtype == "anisotransform"):
-    #     rstring = f'{rtype}{neval}{nmatch}'
-    # elif(rtype == "tead"):
-    #     rstring = f'{rtype}{neval}'
-    # else:
-    #     rstring = f'{rtype}'
-
-    # title = f'{prob}_{rstring}_{stype}_{corr}_{dim}d_{Nruns}runs_{nt0}to{ntot}pts_{batch}batch_{multistart}mstart_{opt}opt'
-    # if not os.path.isdir(title):
-    #     os.mkdir(title)
     # LHS Data
     with open(f'./{title}/xk.pickle', 'wb') as f:
         pickle.dump(xtrainK, f)

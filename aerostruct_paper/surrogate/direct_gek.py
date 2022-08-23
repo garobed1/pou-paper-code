@@ -121,12 +121,12 @@ class DGEK(KrgBased):
         dd = self._componentwise_distance(
             dxx, theta=theta, return_derivative=True
         )
-        dx = self.D
+        # dx = self.D
         # dx = 0
         # dd, ij = cross_distances(self.X_norma)
         # for j in range(dd.shape[1]):
         #     dd[:,j] *= 2*theta[j]
-
+        # import pdb; pdb.set_trace()
         derivative_dic = {"dx": dxx, "dd": dd}
         hess_dic = {"dx": dxx, "dd": dd}
         r = self._correlation_types[self.options["corr"]](theta, self.D).reshape(
@@ -160,8 +160,11 @@ class DGEK(KrgBased):
 
 
         if(self.options["corr"] == "squar_exp"):
-            S = np.eye(self.nt*n_comp)*(-2*theta)
-        if(self.options["corr"] == "matern32"):
+            S = np.eye(self.nt*n_comp)
+            for j in range(n_comp):
+                S[j::n_comp] *= (2*theta[j])
+                R[self.nt + j::n_comp, self.nt + j::n_comp] = (2*theta[j])
+        elif(self.options["corr"] == "matern32"):
             S = np.eye(self.nt*n_comp)
             for j in range(n_comp):
                 S[j::n_comp] *= (3*(theta[j]**2))
@@ -174,13 +177,15 @@ class DGEK(KrgBased):
         R[self.ij[:, 1], self.ij[:, 0]] = r[:, 0]
         P[self.ij[:, 0], self.ij[:, 1]] = r[:, 0]
         P[self.ij[:, 1], self.ij[:, 0]] = r[:, 0]
-
+        print(theta)
+        print(np.linalg.cond(P))
+        # import pdb; pdb.set_trace()
         # R[self.nt:, self.nt:] = S.copy()
 
         # hessian
         for k in range(n_elem):
             R[(self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp), (self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp)] = -d2r[k]
-            R[(self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp), (self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp)] = -d2r[k]
+            R[(self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp), (self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp)] = -d2r[k].T
 
             S[(self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp), (self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp)] = -d2r[k]
             S[(self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp), (self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp)] = -d2r[k].T
@@ -194,7 +199,6 @@ class DGEK(KrgBased):
 
             Pg[(self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp), self.ij[k,0]] = -dr[k].T
             Pg[(self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp), self.ij[k,1]] = dr[k].T
-
 
 
 
@@ -286,6 +290,7 @@ class DGEK(KrgBased):
         par["Ft"] = 0#Ft
         par["G"] = 0#G
         par["Q"] = 0#Q
+        par["cond"] = np.linalg.cond(R)
         #import pdb; pdb.set_trace()
         if self.name in ["MGP"]:
             reduced_likelihood_function_value += self._reduced_log_prior(theta)
@@ -304,8 +309,8 @@ class DGEK(KrgBased):
         ):
             self.best_iteration_fail = reduced_likelihood_function_value
             self._thetaMemory = np.array(tmp_var)
-        if reduced_likelihood_function_value > 1e15:
-            reduced_likelihood_function_value = 1e15
+        # if reduced_likelihood_function_value > 1e15:
+        #     reduced_likelihood_function_value = 1e15
         # print(sigma2)
         # print(np.linalg.cond(R))
         # print(theta)
@@ -343,11 +348,10 @@ class DGEK(KrgBased):
         # Get pairwise componentwise L1-distances to the input training set
         dx = differences(X_cont, Y=self.X_norma.copy())
         d = self._componentwise_distance(dx)
-        dd = dx.copy()
-        for j in range(dd.shape[1]):
-            dd[:,j] *= 2*self.optimal_theta[j]
+        dd = self._componentwise_distance(
+            dx, theta=self.optimal_theta, return_derivative=True
+        )
         derivative_dic = {"dx": dx, "dd": dd}
-
         # Compute the correlation function
         r = self._correlation_types[self.options["corr"]](self.optimal_theta, d
         ).reshape(n_eval, self.nt)

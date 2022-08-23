@@ -1,12 +1,12 @@
 
-header = "pou_hess_test"
+header = "pou_wDV_test"
 skip_LHS = False
 LHS_batch = 4
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "arctan"    #problem
-dim = 3     #problem dimension
+prob  = "wingweight"    #problem
+dim = 10     #problem dimension
 
 
 # Surrogate Settings
@@ -21,13 +21,20 @@ rho = 120            #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*5       #initial design size
-ntr = dim*30       #number of points to add
+ntr = dim*15       #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error
 pperb = batch
 pperbk = int(ntr/LHS_batch)
-multistart = 25*dim     #aniso opt multistart
+mstarttype = 2            # 0: No multistart
+                          # 1: Start at the best out of a number of samples
+                          # 2: Perform multiple optimizations
+if(mstarttype == 1):   
+    multistart = 50*dim
+if(mstarttype == 2):
+    multistart = 5*dim
+
 if(pperb == 0):
     pperb = 1
 

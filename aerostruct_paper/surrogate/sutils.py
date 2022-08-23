@@ -526,7 +526,7 @@ def estimate_pou_volume(trx, bounds):
     """
     m, n = trx.shape
 
-    dV = np.zeros(m)
+    dV = np.ones(m)
     sampling = LHS(xlimits=bounds)
     vx = sampling(100*m)
     ms, ns = vx.shape

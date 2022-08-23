@@ -12,7 +12,7 @@ from scipy.stats import qmc
 from scipy.spatial import KDTree
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds
-from sutils import innerMatrixProduct, linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
+from sutils import innerMatrixProduct, linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, estimate_pou_volume
 
 
 """
@@ -126,6 +126,7 @@ class HessianRefine(ASCriteria):
 
             self.H = hess
 
+        
 
     # Assumption is that the quadratic terms are the error
     def evaluate(self, x, bounds, dir=0):
@@ -142,7 +143,7 @@ class HessianRefine(ASCriteria):
         for i in range(self.ntr):
             work = x - self.trx[i]
             dist = D[0][i] + delta#np.sqrt(D[0][i] + delta)
-            local = 0.5*innerMatrixProduct(self.H[i], work)
+            local = 0.5*innerMatrixProduct(self.H[i], work)*self.dV[i]
             expfac = np.exp(-self.rho*(dist-mindist))
             numer += local*expfac
             denom += expfac
@@ -178,8 +179,8 @@ class HessianRefine(ASCriteria):
             work = x - self.trx[i]
             dist = D[0][i] + delta#np.sqrt(D[0][i] + delta)
             ddist = work/D[0][i]
-            local = 0.5*innerMatrixProduct(self.H[i], work)
-            dlocal = np.dot(self.H[i], work)
+            local = 0.5*innerMatrixProduct(self.H[i], work)*self.dV[i]
+            dlocal = np.dot(self.H[i], work)*self.dV[i]
             expfac = np.exp(-self.rho*(dist-mindist))
             dexpfac = -self.rho*expfac*ddist
             numer += local*expfac
@@ -212,6 +213,13 @@ class HessianRefine(ASCriteria):
         trx = self.trx
         m, n = trx.shape
 
+        # factor in cell volume
+        fakebounds = copy.deepcopy(bounds)
+        fakebounds[:,0] = 0.
+        fakebounds[:,1] = 1.
+        self.dV = estimate_pou_volume(self.trx, fakebounds)
+
+
         # ### FD CHECK
         # h = 1e-6
         # zero = 0.5*np.ones([2])
@@ -222,27 +230,27 @@ class HessianRefine(ASCriteria):
         # step = 0.5*np.ones([2])
         # step[1] += h
         # fd2 = (self.evaluate(step, bounds) - self.evaluate(zero, bounds))/h
-        # fd = [fd1[0], fd2[0]]
+        # fd = [fd1, fd2]
         # import pdb; pdb.set_trace()
 
-        # if(n == 1):
-        #     ndir = 75
-        #     # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
-        #     # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
-        #     x = np.linspace(0., 1., ndir)
-        #     F  = np.zeros([ndir]) 
-        #     for i in range(ndir):
-        #         xi = np.zeros([1])
-        #         xi[0] = x[i]
-        #         F[i]  = self.evaluate(xi, bounds, dir=dir)    
-        #     plt.plot(x, F)
-        #     plt.ylim(top=0.1)
-        #     plt.ylim(bottom=np.min(F))
-        #     trxs = self.trx#qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
-        #     plt.plot(trxs[0:-1,0], np.zeros(trxs[0:-1,0].shape[0]), 'bo')
-        #     plt.plot(trxs[-1,0], [0], 'ro')
-        #     plt.savefig("taylor_rc_1d.png")    
-        #     plt.clf()
+        if(n == 1):
+            ndir = 75
+            # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+            # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+            x = np.linspace(0., 1., ndir)
+            F  = np.zeros([ndir]) 
+            for i in range(ndir):
+                xi = np.zeros([1])
+                xi[0] = x[i]
+                F[i]  = self.evaluate(xi, bounds, dir=dir)    
+            plt.plot(x, F)
+            plt.ylim(top=0.1)
+            plt.ylim(bottom=np.min(F))
+            trxs = self.trx#qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
+            plt.plot(trxs[0:-1,0], np.zeros(trxs[0:-1,0].shape[0]), 'bo')
+            plt.plot(trxs[-1,0], [0], 'ro')
+            plt.savefig("taylor_rc_1d.png")    
+            plt.clf()
         # import pdb; pdb.set_trace()
 
         # if(n == 2):
@@ -259,13 +267,15 @@ class HessianRefine(ASCriteria):
         #             xi[0] = x[i]
         #             xi[1] = y[j]
         #             F[i,j]  = self.evaluate(xi, bounds, dir=dir)    
-        #     cs = plt.contour(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
+        #     cs = plt.contourf(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
         #     plt.colorbar(cs)
-        #     trxs = qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
+        #     trxs = self.trx #qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
         #     plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
         #     plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
         #     plt.savefig("taylor_rc_2d.png")    
         #     plt.clf()
+        # import pdb; pdb.set_trace()
+
 
         sampling = LHS(xlimits=bounds, criterion='m')
         ntries = self.options["multistart"]

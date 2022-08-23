@@ -14,10 +14,10 @@ from sutils import divide_cases
 from error import rmse, meane
 
 from example_problems import Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
-from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
+from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam, WingWeight
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
-from pougrad import POUSurrogate
+from pougrad import POUSurrogate, POUHessian
 import matplotlib as mpl
 import matplotlib.ticker as mticker
 from smt.sampling_methods import LHS
@@ -99,7 +99,6 @@ for i in range(nprocs):
     xk = xk + xtrainK[i][:]
     fk = fk + ftrainK[i][:]
     gk = gk + gtrainK[i][:]
-    import pdb; pdb.set_trace()
     ekr = ekr + errkrms[i][:]
     ekm = ekm + errkmean[i][:]
     mf = mf + modelf[i][:]
@@ -151,6 +150,10 @@ elif(prob == "cantilever"):
     trueFunc = CantileverBeam(ndim=dim)
 elif(prob == "hadamard"):
     trueFunc = QuadHadamard(ndim=dim)
+elif(prob == "lpnorm"):
+    trueFunc = LpNorm(ndim=dim)
+elif(prob == "wingweight"):
+    trueFunc = WingWeight(ndim=dim)
 elif(prob == "fakeshock"):
     trueFunc = FakeShock(ndim=dim)
 else:
@@ -216,6 +219,7 @@ for i in range(nruns):
 
 
 
+
 #NRMSE
 ax = plt.gca()
 plt.loglog(samplehist, ehrm, "b-", label=f'Adaptive')
@@ -229,23 +233,15 @@ plt.grid()
 ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
 ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
-
 plt.legend(loc=3)
 plt.savefig(f"./{title}/err_nrmse_ensemble.png", bbox_inches="tight")
 plt.clf()
 
 ax = plt.gca()
-plt.loglog(samplehist, ehmm, "b--", label='AIGES Mean' )
-plt.loglog(samplehistk, ekmm, 'k--', label='LHS Mean')
-if(title2):
-    plt.loglog(samplehist, ehmmt, "r--", label='TEAD Mean' )
-plt.loglog(samplehist, ehsm, "b-.", label='AIGES Std. Dev.' )
-plt.loglog(samplehistk, eksm, 'k-.', label='LHS Std. Dev.')
-if(title2):
-    plt.loglog(samplehist, ehsmt, "r-.", label='TEAD Std. Dev.' )
-
+plt.loglog(samplehist, ehmm, "b-", label='Adaptive' )
+plt.loglog(samplehistk, ekmm, 'k-', label='LHS')
 plt.xlabel("Number of samples")
-plt.ylabel("Error")
+plt.ylabel("Mean Error")
 plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
 plt.grid()
 ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -253,7 +249,22 @@ ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 
 plt.legend(loc=3)
-plt.savefig(f"./{title}/err_uq_ensemble.png", bbox_inches="tight")
+plt.savefig(f"./{title}/err_mean_ensemble.png", bbox_inches="tight")
+plt.clf()
+
+ax = plt.gca()
+plt.loglog(samplehist, ehsm, "b-", label='Adaptive' )
+plt.loglog(samplehistk, eksm, 'k-', label='LHS')
+plt.xlabel("Number of samples")
+plt.ylabel(r"$\sigma$ Error")
+plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
+plt.grid()
+ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
+ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+ax.ticklabel_format(style='plain', axis='x')
+
+plt.legend(loc=3)
+plt.savefig(f"./{title}/err_stdv_ensemble.png", bbox_inches="tight")
 plt.clf()
 
 trx = mf[0].training_points[None][0][0]
@@ -266,6 +277,17 @@ planedists = np.zeros(m)
 for i in range(m):
     planedists[i] = abs(np.dot(trx[i,:],normal))
 
+mk = copy.deepcopy(mf[0])
+mk.set_training_values(xk[-1], fk[-1])
+if(isinstance(mk, GEKPLS) or isinstance(mk, POUSurrogate) or isinstance(mk, POUHessian)):
+    for j in range(dim):
+        mk.set_training_derivatives(xk[-1], gk[-1][:,j:j+1], j)
+mk.train()
+trxk = mk.training_points[None][0][0]
+trfk = mk.training_points[None][0][1]
+mk.options.update({"print_global":False})
+mf[0].options.update({"print_global":False})
+
 
 # # Plot points
 
@@ -273,12 +295,12 @@ if(dim == 1):
     plt.clf()
     nt0 = samplehist[0]
     # Plot Training Points
-    plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", label='Initial Samples')
-    plt.plot(trx[nt0:,0], trf[nt0:,0], "ro", label='Adaptive Samples')
+    plt.plot(trx[0:nt0,0], np.zeros(trx[0:nt0,0].shape[0]), "bo", label='Initial Samples')
+    plt.plot(trx[nt0:,0], np.zeros(trx[nt0:,0].shape[0]), "ro", label='Adaptive Samples')
     plt.xlabel(r"$x$")
     plt.ylabel(r"$f$")
     #plt.legend(loc=1)
-    plt.savefig(f"./{title}/1d_aniso_pts.png", bbox_inches="tight")#"tight")
+    plt.savefig(f"./{title}/1d_adaptive_pts.png", bbox_inches="tight")#"tight")
     plt.clf()
 
     ndir = 75
@@ -295,6 +317,14 @@ if(dim == 1):
         TF[i] = trueFunc(xi)
         F[i] = mf[0].predict_values(xi)
         Z[i] = abs(F[i] - TF[i])
+
+    # Plot the target function
+    plt.plot(x, TF, "-k", label=f'True')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$f$")
+    #plt.legend(loc=1)
+    plt.savefig(f"./{title}/1dtrue.png", bbox_inches="tight")
+    plt.clf()
 
     # Plot Non-Adaptive Error
     plt.plot(x, TF, "-k", label=f'True')
@@ -314,8 +344,8 @@ if(dim == 1):
     plt.xlabel(r"$x$")
     plt.ylabel(r"$err$")
     #plt.legend(loc=1)
-    plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", label='Initial Samples')
-    plt.plot(trx[nt0:,0], trf[nt0:,0], "ro", label='Adaptive Samples')
+    plt.plot(trx[0:nt0,0], np.zeros_like(trf[0:nt0,0]), "bo", label='Initial Samples')
+    plt.plot(trx[nt0:,0], np.zeros_like(trf[nt0:,0]), "ro", label='Adaptive Samples')
     plt.savefig(f"./{title}/1derr.png", bbox_inches="tight")
 
     plt.clf()
@@ -331,11 +361,20 @@ if(dim == 2):
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
-    plt.savefig(f"./{title}/2d_aniso_pts.png", bbox_inches="tight")#"tight")
+    plt.savefig(f"./{title}/2d_adaptive_pts.png", bbox_inches="tight")#"tight")
     plt.clf()
     
-    # Plot Error Contour
-    #Contour
+    plt.clf()
+    # Plot Training Points
+    plt.plot(trxk[:,0], trx[:,1], "bo", label='LHS Points')
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    #plt.legend(loc=1)
+    plt.savefig(f"./{title}/2d_lhs_pts.png", bbox_inches="tight")#"tight")
+    plt.clf()
+
+    # Plot Error contour
+    #contour
     ndir = 150
     xlimits = trueFunc.xlimits
     x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
@@ -343,12 +382,9 @@ if(dim == 2):
 
     X, Y = np.meshgrid(x, y)
     Za = np.zeros([ndir, ndir])
-    Va = np.zeros([ndir, ndir])
-    V0 = np.zeros([ndir, ndir])
     Zk = np.zeros([ndir, ndir])
-    Vk = np.zeros([ndir, ndir])
-    Z0 = np.zeros([ndir, ndir])
     F  = np.zeros([ndir, ndir])
+    FK  = np.zeros([ndir, ndir])
     TF = np.zeros([ndir, ndir])
 
     for i in range(ndir):
@@ -357,32 +393,49 @@ if(dim == 2):
             xi[0,0] = x[i]
             xi[0,1] = y[j]
             F[j,i]  = mf[0].predict_values(xi)
+            FK[j,i] = mk.predict_values(xi)
             TF[j,i] = trueFunc(xi)
             Za[j,i] = abs(F[j,i] - TF[j,i])
-            Zk[j,i] = abs(mk.predict_values(xi) - TF[j,i])
+            Zk[j,i] = abs(FK[j,i] - TF[j,i])
 
+    # Plot original function
+    cs = plt.contourf(X, Y, TF, levels = 40)
+    plt.colorbar(cs, aspect=20)
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    #plt.legend(loc=1)
+    plt.savefig(f"./{title}/2d_true.png", bbox_inches="tight")
 
-    cs = plt.contour(X, Y, Za, levels = 40)
+    plt.clf()
+
+    cs = plt.contourf(X, Y, Za, levels = 40)
     plt.colorbar(cs, aspect=20)
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
     plt.plot(trx[0:nt0,0], trx[0:nt0,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
     plt.plot(trx[nt0:,0], trx[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
-    plt.savefig(f"./{title}/2d_errcona.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/2d_errcon_a.png", bbox_inches="tight")
 
     plt.clf()
 
-    # # Plot Non-Adaptive Error
-    # tk = mk.training_points[None][0][0]
-    # plt.contour(X, Y, Zk, levels = cs.levels)
-    # plt.colorbar(cs, )
-    # plt.xlabel(r"$x_1$")
-    # plt.ylabel(r"$x_2$")
-    # plt.plot(tk[:,0], tk[:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='LHS Samples')
-    # plt.savefig(f"./{title}/2d_errconk.png", bbox_inches="tight")
+    # Plot Non-Adaptive Error
+    tk = mk.training_points[None][0][0]
+    plt.contourf(X, Y, Zk, levels = cs.levels)
+    plt.colorbar(cs, )
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    plt.plot(tk[:,0], tk[:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='LHS Samples')
+    plt.savefig(f"./{title}/2d_errcon_k.png", bbox_inches="tight")
 
-    # plt.clf()
+    plt.clf()
+
+
+
+
+
+
+
 
 # Nerr = 5000
 # sampling = LHS(xlimits=trueFunc.xlimits, criterion='m')

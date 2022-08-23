@@ -7,7 +7,7 @@ from smt.surrogate_models import GEKPLS
 from direct_gek import DGEK
 from scipy.stats import qmc
 from pougrad import POUSurrogate
-from error import rmse, meane
+from error import rmse, meane, full_error
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -58,28 +58,35 @@ def getxnew(rcrit, x0, bounds, options=None):
             jac = None
             if(rcrit.supports["obj_derivatives"]):
                 jac = rcrit.eval_grad
-            if(options["localswitch"]):
+            if(options["local"]):
 
-                #TODO: Make these options
-                # multistart
-                # resx = np.zeros([m,n])
-                # resy = np.zeros(m)
-                # for j in range(m):
-                    
-                #     results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0[j,:])
-                #     resx[j,:] = results.x
-                #     resy[j] = results.fun
-                # rx = resx[np.argmin(resy)]
+                # proper multistart
+                if(options["multistart"] == 2):
+                    resx = np.zeros([m,n])
+                    resy = np.zeros(m)
+                    for j in range(m):
+                        
+                        results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0[j,:])
+                        resx[j,:] = results.x
+                        resy[j] = results.fun
+                    rx = resx[np.argmin(resy)]
 
                 # start at best point
-                x0b = None
-                y0 = np.zeros(m)
-                for j in range(m):
-                    y0[j] = rcrit.evaluate(x0[j], bounds_used, i)
-                ind = np.argmin(y0)
-                x0b = x0[ind]
-                results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0b)
-                rx = results.x
+                if(options["multistart"] == 1):
+                    x0b = None
+                    y0 = np.zeros(m)
+                    for j in range(m):
+                        y0[j] = rcrit.evaluate(x0[j], bounds_used, i)
+                    ind = np.argmin(y0)
+                    x0b = x0[0]
+                    results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0b)
+                    rx = results.x
+
+                # perform one optimization
+                else:
+                    x0b = x0[0]
+                    results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0b)
+                    rx = results.x
 
             else:
                 results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="global", constraints=rcrit.condict)
@@ -97,7 +104,6 @@ def getxnew(rcrit, x0, bounds, options=None):
 
 def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
 
-    #TODO: Alternate Stopping Criteria
     count = int(ntr/rcrit.nnew)
     hist = []
     errh = []
@@ -130,10 +136,11 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         # evaluate errors
         if(options["errorcheck"] is not None):
             xdata, fdata = options["errorcheck"]
-            err = rmse(model, func, xdata=xdata, fdata=fdata)
-            err2 = meane(model, func, xdata=xdata, fdata=fdata)
-            errh.append(err)
-            errh2.append(err2)
+            # err = rmse(model, func, xdata=xdata, fdata=fdata)
+            # err2 = meane(model, func, xdata=xdata, fdata=fdata)
+            err = full_error(model, func, xdata=xdata, fdata=fdata)
+            errh.append(err[0])
+            errh2.append(err[1:])
         else:
             errh = None
             errh2 = None

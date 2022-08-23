@@ -25,17 +25,17 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "fakeshock"    #problem
+prob  = "arctan"    #problem
 plot  = -1
 
 # Conditions
-dim = 2      #problem dimension
-corr  = "matern32" #kriging correlation
+dim = 1      #problem dimension
+corr  = "squar_exp" #kriging correlation
 poly  = "constant"    #kriging regression 
 ncomp = dim
 extra = 2           #gek extra points
-nt0 = 5
-ntr = 55
+nt0 = 10
+ntr = 10
 batch = 10
 tval = 1e-0
 t0 = [1e-2]
@@ -246,11 +246,11 @@ if(dim == 1):
     xlimits = trueFunc.xlimits
     x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
 
-    Zgek = np.zeros([ndir, ndir])
+    # Zgek = np.zeros([ndir, ndir])
     Zkpl = np.zeros([ndir, ndir])
     Zkrg = np.zeros([ndir, ndir])
     Zdge = np.zeros([ndir, ndir])
-    Fgek = np.zeros([ndir, ndir])
+    # Fgek = np.zeros([ndir, ndir])
     Fkpl = np.zeros([ndir, ndir])
     Fkrg = np.zeros([ndir, ndir])
     Fdge = np.zeros([ndir, ndir])
@@ -260,11 +260,11 @@ if(dim == 1):
         xi = np.zeros([1,1])
         xi[0] = x[i]
         TF[i] = trueFunc(xi)
-        Fgek[i] = mgek[plot].predict_values(xi)
+        # Fgek[i] = mgek[plot].predict_values(xi)
         Fkpl[i] = mkpl[plot].predict_values(xi)
         Fkrg[i] = mkrg[plot].predict_values(xi)
         Fdge[i] = mdge[plot].predict_values(xi)
-        Zgek[i] = abs(Fgek[i] - TF[i])
+        # Zgek[i] = abs(Fgek[i] - TF[i])
         Zkpl[i] = abs(Fkpl[i] - TF[i])
         Zkrg[i] = abs(Fkrg[i] - TF[i])
         Zdge[i] = abs(Fdge[i] - TF[i])

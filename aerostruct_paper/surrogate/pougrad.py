@@ -9,7 +9,7 @@ from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.stats import qmc
 from sutils import estimate_pou_volume, innerMatrixProduct, quadraticSolveHOnly, symMatfromVec
 from sutils import standardization2
-
+from pou_cython_ext import POUEval
 
 """
 Gradient-Enhanced Partition-of-Unity Surrogate model
@@ -84,10 +84,13 @@ class POUSurrogate(SurrogateModel):
         X_cont = (xt - self.X_offset) / self.X_scale
         xc = self.X_norma
         f = self.y_norma
+        g = self.g_norma
+        h = self.h
         numsample = xc.shape[0]
-        dim = xc.shape[1]
         delta = self.options["delta"]
         rho = self.options["rho"]
+
+        # y_ = POUEval(X_cont, xc, f, g, h, delta, rho)
 
         # loop over rows in xt
         y_ = np.zeros(xt.shape[0])
@@ -103,11 +106,12 @@ class POUSurrogate(SurrogateModel):
 
             # evaluate the surrogate, requiring the distance from every point
             # for i in range(numsample):
+            work = x - xc
             dist = D[0][:] + delta#np.sqrt(D[0][i] + delta)
             expfac = np.exp(-rho*(dist-mindist))
             local = np.zeros(numsample)
             for i in range(numsample):
-                local[i] = f[i] + self.higher_terms(x, i)#np.dot(g[i], x-xc[i]) # locally linear approximation
+                local[i] = f[i] + self.higher_terms(work[i], g[i], h[i])
             numer = np.dot(local, expfac)
             denom = np.sum(expfac)
             # t2 = time.time()
@@ -125,8 +129,8 @@ class POUSurrogate(SurrogateModel):
         return y
 
 
-    def higher_terms(self, x, i):
-        return np.dot(self.g_norma[i], x-self.X_norma[i])
+    def higher_terms(self, dx, g, h):
+        return np.dot(g, dx)
 
 
     def _train(self):
@@ -148,7 +152,9 @@ class POUSurrogate(SurrogateModel):
         for i in range(self.xc.shape[1]):
             self.g_norma[:,[i]] = self.training_points[None][i+1][1]*(self.X_scale[i]/self.y_std)
 
+        self.h = np.zeros([xc.shape[0], self.dim, self.dim])
         
+        # self.dV = estimate_pou_volume(self.training_points[None][0][0], self.options["bounds"])
 
 '''
 First-order POU surrogate with Hessian estimation
@@ -189,10 +195,9 @@ class POUHessian(POUSurrogate):
 
         self.supports["training_derivatives"] = True
 
-    def higher_terms(self, x, i):
-        work = x - self.X_norma[i]
-        terms = np.dot(self.g_norma[i], work)
-        terms += 0.5*innerMatrixProduct(self.h[i], work)
+    def higher_terms(self, dx, g, h):
+        terms = np.dot(g, dx)
+        terms += 0.5*innerMatrixProduct(h, dx)
         return terms
 
 
@@ -241,7 +246,7 @@ class POUHessian(POUSurrogate):
 
         self.h = hess
 
-
+        # self.dV = estimate_pou_volume(self.training_points[None][0][0], self.options["bounds"])
 
 
 
