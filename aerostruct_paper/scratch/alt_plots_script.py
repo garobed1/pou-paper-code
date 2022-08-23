@@ -1,8 +1,7 @@
 import sys, os
 import copy
 import pickle
-from telnetlib import XASCII
-from matplotlib.transforms import Bbox
+from mpi4py import MPI
 sys.path.insert(1,"../surrogate")
 
 import numpy as np
@@ -24,6 +23,10 @@ from direct_gek import DGEK
 import matplotlib as mpl
 import matplotlib.ticker as mticker
 from smt.sampling_methods import LHS
+
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
 """
 In this plotting script, generate desired alternative surrogate models from
@@ -97,6 +100,7 @@ for i in range(nprocs):
     ehm = ehm + errhmean[i][:]
 
 nruns = len(mf)
+nperr = int(nruns/size)
 dim = xk[0].shape[1]
 
 
@@ -145,8 +149,17 @@ xlimits = trueFunc.xlimits
 testdata = None
 Nerr = 5000
 sampling = LHS(xlimits=xlimits, criterion='m')
-xtest = sampling(Nerr)
-ftest = trueFunc(xtest)
+
+# Error
+xtest = None 
+ftest = None
+testdata = None
+if rank == 0:
+    xtest = sampling(Nerr)
+    ftest = trueFunc(xtest)
+
+xtest = comm.bcast(xtest, root=0)
+ftest = comm.bcast(ftest, root=0)
 
 # Generate Alternative Surrogate
 if(alt_model == "gekpls"):
@@ -181,12 +194,14 @@ elif(alt_model == "kpls"):
     modelbase.options.update({"corr":ssettings["corr"]})
     modelbase.options.update({"poly":ssettings["poly"]})
     modelbase.options.update({"n_start":5})
-else:
+elif(alt_model == "kriging"):
     modelbase = KRG()
     # modelbase.options.update({"hyper_opt":'TNC'})
     modelbase.options.update({"corr":ssettings["corr"]})
     modelbase.options.update({"poly":ssettings["poly"]})
     modelbase.options.update({"n_start":5})
+else:
+    raise ValueError("Given alternative model not valid.")
 # modelbase.options.update({"print_global":False})
 modelbase.options.update({"print_training":True})
 modelbase.options.update({"print_prediction":True})
@@ -242,20 +257,29 @@ for k in range(nruns):
         ga[k][-1][:,j:j+1] = mf[k].training_points[None][j+1][1]
 
 # Train alternative surrogates
-ma = []
-ear = np.zeros([nruns, itersk])
-eam = np.zeros([nruns, itersk])
-eas = np.zeros([nruns, itersk])
-for k in range(nruns):
-    ma.append([])
+ma = [[] for _ in range(nperr)]
+ear = np.zeros([nperr, itersk])
+eam = np.zeros([nperr, itersk])
+eas = np.zeros([nperr, itersk])
+
+for k in range(nperr):
+    ind = k + rank*nperr
     for i in range(itersk):
         ma[k].append(copy.deepcopy(modelbase))
-        ma[k][i].set_training_values(xa[k][i], fa[k][i])
+        ma[k][i].set_training_values(xa[ind][i], fa[ind][i])
         if(ma[k][i].supports["training_derivatives"]):
             for j in range(dim):
-                ma[k][i].set_training_derivatives(xa[k][i], ga[k][i][:,j:j+1], j)
+                ma[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
         ma[k][i].train()
         ear[k][i], eam[k][i], eas[k][i] = full_error(ma[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+
+ma = comm.allgather(ma)
+ear = comm.allgather(ear)
+eam = comm.allgather(eam)
+eas = comm.allgather(eas)
+ear = np.concatenate(ear[:], axis=0)
+eam = np.concatenate(eam[:], axis=0)
+eas = np.concatenate(eas[:], axis=0)
 
 # Average out runs
 ehrm = np.zeros(iters)
@@ -283,54 +307,52 @@ for i in range(nruns):
 
 
 
+if rank == 0:
+    #NRMSE
+    ax = plt.gca()
+    plt.loglog(samplehist, ehrm, "b-", label=f'Adaptive')
+    plt.loglog(samplehistk, ekrm, 'k-', label='LHS')
+    plt.loglog(samplehistk, earm, 'r-', label=f'Adaptive ({alt_model})')
+    plt.xlabel("Number of samples")
+    plt.ylabel("NRMSE")
+    plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
+    plt.grid()
+    ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
+    ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+    ax.ticklabel_format(style='plain', axis='x')
+    plt.legend(loc=3)
+    plt.savefig(f"./{title}/err_nrmse_ensemble.png", bbox_inches="tight")
+    plt.clf()
 
+    ax = plt.gca()
+    plt.loglog(samplehist, ehmm, "b-", label='Adaptive' )
+    plt.loglog(samplehistk, ekmm, 'k-', label='LHS')
+    plt.loglog(samplehistk, eamm, 'r-', label=f'Adaptive ({alt_model})')
+    plt.xlabel("Number of samples")
+    plt.ylabel("Mean Error")
+    plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
+    plt.grid()
+    ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
+    ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+    ax.ticklabel_format(style='plain', axis='x')
 
+    plt.legend(loc=3)
+    plt.savefig(f"./{title}/err_mean_ensemble.png", bbox_inches="tight")
+    plt.clf()
 
-#NRMSE
-ax = plt.gca()
-plt.loglog(samplehist, ehrm, "b-", label=f'Adaptive')
-plt.loglog(samplehistk, ekrm, 'k-', label='LHS')
-plt.loglog(samplehistk, earm, 'r-', label=f'Adaptive ({alt_model})')
-plt.xlabel("Number of samples")
-plt.ylabel("NRMSE")
-plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
-plt.grid()
-ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
-ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-ax.ticklabel_format(style='plain', axis='x')
-plt.legend(loc=3)
-plt.savefig(f"./{title}/err_nrmse_ensemble.png", bbox_inches="tight")
-plt.clf()
+    ax = plt.gca()
+    plt.loglog(samplehist, ehsm, "b-", label='Adaptive' )
+    plt.loglog(samplehistk, eksm, 'k-', label='LHS')
+    plt.loglog(samplehistk, easm, 'r-', label=f'Adaptive ({alt_model})')
+    plt.xlabel("Number of samples")
+    plt.ylabel(r"$\sigma$ Error")
+    plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
+    plt.grid()
+    ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
+    ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
+    ax.ticklabel_format(style='plain', axis='x')
 
-ax = plt.gca()
-plt.loglog(samplehist, ehmm, "b-", label='Adaptive' )
-plt.loglog(samplehistk, ekmm, 'k-', label='LHS')
-plt.loglog(samplehistk, eamm, 'r-', label=f'Adaptive ({alt_model})')
-plt.xlabel("Number of samples")
-plt.ylabel("Mean Error")
-plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
-plt.grid()
-ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
-ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-ax.ticklabel_format(style='plain', axis='x')
-
-plt.legend(loc=3)
-plt.savefig(f"./{title}/err_mean_ensemble.png", bbox_inches="tight")
-plt.clf()
-
-ax = plt.gca()
-plt.loglog(samplehist, ehsm, "b-", label='Adaptive' )
-plt.loglog(samplehistk, eksm, 'k-', label='LHS')
-plt.loglog(samplehistk, easm, 'r-', label=f'Adaptive ({alt_model})')
-plt.xlabel("Number of samples")
-plt.ylabel(r"$\sigma$ Error")
-plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
-plt.grid()
-ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
-ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-ax.ticklabel_format(style='plain', axis='x')
-
-plt.legend(loc=3)
-plt.savefig(f"./{title}/err_stdv_ensemble.png", bbox_inches="tight")
-plt.clf()
+    plt.legend(loc=3)
+    plt.savefig(f"./{title}/err_stdv_ensemble.png", bbox_inches="tight")
+    plt.clf()
 
