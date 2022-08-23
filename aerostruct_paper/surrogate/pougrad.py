@@ -9,7 +9,7 @@ from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.stats import qmc
 from sutils import estimate_pou_volume, innerMatrixProduct, quadraticSolveHOnly, symMatfromVec
 from sutils import standardization2
-from pou_cython_ext import POUEval
+#from pou_cython_ext import POUEval
 
 """
 Gradient-Enhanced Partition-of-Unity Surrogate model
