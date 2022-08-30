@@ -6,6 +6,41 @@ import numpy as np
 
 from smt.problems.problem import Problem
 
+
+class Sine1D(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 1, values=[2], types=int)
+        self.options.declare("name", "Sine1D", types=str)
+
+    def _setup(self):
+        self.xlimits[:, 0] = 0.0
+        self.xlimits[:, 1] = 2.*np.pi
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        if kx is None:
+            y[:,0] = np.sin(x[:,0])
+        else:
+            y[:,0] = np.cos(x[:,0])
+
+        return y
+
 class Heaviside(Problem):
     def _initialize(self):
         self.options.declare("ndim", 1, values=[2], types=int)

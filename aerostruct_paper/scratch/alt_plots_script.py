@@ -321,7 +321,7 @@ if rank == 0:
     ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
     ax.ticklabel_format(style='plain', axis='x')
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_nrmse_ensemble.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/err_nrmse_ensemble.pdf", bbox_inches="tight")
     plt.clf()
 
     ax = plt.gca()
@@ -337,7 +337,7 @@ if rank == 0:
     ax.ticklabel_format(style='plain', axis='x')
 
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_mean_ensemble.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/err_mean_ensemble.pdf", bbox_inches="tight")
     plt.clf()
 
     ax = plt.gca()
@@ -353,6 +353,6 @@ if rank == 0:
     ax.ticklabel_format(style='plain', axis='x')
 
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_stdv_ensemble.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/err_stdv_ensemble.pdf", bbox_inches="tight")
     plt.clf()
 

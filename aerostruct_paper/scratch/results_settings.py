@@ -1,23 +1,25 @@
 
-header = "pou_wDV_test"
-skip_LHS = False
+header = "pou_localswitch_test"
+skip_LHS = True
 LHS_batch = 4
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "wingweight"    #problem
-dim = 10     #problem dimension
+prob  = "arctan"    #problem
+dim = 2     #problem dimension
 
 
 # Surrogate Settings
 stype = "pouhess"    #surrogate type
-rtype = "hess"     #criteria type
+# rtype = "poussa"#     #criteria type #poussa
+rype =  "hess"
 corr  = "matern32"  #kriging correlation
 poly  = "linear"    #kriging regression 
 extra = dim           #gek extra points
 t0 = [1e-0]
-tb = [1e-2, 2e+1]
-rho = 120            #POU parameter
+tb = [1e-5, 2e+1]
+C = 5.5
+rho = 10          #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*5       #initial design size

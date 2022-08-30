@@ -234,7 +234,7 @@ ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
 ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 plt.legend(loc=3)
-plt.savefig(f"./{title}/err_nrmse_ensemble.png", bbox_inches="tight")
+plt.savefig(f"./{title}/err_nrmse_ensemble.pdf", bbox_inches="tight")
 plt.clf()
 
 ax = plt.gca()
@@ -249,7 +249,7 @@ ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 
 plt.legend(loc=3)
-plt.savefig(f"./{title}/err_mean_ensemble.png", bbox_inches="tight")
+plt.savefig(f"./{title}/err_mean_ensemble.pdf", bbox_inches="tight")
 plt.clf()
 
 ax = plt.gca()
@@ -264,7 +264,7 @@ ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
 ax.ticklabel_format(style='plain', axis='x')
 
 plt.legend(loc=3)
-plt.savefig(f"./{title}/err_stdv_ensemble.png", bbox_inches="tight")
+plt.savefig(f"./{title}/err_stdv_ensemble.pdf", bbox_inches="tight")
 plt.clf()
 
 trx = mf[0].training_points[None][0][0]
@@ -300,7 +300,7 @@ if(dim == 1):
     plt.xlabel(r"$x$")
     plt.ylabel(r"$f$")
     #plt.legend(loc=1)
-    plt.savefig(f"./{title}/1d_adaptive_pts.png", bbox_inches="tight")#"tight")
+    plt.savefig(f"./{title}/1d_adaptive_pts.pdf", bbox_inches="tight")#"tight")
     plt.clf()
 
     ndir = 75
@@ -323,7 +323,7 @@ if(dim == 1):
     plt.xlabel(r"$x$")
     plt.ylabel(r"$f$")
     #plt.legend(loc=1)
-    plt.savefig(f"./{title}/1dtrue.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/1dtrue.pdf", bbox_inches="tight")
     plt.clf()
 
     # Plot Non-Adaptive Error
@@ -335,7 +335,7 @@ if(dim == 1):
     #plt.legend(loc=1)
     plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", label='Initial Samples')
     plt.plot(trx[nt0:,0], trf[nt0:,0], "ro", label='Adaptive Samples')
-    plt.savefig(f"./{title}/1dplot.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/1dplot.pdf", bbox_inches="tight")
     plt.clf()
 
     # Plot Non-Adaptive Error
@@ -346,7 +346,7 @@ if(dim == 1):
     #plt.legend(loc=1)
     plt.plot(trx[0:nt0,0], np.zeros_like(trf[0:nt0,0]), "bo", label='Initial Samples')
     plt.plot(trx[nt0:,0], np.zeros_like(trf[nt0:,0]), "ro", label='Adaptive Samples')
-    plt.savefig(f"./{title}/1derr.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/1derr.pdf", bbox_inches="tight")
 
     plt.clf()
 
@@ -361,7 +361,7 @@ if(dim == 2):
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
-    plt.savefig(f"./{title}/2d_adaptive_pts.png", bbox_inches="tight")#"tight")
+    plt.savefig(f"./{title}/2d_adaptive_pts.pdf", bbox_inches="tight")#"tight")
     plt.clf()
     
     plt.clf()
@@ -370,7 +370,7 @@ if(dim == 2):
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
-    plt.savefig(f"./{title}/2d_lhs_pts.png", bbox_inches="tight")#"tight")
+    plt.savefig(f"./{title}/2d_lhs_pts.pdf", bbox_inches="tight")#"tight")
     plt.clf()
 
     # Plot Error contour
@@ -404,7 +404,7 @@ if(dim == 2):
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
-    plt.savefig(f"./{title}/2d_true.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/2d_true.pdf", bbox_inches="tight")
 
     plt.clf()
 
@@ -415,7 +415,7 @@ if(dim == 2):
     #plt.legend(loc=1)
     plt.plot(trx[0:nt0,0], trx[0:nt0,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
     plt.plot(trx[nt0:,0], trx[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
-    plt.savefig(f"./{title}/2d_errcon_a.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/2d_errcon_a.pdf", bbox_inches="tight")
 
     plt.clf()
 
@@ -426,7 +426,7 @@ if(dim == 2):
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     plt.plot(tk[:,0], tk[:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='LHS Samples')
-    plt.savefig(f"./{title}/2d_errcon_k.png", bbox_inches="tight")
+    plt.savefig(f"./{title}/2d_errcon_k.pdf", bbox_inches="tight")
 
     plt.clf()
 

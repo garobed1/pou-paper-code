@@ -41,6 +41,13 @@ class ASCriteria():
         self.options = OptionsDictionary()
         self._init_options()
         self.options.declare("print_iter", True, types=bool)
+        self.options.declare(
+            "print_rc_plots", 
+            False, 
+            types=bool,
+            desc="Print plots of the RC function if 1D or 2D"
+            )
+
         self.options.update(kwargs)
         
         self.nnew = 1

@@ -137,6 +137,9 @@ class POUSurrogate(SurrogateModel):
         xc = self.training_points[None][0][0]
         f = self.training_points[None][0][1]
 
+        self.dim = xc.shape[1]
+        self.ntr = xc.shape[0]
+
         # Center and scale X and y
         (
             self.X_norma,
@@ -149,7 +152,9 @@ class POUSurrogate(SurrogateModel):
 
         self.g_norma = np.zeros([xc.shape[0], xc.shape[1]])
         
-        for i in range(self.xc.shape[1]):
+        self.g_norma = np.zeros([xc.shape[0], xc.shape[1]])
+        
+        for i in range(self.dim):
             self.g_norma[:,[i]] = self.training_points[None][i+1][1]*(self.X_scale[i]/self.y_std)
 
         self.h = np.zeros([xc.shape[0], self.dim, self.dim])
@@ -781,3 +786,112 @@ class POUErrorVol(POUError):
         bounds = np.zeros([n,2])
         bounds[:,1] = 1.
         self.dV = estimate_pou_volume(self.training_points[None][0][0], bounds)
+
+
+
+
+
+class POUCV(SurrogateModel): 
+    name = "POU"
+    """
+    Computes cross-validation error of POU model
+
+    Parameters
+    ----------
+
+    xcenter : numpy array(numsample, dim)
+        Surrogate data locations
+    func : numpy array(numsample)
+        Surrogate data outputs
+    grad : numpy array(numsample, dim)
+        Surrogate data gradients
+    rho : float
+        Hyperparameter that controls smoothness
+    delta : float
+        Parameter used to regularize the distance function
+
+    """
+    def _initialize(self):#, xcenter, func, grad, rho, delta=1e-10):
+        # initialize data and parameters
+        super(POUCV, self)._initialize()
+        declare = self.options.declare
+        declare(
+            "pmodel",
+            desc="POU Model of Interest",
+            types=(SurrogateModel),
+        )
+
+
+    """
+    Evaluate the CV error at point x
+
+    Parameters
+    ----------
+
+    Parameters
+        ----------
+        x : np.ndarray[nt, nx]
+            Input values for the prediction points.
+
+        Returns
+        -------
+        y : np.ndarray[nt, ny]
+            Output values at the prediction points.
+        
+    """
+    def _predict_values(self, xt):
+
+        pmodel = self.options["pmodel"]
+
+        xc = pmodel.X_norma
+        f = pmodel.y_norma
+        g = pmodel.g_norma
+        h = pmodel.h
+        numsample = xc.shape[0]
+        delta = pmodel.options["delta"]
+        rho = pmodel.options["rho"]
+
+        # y_ = POUEval(X_cont, xc, f, g, h, delta, rho)
+
+        # loop over rows in xt
+        y_ = np.zeros(xt.shape[0])
+        for k in range(xt.shape[0]):
+            x = xt[k,:]
+
+            # exhaustive search for closest sample point, for regularization
+            D = cdist(np.array([x]),xc)
+            mindist = min(D[0])
+
+            numer = 0
+            denom = 0
+
+            # evaluate the surrogate, requiring the distance from every point
+            # for i in range(numsample):
+            work = x - xc
+            dist = D[0][:] + delta#np.sqrt(D[0][i] + delta)
+            expfac = np.exp(-rho*(dist-mindist))
+            local = np.zeros(numsample)
+            for i in range(numsample):
+                local[i] = f[i] + pmodel.higher_terms(work[i], g[i], h[i])
+            numer = np.dot(local, expfac)
+            denom = np.sum(expfac)
+            # t2 = time.time()
+
+            # exec1 += t1-t0
+            # exec2 += t2-t1
+            
+
+            y_base = numer/denom
+            y_[k] = 0
+            for i in range(numsample):
+                y_i = (numer - local[i]*expfac[i])/(denom - expfac[i])
+                y_[k] += (y_base - y_i)**2
+            y_[k] = np.sqrt(y_[k]/numsample)
+
+        y = y_.ravel()
+        # print("mindist  = ", exec1)
+        # print("evaluate = ", exec2)
+
+        return y
+
+

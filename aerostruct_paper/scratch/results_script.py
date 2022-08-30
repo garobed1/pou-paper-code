@@ -10,7 +10,7 @@ import numpy as np
 from refinecriteria import looCV, HessianFit, TEAD
 from aniso_criteria import AnisotropicRefine
 from taylor_criteria import TaylorRefine, TaylorExploreRefine
-from hess_criteria import HessianRefine
+from hess_criteria import HessianRefine, POUSSA
 from aniso_transform import AnisotropicTransform
 from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
@@ -114,6 +114,7 @@ testdata = comm.bcast(testdata, root=0)
 # Adaptive Sampling Conditions
 options = DefaultOptOptions
 options["local"] = False
+options["localswitch"] = True
 options["errorcheck"] = testdata
 options["multistart"] = mstarttype
 options["lmethod"] = opt
@@ -333,6 +334,8 @@ for n in cases[rank]:
         RC0.append(TaylorExploreRefine(model0[co], gtrain0[n], xlimits, rscale=rscale, improve=pperb, objective=obj, multistart=multistart) ) 
     elif(rtype == "hess"):
         RC0.append(HessianRefine(model0[co], gtrain0[n], xlimits, neval=neval, rscale=rscale, improve=pperb, multistart=multistart) )
+    elif(rtype == "poussa"):
+        RC0.append(POUSSA(model0[co], gtrain0[n], xlimits, improve=pperb, multistart=multistart))
     else:
         raise ValueError("Given criteria not valid.")
     co += 1

@@ -24,9 +24,12 @@ def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, co
     if(type == "global"):
         if(method == "ga"):
             #constraints = NonlinearConstraint(constraints["fun"], lb=0., ub=np.inf)
-            results = differential_evolution(func, bounds, args, strategy, maxiter=giter, popsize=gpop, tol=gtol)
+            results = differential_evolution(func, bounds, args, strategy, maxiter=giter, popsize=gpop, tol=gtol, disp=False)
         else:
             return
+
+        if(options["localswitch"]):
+            results = minimize(func, results.x, args, method=lmethod, jac=jac, hess=hess, bounds=bounds, constraints=constraints, tol=ltol, options={"maxiter":liter,"disp":False, "iprint":1})
 
     # if local, use minimize
     else:

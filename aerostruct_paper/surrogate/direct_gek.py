@@ -100,7 +100,6 @@ class DGEK(KrgBased):
             Q, G
             QR decomposition of the matrix Ft.
         """
-        
         # Initialize output
         reduced_likelihood_function_value = -np.inf
         par = {}
@@ -172,13 +171,13 @@ class DGEK(KrgBased):
         else:
             raise ValueError("Not available for this correlation kernel")
 
-        #R[self.nt:(self.nt+self.nt*n_comp), self.nt:(self.nt+self.nt*n_comp)] = np.eye(self.nt)*(3*theta*theta)
+        # R[self.nt:(self.nt+self.nt*n_comp), self.nt:(self.nt+self.nt*n_comp)] = np.eye(self.nt)*(3*theta*theta)
         R[self.ij[:, 0], self.ij[:, 1]] = r[:, 0]
         R[self.ij[:, 1], self.ij[:, 0]] = r[:, 0]
         P[self.ij[:, 0], self.ij[:, 1]] = r[:, 0]
         P[self.ij[:, 1], self.ij[:, 0]] = r[:, 0]
-        print(theta)
-        print(np.linalg.cond(P))
+        # print(theta)
+        # print(np.linalg.cond(P))
         # import pdb; pdb.set_trace()
         # R[self.nt:, self.nt:] = S.copy()
 
@@ -191,7 +190,6 @@ class DGEK(KrgBased):
             S[(self.ij[k,1]*n_comp):(self.ij[k,1]*n_comp+n_comp), (self.ij[k,0]*n_comp):(self.ij[k,0]*n_comp+n_comp)] = -d2r[k].T
         
         # upper and lower grad
-        for k in range(n_elem):
             R[self.ij[k,0], (self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp)] = -dr[k]
             R[self.ij[k,1], (self.nt + self.ij[k,0]*n_comp):(self.nt + self.ij[k,0]*n_comp+n_comp)] = dr[k]
             R[(self.nt + self.ij[k,1]*n_comp):(self.nt + self.ij[k,1]*n_comp+n_comp), self.ij[k,0]] = -dr[k].T
@@ -214,8 +212,9 @@ class DGEK(KrgBased):
         Oa[self.nt:] = 0
 
         
-
-
+        # print(theta)
+        # print(np.linalg.cond(R))
+        # import pdb; pdb.set_trace()
 
         # Invert the augmented covariance matrix R (Lockwood and Anitescu 2012)
         #defs
@@ -274,9 +273,9 @@ class DGEK(KrgBased):
 
         # Compute/Organize output
         sigma2 = np.dot(np.dot(rho, Rinv), rho) /self.nt
-        # sigma2 = np.dot(rhot, rhot) / (self.nt)
-        work1 = -full_size*np.log(sigma2) 
-        work2 = -np.log(detR)#**(1/full_size)
+        # sigma2 = (rho ** 2.0).sum(axis=0) / (self.nt)
+        work1 = -self.nt*np.log10(sigma2) 
+        work2 = -np.log10(detR)#**(1/full_size)
         reduced_likelihood_function_value = work1 + work2
         # work = detR**(1/full_size)
         # reduced_likelihood_function_value = -sigma2*(work)
@@ -319,7 +318,6 @@ class DGEK(KrgBased):
         # print(work1)
         # print(work2)
         # print(np.linalg.cond(P))
-        # print(np.linalg.cond(M))
         return reduced_likelihood_function_value, par
 
 

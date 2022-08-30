@@ -25,22 +25,22 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "arctan"    #problem
+prob  = "tensorexp"    #problem
 plot  = -1
 
 # Conditions
 dim = 1      #problem dimension
 corr  = "squar_exp" #kriging correlation
-poly  = "constant"    #kriging regression 
+poly  = "linear"    #kriging regression 
 ncomp = dim
 extra = 2           #gek extra points
 nt0 = 10
-ntr = 10
+ntr = 70
 batch = 10
-tval = 1e-0
+tval = 1e-2
 t0 = [1e-2]
 t0g = [tval]
-tb = [1e-3, 20]
+tb = [1e-5, 20]
 tbg = tb#[tval, tval+1e-4]#[tval, tval]
 Nerr = 5000       #number of test points to evaluate the error
 dx = 1e-4
@@ -125,26 +125,26 @@ modeldge.options.update({"print_prediction":False})
 #     modeldge.set_training_derivatives(xtrainK[0], gtrainK[0][:,i:i+1], i)
 # modeldge.train()
 
-# if(dim > 1):
-#     modelgek = GEKPLS(xlimits=xlimits)
-#     modelgek.options.update({"theta0":t0g})
-#     modelgek.options.update({"theta_bounds":tbg})
-#     modelgek.options.update({"n_comp":ncomp})
-#     modelgek.options.update({"extra_points":extra})
-#     modelgek.options.update({"corr":corr})
-#     modelgek.options.update({"poly":poly})
-#     modelgek.options.update({"n_start":5})
-#     modelgek.options.update({"delta_x":dx})
-#     modelgek.options.update({"print_prediction":False})
-# else:
-#     modelgek = KRG()
-#     #modelgek.options.update({"hyper_opt":"TNC"})
-#     modelgek.options.update({"theta0":t0g})
-#     modelgek.options.update({"theta_bounds":tbg})
-#     modelgek.options.update({"corr":corr})
-#     modelgek.options.update({"poly":poly})
-#     modelgek.options.update({"n_start":5})
-#     modelgek.options.update({"print_prediction":False})
+if(dim > 1):
+    modelgek = GEKPLS(xlimits=xlimits)
+    modelgek.options.update({"theta0":t0g})
+    modelgek.options.update({"theta_bounds":tbg})
+    modelgek.options.update({"n_comp":ncomp})
+    modelgek.options.update({"extra_points":extra})
+    modelgek.options.update({"corr":corr})
+    modelgek.options.update({"poly":poly})
+    modelgek.options.update({"n_start":5})
+    modelgek.options.update({"delta_x":dx})
+    modelgek.options.update({"print_prediction":False})
+else:
+    modelgek = KRG()
+    #modelgek.options.update({"hyper_opt":"TNC"})
+    modelgek.options.update({"theta0":t0g})
+    modelgek.options.update({"theta_bounds":tbg})
+    modelgek.options.update({"corr":corr})
+    modelgek.options.update({"poly":poly})
+    modelgek.options.update({"n_start":5})
+    modelgek.options.update({"print_prediction":False})
 
 modelkpl = KPLS()
 #modelkpl.options.update({"hyper_opt":"TNC"})
@@ -174,63 +174,63 @@ mkpl = []
 mkrg = []
 mdge = []
 for j in range(nruns):
-    # if(dim > 1):
-    #     modelgek.set_training_values(xtrainK[j], ftrainK[j])
-    #     for i in range(dim):
-    #         modelgek.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
-    #     modelgek.train()
-    # else:
-    #     nex = xtrainK[j].shape[0]
-    #     xaug = np.zeros([nex, 1])
-    #     faug = np.zeros([nex, 1])
-    #     for k in range(nex):
-    #         xaug[k] = xtrainK[j][k] + dx
-    #         faug[k] = ftrainK[j][k] + dx*gtrainK[j][k]
-    #     xtot = np.append(xtrainK[j], xaug, axis=0)
-    #     ftot = np.append(ftrainK[j], faug, axis=0)
-    #     modelgek.set_training_values(xtot, ftot)
-    #     modelgek.train()
-    # mgek.append(copy.deepcopy(modelgek))
-    # print("GEK Done")
+    if(dim > 1):
+        modelgek.set_training_values(xtrainK[j], ftrainK[j])
+        for i in range(dim):
+            modelgek.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
+        modelgek.train()
+    else:
+        nex = xtrainK[j].shape[0]
+        xaug = np.zeros([nex, 1])
+        faug = np.zeros([nex, 1])
+        for k in range(nex):
+            xaug[k] = xtrainK[j][k] + dx
+            faug[k] = ftrainK[j][k] + dx*gtrainK[j][k]
+        xtot = np.append(xtrainK[j], xaug, axis=0)
+        ftot = np.append(ftrainK[j], faug, axis=0)
+        modelgek.set_training_values(xtot, ftot)
+        modelgek.train()
+    mgek.append(copy.deepcopy(modelgek))
+    print("GEK Done")
     modelkpl.set_training_values(xtrainK[j], ftrainK[j])
     modelkpl.train()
     mkpl.append(copy.deepcopy(modelkpl))
     print("KPL Done")
     modelkrg.set_training_values(xtrainK[j], ftrainK[j])
     modelkrg.train()
-    # errgek.append(rmse(modelgek, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    errgek.append(rmse(modelgek, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     errkpl.append(rmse(modelkpl, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     errkrg.append(rmse(modelkrg, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
     mkrg.append(copy.deepcopy(modelkrg))
     print("KRG Done")
 
-    modeldge.set_training_values(xtrainK[j], ftrainK[j])
-    for i in range(dim):
-        modeldge.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
-    modeldge.train()
-    errdge.append(rmse(modeldge, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-    mdge.append(copy.deepcopy(modeldge))
-    print("DGEK Done")
+    # modeldge.set_training_values(xtrainK[j], ftrainK[j])
+    # for i in range(dim):
+    #     modeldge.set_training_derivatives(xtrainK[j], gtrainK[j][:,i:i+1], i)
+    # modeldge.train()
+    # errdge.append(rmse(modeldge, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+    # mdge.append(copy.deepcopy(modeldge))
+    # print("DGEK Done")
 
-# print("IGEK")
-# print(errgek)
-# print(modelgek.optimal_theta)
+print("IGEK")
+print(errgek)
+print(modelgek.optimal_theta)
 print("KPL")
 print(errkpl)
 print(modelkpl.optimal_theta)
 print("KRG")
 print(errkrg)
 print(modelkrg.optimal_theta)
-print("DGEK")
-print(errdge)
-print(modeldge.optimal_theta)
+# print("DGEK")
+# print(errdge)
+# print(modeldge.optimal_theta)
 
 if(nruns > 2):
 
-    # plt.loglog(nt, errgek, "m-", label=f'GEK')
+    plt.loglog(nt, errgek, "m-", label=f'GEK')
     plt.loglog(nt, errkpl, 'b-', label='KPL')
     plt.loglog(nt, errkrg, 'r-', label='KRG')
-    plt.loglog(nt, errdge, 'c-', label='DGEK')
+    # plt.loglog(nt, errdge, 'c-', label='DGEK')
     plt.xlabel("Number of samples")
     plt.ylabel("NRMSE")
     plt.grid()
@@ -246,11 +246,11 @@ if(dim == 1):
     xlimits = trueFunc.xlimits
     x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
 
-    # Zgek = np.zeros([ndir, ndir])
+    Zgek = np.zeros([ndir, ndir])
     Zkpl = np.zeros([ndir, ndir])
     Zkrg = np.zeros([ndir, ndir])
     Zdge = np.zeros([ndir, ndir])
-    # Fgek = np.zeros([ndir, ndir])
+    Fgek = np.zeros([ndir, ndir])
     Fkpl = np.zeros([ndir, ndir])
     Fkrg = np.zeros([ndir, ndir])
     Fdge = np.zeros([ndir, ndir])
@@ -260,18 +260,18 @@ if(dim == 1):
         xi = np.zeros([1,1])
         xi[0] = x[i]
         TF[i] = trueFunc(xi)
-        # Fgek[i] = mgek[plot].predict_values(xi)
+        Fgek[i] = mgek[plot].predict_values(xi)
         Fkpl[i] = mkpl[plot].predict_values(xi)
         Fkrg[i] = mkrg[plot].predict_values(xi)
         Fdge[i] = mdge[plot].predict_values(xi)
-        # Zgek[i] = abs(Fgek[i] - TF[i])
+        Zgek[i] = abs(Fgek[i] - TF[i])
         Zkpl[i] = abs(Fkpl[i] - TF[i])
         Zkrg[i] = abs(Fkrg[i] - TF[i])
         Zdge[i] = abs(Fdge[i] - TF[i])
 
     # Plot Non-Adaptive Error
     plt.plot(x, TF, "-k")
-    # plt.plot(x, Fgek, "-m", label=f'IGEK')
+    plt.plot(x, Fgek, "-m", label=f'IGEK')
     plt.plot(x, Fkpl, "-b", label=f'KPL')
     plt.plot(x, Fkrg, "-r", label=f'KRG')
     plt.plot(x, Fdge, "-c", label=f'DGEK')
@@ -284,7 +284,7 @@ if(dim == 1):
     plt.clf()
 
     # Plot Non-Adaptive Error
-    # plt.plot(x, Zgek, "-m", label=f'IGEK')
+    plt.plot(x, Zgek, "-m", label=f'IGEK')
     plt.plot(x, Zkpl, "-b", label=f'KPL')
     plt.plot(x, Zkrg, "-r", label=f'KRG')
     plt.plot(x, Zdge, "-c", label=f'DGEK')
@@ -341,15 +341,15 @@ if(dim == 2):
 
     plt.clf()
 
-    # plt.contour(X, Y, Zgek, levels = cs.levels)
-    # plt.colorbar(cs, )
-    # plt.xlabel(r"$x_1$")
-    # plt.ylabel(r"$x_2$")
-    # #plt.legend(loc=1)
-    # plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
-    # plt.savefig(f"./gek_errcona.png", bbox_inches="tight")
+    plt.contour(X, Y, Zgek, levels = cs.levels)
+    plt.colorbar(cs, )
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    #plt.legend(loc=1)
+    plt.plot(xtrainK[-1][:,0], xtrainK[-1][:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+    plt.savefig(f"./gek_errcona.png", bbox_inches="tight")
 
-    # plt.clf()
+    plt.clf()
 
     
 
