@@ -224,7 +224,7 @@ elif(stype == "pou"):
     modelbase = POUSurrogate()
     modelbase.options.update({"rho":rho})
 elif(stype == "pouhess"):
-    modelbase = POUHessian(bounds=xlimits)
+    modelbase = POUHessian(bounds=xlimits, rscale=rscale)
     modelbase.options.update({"rho":rho})
     modelbase.options.update({"neval":neval})
 elif(stype == "kpls"):

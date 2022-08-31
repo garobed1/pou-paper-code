@@ -97,7 +97,7 @@ class HessianRefine(ASCriteria):
         self.trx = trx
         
         # Determine rho for the error model
-        self.rho = self.options['rscale']*(self.ntr/self.dim)
+        self.rho = self.options['rscale']*pow(self.ntr, 1./self.dim)
 
         # Generate kd tree for nearest neighbors lookup
         self.tree = KDTree(self.trx)

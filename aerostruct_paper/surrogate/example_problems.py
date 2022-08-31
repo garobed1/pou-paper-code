@@ -199,6 +199,11 @@ class QuadHadamard(Problem):
         self.xlimits[:, 1] = 10.
 
         self.dim = self.options["ndim"]
+
+        if(self.dim == 16):
+            self.mean = 112.68464900969741
+            self.stdev = 50.64728616481403
+
         self.eigen_vals = np.zeros(self.dim)
         self.eigen_vectors = np.zeros((self.dim, self.dim))
         self.eigen_decayrate = self.options["eigenrate"]
@@ -296,8 +301,25 @@ class MultiDimJump(Problem):
         self.xlimits[:, 0] = -2.5
         self.xlimits[:, 1] = 2.5
 
+        self.dim = self.options["ndim"]
         self.t = np.ones(self.options["ndim"])# np.random.normal(size=self.options["ndim"])
         
+        if(self.dim == 1):
+            self.mean = 0.
+            self.stdev = 1.3950154957734922
+
+        if(self.dim == 2):
+            self.mean = 0.
+            self.stdev = 1.3643327395075313
+
+        if(self.dim == 6):
+            self.mean = 0.
+            self.stdev = 1.362917285776268
+
+        if(self.dim == 12):
+            self.mean = 0.
+            self.stdev = 1.3613630211906838
+
         self.t = self.t/np.linalg.norm(self.t)
         self.alpha = self.options["alpha"]
 
@@ -536,6 +558,9 @@ class Peaks2D(Problem):
         self.xlimits[0, 1] = 3.0
         self.xlimits[1, 0] = -3.0
         self.xlimits[1, 1] = 3.0
+
+        self.mean = 0.362770232179922
+        self.stdev = 1.9065492039328813
 
     def _evaluate(self, x, kx):
         """

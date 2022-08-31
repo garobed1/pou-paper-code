@@ -52,6 +52,12 @@ class POUSurrogate(SurrogateModel):
             types=(int, float),
             desc="Distance scaling parameter"
         )
+        declare(
+            "rscale",
+            None,
+            types=(int, float),
+            desc="Scaling factor for auto refining rho"
+        )
 
         declare(
             "delta",
@@ -89,6 +95,9 @@ class POUSurrogate(SurrogateModel):
         numsample = xc.shape[0]
         delta = self.options["delta"]
         rho = self.options["rho"]
+
+        if(self.options["rscale"]):
+            rho = self.options["rscale"]*pow(numsample, 1./xc.shape[1])
 
         # y_ = POUEval(X_cont, xc, f, g, h, delta, rho)
 
@@ -184,6 +193,7 @@ class POUHessian(POUSurrogate):
             types=(int, float),
             desc="Distance scaling parameter"
         )
+
 
         declare(
             "delta",
