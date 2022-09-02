@@ -16,7 +16,7 @@ from mphys.scenario_aerostructural import ScenarioAeroStructural
 from mphys.mphys_adflow import ADflowBuilder
 from mphys_eb import EBBuilder
 from mphys_onetoone import OTOBuilder
-from mphys.mphys_meld import MeldBuilder
+#from mphys.mphys_meld import MeldBuilder
 #from mphys.mphys_rlt import RltBuilder
 
 from baseclasses import AeroProblem
