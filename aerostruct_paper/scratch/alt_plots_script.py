@@ -36,7 +36,7 @@ sampling, and compare performance.
 
 # Give directory with desired results as argument
 title = sys.argv[1]
-alt_model = sys.argv[2]
+alt_model = ['kriging','gekpls']#sys.argv[2]
 setmod = importlib.import_module(f'{title[:-1]}.settings')
 ssettings = setmod.__dict__
 
@@ -162,51 +162,54 @@ xtest = comm.bcast(xtest, root=0)
 ftest = comm.bcast(ftest, root=0)
 
 # Generate Alternative Surrogate
-if(alt_model == "gekpls"):
-    modelbase = GEKPLS(xlimits=xlimits)
-    # modelbase.options.update({"hyper_opt":'TNC'})
-    # modelbase.options.update({"theta0":t0g})
-    # modelbase.options.update({"theta_bounds":tbg})
-    modelbase.options.update({"n_comp":dim})
-    modelbase.options.update({"extra_points":ssettings["extra"]})
-    modelbase.options.update({"corr":ssettings["corr"]})
-    modelbase.options.update({"poly":ssettings["poly"]})
-    modelbase.options.update({"n_start":5})
-elif(alt_model == "dgek"):
-    modelbase = DGEK(xlimits=xlimits)
-    # modelbase.options.update({"hyper_opt":'TNC'})
-    modelbase.options.update({"corr":ssettings["corr"]})
-    modelbase.options.update({"poly":ssettings["poly"]})
-    modelbase.options.update({"n_start":5})
-    modelbase.options.update({"theta0":ssettings["t0"]})
-    modelbase.options.update({"theta_bounds":ssettings["tb"]})
-elif(alt_model == "pou"):
-    modelbase = POUSurrogate()
-    modelbase.options.update({"rho":ssettings["rho"]})
-elif(alt_model == "pouhess"):
-    modelbase = POUHessian(bounds=xlimits)
-    modelbase.options.update({"rho":ssettings["rho"]})
-    modelbase.options.update({"neval":ssettings["neval"]})
-elif(alt_model == "kpls"):
-    modelbase = KPLS()
-    # modelbase.options.update({"hyper_opt":'TNC'})
-    modelbase.options.update({"n_comp":dim})
-    modelbase.options.update({"corr":ssettings["corr"]})
-    modelbase.options.update({"poly":ssettings["poly"]})
-    modelbase.options.update({"n_start":5})
-elif(alt_model == "kriging"):
-    modelbase = KRG()
-    # modelbase.options.update({"hyper_opt":'TNC'})
-    modelbase.options.update({"corr":ssettings["corr"]})
-    modelbase.options.update({"poly":ssettings["poly"]})
-    modelbase.options.update({"n_start":5})
-else:
-    raise ValueError("Given alternative model not valid.")
-# modelbase.options.update({"print_global":False})
-modelbase.options.update({"print_training":True})
-modelbase.options.update({"print_prediction":True})
-modelbase.options.update({"print_problem":True})
-modelbase.options.update({"print_solver":True})
+# if(alt_model == "gekpls"):
+modelbase2 = GEKPLS(xlimits=xlimits)
+# modelbase.options.update({"hyper_opt":'TNC'})
+modelbase2.options.update({"theta0":ssettings["t0"]})
+modelbase2.options.update({"theta_bounds":ssettings["tb"]})
+modelbase2.options.update({"n_comp":dim})
+modelbase2.options.update({"extra_points":ssettings["extra"]})
+modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})#
+modelbase2.options.update({"poly":ssettings["poly"]})
+modelbase2.options.update({"n_start":5})
+# elif(alt_model == "dgek"):
+#     modelbase = DGEK(xlimits=xlimits)
+#     # modelbase.options.update({"hyper_opt":'TNC'})
+#     modelbase.options.update({"corr":ssettings["corr"]})
+#     modelbase.options.update({"poly":ssettings["poly"]})
+#     modelbase.options.update({"n_start":5})
+#     modelbase.options.update({"theta0":ssettings["t0"]})
+#     modelbase.options.update({"theta_bounds":ssettings["tb"]})
+# elif(alt_model == "pou"):
+#     modelbase = POUSurrogate()
+#     modelbase.options.update({"rho":ssettings["rho"]})
+# elif(alt_model == "pouhess"):
+#     modelbase = POUHessian(bounds=xlimits)
+#     modelbase.options.update({"rho":ssettings["rho"]})
+#     modelbase.options.update({"neval":ssettings["neval"]})
+# elif(alt_model == "kpls"):
+#     modelbase = KPLS()
+#     # modelbase.options.update({"hyper_opt":'TNC'})
+#     modelbase.options.update({"n_comp":dim})
+#     modelbase.options.update({"corr":ssettings["corr"]})
+#     modelbase.options.update({"poly":ssettings["poly"]})
+#     modelbase.options.update({"n_start":5})
+# elif(alt_model == "kriging"):
+modelbase1 = KRG()
+# modelbase.options.update({"hyper_opt":'TNC'})
+modelbase1.options.update({"theta0":ssettings["t0"]})
+modelbase1.options.update({"theta_bounds":ssettings["tb"]})
+modelbase1.options.update({"corr":"squar_exp"})#ssettings["corr"]})
+modelbase1.options.update({"poly":ssettings["poly"]})
+modelbase1.options.update({"n_start":5})
+# else:
+#     raise ValueError("Given alternative model not valid.")
+modelbase1.options.update({"print_global":False})
+modelbase2.options.update({"print_global":True})
+# modelbase.options.update({"print_training":True})
+# modelbase.options.update({"print_prediction":True})
+# modelbase.options.update({"print_problem":True})
+# modelbase.options.update({"print_solver":True})
 
 
 
@@ -233,53 +236,125 @@ samplehist[iters-1] = mf[0].training_points[None][0][0].shape[0]
 for i in range(itersk):
     samplehistk[i] = len(xk[i])
 
-
-
-# Grab data from the adaptive sample sets
+# Grab data from the lhs and adaptive sample sets
 ind_alt = np.linspace(0, iters, itersk, dtype=int)
 xa = []
 fa = []
 ga = []
+xh = []
+fh = []
+gh = []
 for k in range(nruns):
     xa.append([])
     fa.append([])
     ga.append([])
+    xh.append([])
+    fh.append([])
+    gh.append([])
     for i in range(itersk-1):
         xa[k].append(hi[k][ind_alt[i]].model.training_points[None][0][0])
         fa[k].append(hi[k][ind_alt[i]].model.training_points[None][0][1])
         ga[k].append(np.zeros_like(hi[k][ind_alt[i]].model.training_points[None][0][0]))
         for j in range(dim):
             ga[k][i][:,j:j+1] = hi[k][ind_alt[i]].model.training_points[None][j+1][1]
+        xh[k].append(xk[i+k*itersk])
+        fh[k].append(fk[i+k*itersk])
+        gh[k].append(gk[i+k*itersk])
+
     xa[k].append(mf[k].training_points[None][0][0])
     fa[k].append(mf[k].training_points[None][0][1])
     ga[k].append(np.zeros_like(mf[k].training_points[None][0][0]))
     for j in range(dim):
         ga[k][-1][:,j:j+1] = mf[k].training_points[None][j+1][1]
+    xh[k].append(xk[itersk-1+k*itersk])
+    fh[k].append(fk[itersk-1+k*itersk])
+    gh[k].append(gk[itersk-1+k*itersk])
+    
 
 # Train alternative surrogates
-ma = [[] for _ in range(nperr)]
-ear = np.zeros([nperr, itersk])
-eam = np.zeros([nperr, itersk])
-eas = np.zeros([nperr, itersk])
+ma1 = [[] for _ in range(nperr)]
+ma2 = [[] for _ in range(nperr)]
+mh1 = [[] for _ in range(nperr)]
+mh2 = [[] for _ in range(nperr)]
+ear1 = np.zeros([nperr, itersk])
+eam1 = np.zeros([nperr, itersk])
+eas1 = np.zeros([nperr, itersk])
+ear2 = np.zeros([nperr, itersk])
+eam2 = np.zeros([nperr, itersk])
+eas2 = np.zeros([nperr, itersk])
+ehr1 = np.zeros([nperr, itersk])
+ehm1 = np.zeros([nperr, itersk])
+ehs1 = np.zeros([nperr, itersk])
+ehr2 = np.zeros([nperr, itersk])
+ehm2 = np.zeros([nperr, itersk])
+ehs2 = np.zeros([nperr, itersk])
 
 for k in range(nperr):
     ind = k + rank*nperr
     for i in range(itersk):
-        ma[k].append(copy.deepcopy(modelbase))
-        ma[k][i].set_training_values(xa[ind][i], fa[ind][i])
-        if(ma[k][i].supports["training_derivatives"]):
+        ma1[k].append(copy.deepcopy(modelbase1))
+        ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
+        if(ma1[k][i].supports["training_derivatives"]):
             for j in range(dim):
-                ma[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
-        ma[k][i].train()
-        ear[k][i], eam[k][i], eas[k][i] = full_error(ma[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+                ma1[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
+        ma1[k][i].train()
+        ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
 
-ma = comm.allgather(ma)
-ear = comm.allgather(ear)
-eam = comm.allgather(eam)
-eas = comm.allgather(eas)
-ear = np.concatenate(ear[:], axis=0)
-eam = np.concatenate(eam[:], axis=0)
-eas = np.concatenate(eas[:], axis=0)
+        ma2[k].append(copy.deepcopy(modelbase2))
+        ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
+        if(ma2[k][i].supports["training_derivatives"]):
+            for j in range(dim):
+                ma2[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
+        ma2[k][i].train()
+        ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+
+        mh1[k].append(copy.deepcopy(modelbase1))
+        mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
+        if(mh1[k][i].supports["training_derivatives"]):
+            for j in range(dim):
+                mh1[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
+        mh1[k][i].train()
+        ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+
+        mh2[k].append(copy.deepcopy(modelbase2))
+        mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
+        if(mh2[k][i].supports["training_derivatives"]):
+            for j in range(dim):
+                mh2[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
+        mh2[k][i].train()
+        ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        # import pdb; pdb.set_trace()
+ma1 = comm.allgather(ma1)
+ear1 = comm.allgather(ear1)
+eam1 = comm.allgather(eam1)
+eas1 = comm.allgather(eas1)
+ear1 = np.concatenate(ear1[:], axis=0)
+eam1 = np.concatenate(eam1[:], axis=0)
+eas1 = np.concatenate(eas1[:], axis=0)
+
+ma2 = comm.allgather(ma2)
+ear2 = comm.allgather(ear2)
+eam2 = comm.allgather(eam2)
+eas2 = comm.allgather(eas2)
+ear2 = np.concatenate(ear2[:], axis=0)
+eam2 = np.concatenate(eam2[:], axis=0)
+eas2 = np.concatenate(eas2[:], axis=0)
+
+mh1 = comm.allgather(mh1)
+ehr1 = comm.allgather(ehr1)
+ehm1 = comm.allgather(ehm1)
+ehs1 = comm.allgather(ehs1)
+ehr1 = np.concatenate(ehr1[:], axis=0)
+ehm1 = np.concatenate(ehm1[:], axis=0)
+ehs1 = np.concatenate(ehs1[:], axis=0)
+
+mh2 = comm.allgather(mh2)
+ehr2 = comm.allgather(ehr2)
+ehm2 = comm.allgather(ehm2)
+ehs2 = comm.allgather(ehs2)
+ehr2 = np.concatenate(ehr2[:], axis=0)
+ehm2 = np.concatenate(ehm2[:], axis=0)
+ehs2 = np.concatenate(ehs2[:], axis=0)
 
 # Average out runs
 ehrm = np.zeros(iters)
@@ -288,9 +363,19 @@ ehsm = np.zeros(iters)
 ekrm = np.zeros(itersk)
 ekmm = np.zeros(itersk)
 eksm = np.zeros(itersk)
-eamm = np.zeros(itersk)
-earm = np.zeros(itersk)
-easm = np.zeros(itersk)
+
+eamm1 = np.zeros(itersk)
+earm1 = np.zeros(itersk)
+easm1 = np.zeros(itersk)
+eamm2 = np.zeros(itersk)
+earm2 = np.zeros(itersk)
+easm2 = np.zeros(itersk)
+ehmm1 = np.zeros(itersk)
+ehrm1 = np.zeros(itersk)
+ehsm1 = np.zeros(itersk)
+ehmm2 = np.zeros(itersk)
+ehrm2 = np.zeros(itersk)
+ehsm2 = np.zeros(itersk)
 
 
 for i in range(nruns):
@@ -300,9 +385,20 @@ for i in range(nruns):
     ekrm += np.array(ekr[i]).T[0]/nruns
     ekmm += np.array(ekm[i]).T[0][0]/nruns
     eksm += np.array(ekm[i]).T[0][1]/nruns
-    earm += np.array(ear[i]).T/nruns
-    eamm += np.array(eam[i]).T/nruns
-    easm += np.array(eas[i]).T/nruns
+
+    earm1 += np.array(ear1[i]).T/nruns
+    eamm1 += np.array(eam1[i]).T/nruns
+    easm1 += np.array(eas1[i]).T/nruns
+    earm2 += np.array(ear2[i]).T/nruns
+    eamm2 += np.array(eam2[i]).T/nruns
+    easm2 += np.array(eas2[i]).T/nruns
+
+    ehrm1 += np.array(ehr1[i]).T/nruns
+    ehmm1 += np.array(ehm1[i]).T/nruns
+    ehsm1 += np.array(ehs1[i]).T/nruns
+    ehrm2 += np.array(ehr2[i]).T/nruns
+    ehmm2 += np.array(ehm2[i]).T/nruns
+    ehsm2 += np.array(ehs2[i]).T/nruns
 
 
 
@@ -310,9 +406,12 @@ for i in range(nruns):
 if rank == 0:
     #NRMSE
     ax = plt.gca()
-    plt.loglog(samplehist, ehrm, "b-", label=f'Adaptive')
-    plt.loglog(samplehistk, ekrm, 'k-', label='LHS')
-    plt.loglog(samplehistk, earm, 'r-', label=f'Adaptive ({alt_model})')
+    plt.loglog(samplehist, ehrm, "b-", label=f'H. Adapt (POU)')
+    plt.loglog(samplehistk, ekrm, 'k-', label='LHS (POU)')
+    plt.loglog(samplehistk, earm1,  label=f'H. Adapt {alt_model[0]}')
+    plt.loglog(samplehistk, ehrm1,  label=f'LHS {alt_model[0]}')
+    plt.loglog(samplehistk, earm2,  label=f'H. Adapt {alt_model[1]}')
+    plt.loglog(samplehistk, ehrm2,  label=f'LHS {alt_model[1]}')
     plt.xlabel("Number of samples")
     plt.ylabel("NRMSE")
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
@@ -321,13 +420,16 @@ if rank == 0:
     ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
     ax.ticklabel_format(style='plain', axis='x')
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_nrmse_ensemble.pdf", bbox_inches="tight")
+    plt.savefig(f"./{title}/err_nrmse_ensemble_alt.pdf", bbox_inches="tight")
     plt.clf()
 
     ax = plt.gca()
-    plt.loglog(samplehist, ehmm, "b-", label='Adaptive' )
-    plt.loglog(samplehistk, ekmm, 'k-', label='LHS')
-    plt.loglog(samplehistk, eamm, 'r-', label=f'Adaptive ({alt_model})')
+    plt.loglog(samplehist, ehmm, "b-", label=f'H. Adapt (POU)')
+    plt.loglog(samplehistk, ekmm, 'k-', label='LHS (POU)')
+    plt.loglog(samplehistk, eamm1,  label=f'H. Adapt {alt_model[0]}')
+    plt.loglog(samplehistk, ehmm1,  label=f'LHS {alt_model[0]}')
+    plt.loglog(samplehistk, eamm2,  label=f'H. Adapt {alt_model[1]}')
+    plt.loglog(samplehistk, ehmm2,  label=f'LHS {alt_model[1]}')
     plt.xlabel("Number of samples")
     plt.ylabel("Mean Error")
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
@@ -337,13 +439,16 @@ if rank == 0:
     ax.ticklabel_format(style='plain', axis='x')
 
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_mean_ensemble.pdf", bbox_inches="tight")
+    plt.savefig(f"./{title}/err_mean_ensemble_alt.pdf", bbox_inches="tight")
     plt.clf()
 
     ax = plt.gca()
-    plt.loglog(samplehist, ehsm, "b-", label='Adaptive' )
-    plt.loglog(samplehistk, eksm, 'k-', label='LHS')
-    plt.loglog(samplehistk, easm, 'r-', label=f'Adaptive ({alt_model})')
+    plt.loglog(samplehist, ehsm, "b-", label=f'H. Adapt (POU)')
+    plt.loglog(samplehistk, eksm, 'k-', label='LHS (POU)')
+    plt.loglog(samplehistk, easm1,  label=f'H. Adapt {alt_model[0]}')
+    plt.loglog(samplehistk, ehsm1,  label=f'LHS {alt_model[0]}')
+    plt.loglog(samplehistk, easm2,  label=f'H. Adapt {alt_model[1]}')
+    plt.loglog(samplehistk, ehsm2,  label=f'LHS {alt_model[1]}')
     plt.xlabel("Number of samples")
     plt.ylabel(r"$\sigma$ Error")
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
@@ -353,6 +458,6 @@ if rank == 0:
     ax.ticklabel_format(style='plain', axis='x')
 
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_stdv_ensemble.pdf", bbox_inches="tight")
+    plt.savefig(f"./{title}/err_stdv_ensemble_alt.pdf", bbox_inches="tight")
     plt.clf()
 

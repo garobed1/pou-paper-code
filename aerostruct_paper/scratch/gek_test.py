@@ -25,17 +25,17 @@ size = comm.Get_size()
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "tensorexp"    #problem
+prob  = "arctan"    #problem
 plot  = -1
 
 # Conditions
-dim = 1      #problem dimension
-corr  = "squar_exp" #kriging correlation
+dim = 2      #problem dimension
+corr  = "matern32" #kriging correlation
 poly  = "linear"    #kriging regression 
 ncomp = dim
 extra = 2           #gek extra points
 nt0 = 10
-ntr = 70
+ntr = 10
 batch = 10
 tval = 1e-2
 t0 = [1e-2]
