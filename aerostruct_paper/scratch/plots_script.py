@@ -1,20 +1,14 @@
 import sys, os
 import copy
 import pickle
+import math
 from matplotlib.transforms import Bbox
 sys.path.insert(1,"../surrogate")
 
 import numpy as np
 import matplotlib.pyplot as plt
-from refinecriteria import looCV, HessianFit
-from aniso_criteria import AnisotropicRefine
-from getxnew import getxnew, adaptivesampling
-from defaults import DefaultOptOptions
-from sutils import divide_cases
-from error import rmse, meane
 
-from example_problems import Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
-from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam, WingWeight
+from problem_picker import GetProblem
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
 from pougrad import POUSurrogate, POUHessian
@@ -32,7 +26,7 @@ if not os.path.isdir(title):
     os.mkdir(title)
 
 prob = title.split("_")[-2]
-plt.rcParams['font.size'] = '14'
+plt.rcParams['font.size'] = '13'
 
 if(title2):
     
@@ -121,43 +115,7 @@ dim = xk[0].shape[1]
 
 
 # Problem Settings
-alpha = 8.       #arctangent jump strength
-if(prob == "arctan"):
-    trueFunc = MultiDimJump(ndim=dim, alpha=alpha)
-elif(prob == "arctantaper"):
-    trueFunc = MultiDimJumpTaper(ndim=dim, alpha=alpha)
-elif(prob == "rosenbrock"):
-    trueFunc = Rosenbrock(ndim=dim)
-elif(prob == "peaks"):
-    trueFunc = Peaks2D(ndim=dim)
-elif(prob == "branin"):
-    trueFunc = Branin(ndim=dim)
-elif(prob == "sphere"):
-    trueFunc = Sphere(ndim=dim)
-elif(prob == "fuhgp8"):
-    trueFunc = FuhgP8(ndim=dim)
-elif(prob == "fuhgp9"):
-    trueFunc = FuhgP9(ndim=dim)
-elif(prob == "fuhgp10"):
-    trueFunc = FuhgP10(ndim=dim)
-elif(prob == "waterflow"):
-    trueFunc = WaterFlow(ndim=dim)
-elif(prob == "weldedbeam"):
-    trueFunc = WeldedBeam(ndim=dim)
-elif(prob == "robotarm"):
-    trueFunc = RobotArm(ndim=dim)
-elif(prob == "cantilever"):
-    trueFunc = CantileverBeam(ndim=dim)
-elif(prob == "hadamard"):
-    trueFunc = QuadHadamard(ndim=dim)
-elif(prob == "lpnorm"):
-    trueFunc = LpNorm(ndim=dim)
-elif(prob == "wingweight"):
-    trueFunc = WingWeight(ndim=dim)
-elif(prob == "fakeshock"):
-    trueFunc = FakeShock(ndim=dim)
-else:
-    raise ValueError("Given problem not valid.")
+trueFunc = GetProblem(prob, dim)
 
 
 for i in range(nruns):
@@ -181,7 +139,7 @@ samplehist = np.zeros(iters, dtype=int)
 samplehistk = np.zeros(itersk, dtype=int)
 
 for i in range(iters-1):
-    samplehist[i] = hi[0][i].ntr
+    samplehist[i] = hi[0][i][0][0].shape[0]
 samplehist[iters-1] = mf[0].training_points[None][0][0].shape[0]
 for i in range(itersk):
     samplehistk[i] = len(xk[i])
@@ -228,11 +186,12 @@ if(title2):
     plt.loglog(samplehist, ehrmt, "r-", label=f'TEAD NRMSE')
 plt.xlabel("Number of samples")
 plt.ylabel("NRMSE")
+plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehrm[0])))
+plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehrm[-1])))
 plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
 plt.grid()
 ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
 ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-ax.ticklabel_format(style='plain', axis='x')
 plt.legend(loc=3)
 plt.savefig(f"./{title}/err_nrmse_ensemble.pdf", bbox_inches="tight")
 plt.clf()
@@ -242,11 +201,12 @@ plt.loglog(samplehist, ehmm, "b-", label='Adaptive' )
 plt.loglog(samplehistk, ekmm, 'k-', label='LHS')
 plt.xlabel("Number of samples")
 plt.ylabel("Mean Error")
+plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehmm[0])))
+plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehmm[-1])))
 plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
 plt.grid()
 ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
 ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-ax.ticklabel_format(style='plain', axis='x')
 
 plt.legend(loc=3)
 plt.savefig(f"./{title}/err_mean_ensemble.pdf", bbox_inches="tight")
@@ -257,11 +217,12 @@ plt.loglog(samplehist, ehsm, "b-", label='Adaptive' )
 plt.loglog(samplehistk, eksm, 'k-', label='LHS')
 plt.xlabel("Number of samples")
 plt.ylabel(r"$\sigma$ Error")
+plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehsm[0])))
+plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehsm[-1])))
 plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
 plt.grid()
 ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
 ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-ax.ticklabel_format(style='plain', axis='x')
 
 plt.legend(loc=3)
 plt.savefig(f"./{title}/err_stdv_ensemble.pdf", bbox_inches="tight")

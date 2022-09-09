@@ -1,11 +1,11 @@
 
-header = "pou_precci_test"
+header = "pou_cci_test"
 skip_LHS = False
-LHS_batch = 6
+LHS_batch = 10
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "arctan"    #problem
+prob  = "fuhgsh"    #problem
 dim = 1     #problem dimension
 
 
@@ -24,7 +24,7 @@ rho = 10          #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = dim*30       #number of points to add
+ntr = dim*40      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000       #number of test points to evaluate the error

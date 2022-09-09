@@ -16,9 +16,7 @@ from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
 from sutils import divide_cases
 from error import rmse, meane
-from shock_problem import ImpingingShock
-from example_problems import Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
-from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam, WingWeight
+from problem_picker import GetProblem
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 from direct_gek import DGEK
 #from smt.surrogate_models.rbf import RBF
@@ -47,48 +45,7 @@ if rank == 0:
     shutil.copy("./results_settings.py", f"./{title}/settings.py")
 
 # Problem Settings
-alpha = 8.       #arctangent jump strength
-if(prob == "arctan"):
-    trueFunc = MultiDimJump(ndim=dim, alpha=alpha)
-elif(prob == "arctantaper"):
-    trueFunc = MultiDimJumpTaper(ndim=dim, alpha=alpha)
-elif(prob == "peaks"):
-    trueFunc = Peaks2D(ndim=dim)
-elif(prob == "rosenbrock"):
-    trueFunc = Rosenbrock(ndim=dim)
-elif(prob == "branin"):
-    trueFunc = Branin(ndim=dim)
-elif(prob == "sphere"):
-    trueFunc = Sphere(ndim=dim)
-elif(prob == "fuhgp8"):
-    trueFunc = FuhgP8(ndim=dim)
-elif(prob == "fuhgp9"):
-    trueFunc = FuhgP9(ndim=dim)
-elif(prob == "fuhgp10"):
-    trueFunc = FuhgP10(ndim=dim)
-elif(prob == "waterflow"):
-    trueFunc = WaterFlow(ndim=dim)
-elif(prob == "weldedbeam"):
-    trueFunc = WeldedBeam(ndim=dim)
-elif(prob == "robotarm"):
-    trueFunc = RobotArm(ndim=dim)
-elif(prob == "cantilever"):
-    trueFunc = CantileverBeam(ndim=dim)
-elif(prob == "hadamard"):
-    trueFunc = QuadHadamard(ndim=dim)
-elif(prob == "lpnorm"):
-    trueFunc = LpNorm(ndim=dim)
-elif(prob == "wingweight"):
-    trueFunc = WingWeight(ndim=dim)
-elif(prob == "fakeshock"):
-    trueFunc = FakeShock(ndim=dim)
-elif(prob == "shock"):
-    xlimits = np.zeros([dim,2])
-    xlimits[0,:] = [23., 27.]
-    xlimits[1,:] = [0.36, 0.51]
-    trueFunc = ImpingingShock(ndim=dim, input_bounds=xlimits, comm=MPI.COMM_SELF)
-else:
-    raise ValueError("Given problem not valid.")
+trueFunc = GetProblem(prob, dim)
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m')
 if(rtype == 'anisotransform'):
@@ -240,11 +197,11 @@ else:
     modelbase.options.update({"corr":corr})
     modelbase.options.update({"poly":poly})
     modelbase.options.update({"n_start":5})
-# modelbase.options.update({"print_global":False})
-modelbase.options.update({"print_training":True})
-modelbase.options.update({"print_prediction":True})
-modelbase.options.update({"print_problem":True})
-modelbase.options.update({"print_solver":True})
+modelbase.options.update({"print_global":False})
+# modelbase.options.update({"print_training":True})
+# modelbase.options.update({"print_prediction":True})
+# modelbase.options.update({"print_problem":True})
+# modelbase.options.update({"print_solver":True})
 
 model0 = []
 co = 0
@@ -285,6 +242,10 @@ if(not skip_LHS):
     for n in cases[rank]:
         errkrms.append([])
         errkmean.append([])
+        xtrainK[n][0] = xtrain0[n]
+        ftrainK[n][0] = ftrain0[n]
+        gtrainK[n][0] = gtrain0[n]
+
         for m in range(len(samplehistK)):
             modelK.set_training_values(xtrainK[n][m], ftrainK[n][m])
             if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate) or isinstance(model0[co], DGEK)):

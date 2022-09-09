@@ -5,6 +5,7 @@ from mpi4py import MPI
 sys.path.insert(1,"../surrogate")
 
 import numpy as np
+import math
 import importlib
 import matplotlib.pyplot as plt
 from refinecriteria import looCV, HessianFit
@@ -14,8 +15,7 @@ from defaults import DefaultOptOptions
 from sutils import divide_cases
 from error import rmse, meane, full_error
 
-from example_problems import Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10, FakeShock
-from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam, WingWeight
+from problem_picker import GetProblem
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
 from pougrad import POUSurrogate, POUHessian
@@ -36,7 +36,7 @@ sampling, and compare performance.
 
 # Give directory with desired results as argument
 title = sys.argv[1]
-alt_model = ['kriging','gekpls']#sys.argv[2]
+alt_model = ['KRG','GEK']#sys.argv[2]
 setmod = importlib.import_module(f'{title[:-1]}.settings')
 ssettings = setmod.__dict__
 
@@ -44,7 +44,7 @@ if not os.path.isdir(title):
     os.mkdir(title)
 
 prob = title.split("_")[-2]
-plt.rcParams['font.size'] = '14'
+plt.rcParams['font.size'] = '13'
 
 
 # Adaptive Data
@@ -106,43 +106,7 @@ dim = xk[0].shape[1]
 
 
 # Problem Settings
-alpha = 8.       #arctangent jump strength
-if(prob == "arctan"):
-    trueFunc = MultiDimJump(ndim=dim, alpha=alpha)
-elif(prob == "arctantaper"):
-    trueFunc = MultiDimJumpTaper(ndim=dim, alpha=alpha)
-elif(prob == "rosenbrock"):
-    trueFunc = Rosenbrock(ndim=dim)
-elif(prob == "peaks"):
-    trueFunc = Peaks2D(ndim=dim)
-elif(prob == "branin"):
-    trueFunc = Branin(ndim=dim)
-elif(prob == "sphere"):
-    trueFunc = Sphere(ndim=dim)
-elif(prob == "fuhgp8"):
-    trueFunc = FuhgP8(ndim=dim)
-elif(prob == "fuhgp9"):
-    trueFunc = FuhgP9(ndim=dim)
-elif(prob == "fuhgp10"):
-    trueFunc = FuhgP10(ndim=dim)
-elif(prob == "waterflow"):
-    trueFunc = WaterFlow(ndim=dim)
-elif(prob == "weldedbeam"):
-    trueFunc = WeldedBeam(ndim=dim)
-elif(prob == "robotarm"):
-    trueFunc = RobotArm(ndim=dim)
-elif(prob == "cantilever"):
-    trueFunc = CantileverBeam(ndim=dim)
-elif(prob == "hadamard"):
-    trueFunc = QuadHadamard(ndim=dim)
-elif(prob == "lpnorm"):
-    trueFunc = LpNorm(ndim=dim)
-elif(prob == "wingweight"):
-    trueFunc = WingWeight(ndim=dim)
-elif(prob == "fakeshock"):
-    trueFunc = FakeShock(ndim=dim)
-else:
-    raise ValueError("Given problem not valid.")
+trueFunc = GetProblem(prob, dim)
 xlimits = trueFunc.xlimits
 
 # Get the original testing data
@@ -162,16 +126,27 @@ xtest = comm.bcast(xtest, root=0)
 ftest = comm.bcast(ftest, root=0)
 
 # Generate Alternative Surrogate
-# if(alt_model == "gekpls"):
-modelbase2 = GEKPLS(xlimits=xlimits)
-# modelbase.options.update({"hyper_opt":'TNC'})
-modelbase2.options.update({"theta0":ssettings["t0"]})
-modelbase2.options.update({"theta_bounds":ssettings["tb"]})
-modelbase2.options.update({"n_comp":dim})
-modelbase2.options.update({"extra_points":ssettings["extra"]})
-modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})#
-modelbase2.options.update({"poly":ssettings["poly"]})
-modelbase2.options.update({"n_start":5})
+if(dim > 1):
+    modelbase2 = GEKPLS(xlimits=xlimits)
+    # modelbase.options.update({"hyper_opt":'TNC'})
+    modelbase2.options.update({"theta0":ssettings["t0"]})
+    modelbase2.options.update({"theta_bounds":ssettings["tb"]})
+    modelbase2.options.update({"n_comp":dim})
+    modelbase2.options.update({"extra_points":ssettings["extra"]})
+    modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
+    modelbase2.options.update({"poly":ssettings["poly"]})
+    modelbase2.options.update({"n_start":5})
+else:
+    modelbase2 = KRG()
+    #modelgek.options.update({"hyper_opt":"TNC"})
+    modelbase2.options.update({"theta0":ssettings["t0"]})
+    modelbase2.options.update({"theta_bounds":ssettings["tb"]})
+    modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
+    modelbase2.options.update({"poly":ssettings["poly"]})
+    modelbase2.options.update({"n_start":5})
+    modelbase2.options.update({"print_prediction":False})
+
+
 # elif(alt_model == "dgek"):
 #     modelbase = DGEK(xlimits=xlimits)
 #     # modelbase.options.update({"hyper_opt":'TNC'})
@@ -231,7 +206,7 @@ samplehist = np.zeros(iters, dtype=int)
 samplehistk = np.zeros(itersk, dtype=int)
 
 for i in range(iters-1):
-    samplehist[i] = hi[0][i].ntr
+    samplehist[i] = hi[0][i][0][0].shape[0] #training_points
 samplehist[iters-1] = mf[0].training_points[None][0][0].shape[0]
 for i in range(itersk):
     samplehistk[i] = len(xk[i])
@@ -252,11 +227,11 @@ for k in range(nruns):
     fh.append([])
     gh.append([])
     for i in range(itersk-1):
-        xa[k].append(hi[k][ind_alt[i]].model.training_points[None][0][0])
-        fa[k].append(hi[k][ind_alt[i]].model.training_points[None][0][1])
-        ga[k].append(np.zeros_like(hi[k][ind_alt[i]].model.training_points[None][0][0]))
+        xa[k].append(hi[k][ind_alt[i]][0][0])
+        fa[k].append(hi[k][ind_alt[i]][0][1])
+        ga[k].append(np.zeros_like(hi[k][ind_alt[i]][0][0]))
         for j in range(dim):
-            ga[k][i][:,j:j+1] = hi[k][ind_alt[i]].model.training_points[None][j+1][1]
+            ga[k][i][:,j:j+1] = hi[k][ind_alt[i]][j+1][1]
         xh[k].append(xk[i+k*itersk])
         fh[k].append(fk[i+k*itersk])
         gh[k].append(gk[i+k*itersk])
@@ -294,33 +269,49 @@ for k in range(nperr):
     for i in range(itersk):
         ma1[k].append(copy.deepcopy(modelbase1))
         ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
-        if(ma1[k][i].supports["training_derivatives"]):
-            for j in range(dim):
-                ma1[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
         ma1[k][i].train()
         ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
 
         ma2[k].append(copy.deepcopy(modelbase2))
-        ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
-        if(ma2[k][i].supports["training_derivatives"]):
+        if(dim > 1):
+            ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
             for j in range(dim):
                 ma2[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
+        else:
+            dx = 1e-4
+            nex = xa[ind][i].shape[0]
+            xaug = np.zeros([nex, 1])
+            faug = np.zeros([nex, 1])
+            for l in range(nex):
+                xaug[l] = xa[ind][i][l] + dx
+                faug[l] = fa[ind][i][l] + dx*ga[ind][i][l]
+            xtot = np.append(xa[ind][i], xaug, axis=0)
+            ftot = np.append(fa[ind][i], faug, axis=0)
+            ma2[k][i].set_training_values(xtot, ftot)
         ma2[k][i].train()
         ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
 
         mh1[k].append(copy.deepcopy(modelbase1))
         mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
-        if(mh1[k][i].supports["training_derivatives"]):
-            for j in range(dim):
-                mh1[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
         mh1[k][i].train()
         ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
 
         mh2[k].append(copy.deepcopy(modelbase2))
-        mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
-        if(mh2[k][i].supports["training_derivatives"]):
+        if(dim > 1):
+            mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
             for j in range(dim):
                 mh2[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
+        else:
+            dx = 1e-4
+            nex = xh[ind][i].shape[0]
+            xaug = np.zeros([nex, 1])
+            faug = np.zeros([nex, 1])
+            for l in range(nex):
+                xaug[l] = xh[ind][i][l] + dx
+                faug[l] = fh[ind][i][l] + dx*gh[ind][i][l]
+            xtot = np.append(xh[ind][i], xaug, axis=0)
+            ftot = np.append(fh[ind][i], faug, axis=0)
+            mh2[k][i].set_training_values(xtot, ftot)
         mh2[k][i].train()
         ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
         # import pdb; pdb.set_trace()
@@ -407,18 +398,20 @@ if rank == 0:
     #NRMSE
     ax = plt.gca()
     plt.loglog(samplehist, ehrm, "b-", label=f'H. Adapt (POU)')
-    plt.loglog(samplehistk, ekrm, 'k-', label='LHS (POU)')
-    plt.loglog(samplehistk, earm1,  label=f'H. Adapt {alt_model[0]}')
-    plt.loglog(samplehistk, ehrm1,  label=f'LHS {alt_model[0]}')
-    plt.loglog(samplehistk, earm2,  label=f'H. Adapt {alt_model[1]}')
-    plt.loglog(samplehistk, ehrm2,  label=f'LHS {alt_model[1]}')
+    plt.loglog(samplehistk, ekrm, 'b--', label='LHS (POU)')
+    plt.loglog(samplehistk, earm1, 'g-', label=f'H. Adapt ({alt_model[0]})')
+    plt.loglog(samplehistk, ehrm1, 'g--',  label=f'LHS ({alt_model[0]})')
+    plt.loglog(samplehistk, earm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    plt.loglog(samplehistk, ehrm2, 'r--', label=f'LHS ({alt_model[1]})')
     plt.xlabel("Number of samples")
     plt.ylabel("NRMSE")
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehrm[0])))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehrm[-1])))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
     ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-    ax.ticklabel_format(style='plain', axis='x')
+    # ax.ticklabel_format(style='plain', axis='x')
     plt.legend(loc=3)
     plt.savefig(f"./{title}/err_nrmse_ensemble_alt.pdf", bbox_inches="tight")
     plt.clf()
@@ -432,11 +425,13 @@ if rank == 0:
     plt.loglog(samplehistk, ehmm2,  label=f'LHS {alt_model[1]}')
     plt.xlabel("Number of samples")
     plt.ylabel("Mean Error")
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehmm[0])))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehmm[-1])))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
     ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-    ax.ticklabel_format(style='plain', axis='x')
+    # ax.ticklabel_format(style='plain', axis='x')
 
     plt.legend(loc=3)
     plt.savefig(f"./{title}/err_mean_ensemble_alt.pdf", bbox_inches="tight")
@@ -451,11 +446,13 @@ if rank == 0:
     plt.loglog(samplehistk, ehsm2,  label=f'LHS {alt_model[1]}')
     plt.xlabel("Number of samples")
     plt.ylabel(r"$\sigma$ Error")
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehsm[0])))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehsm[-1])))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
     ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
-    ax.ticklabel_format(style='plain', axis='x')
+    # ax.ticklabel_format(style='plain', axis='x')
 
     plt.legend(loc=3)
     plt.savefig(f"./{title}/err_stdv_ensemble_alt.pdf", bbox_inches="tight")

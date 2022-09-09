@@ -182,6 +182,109 @@ class FuhgP8(Problem):
 
         return y
 
+
+
+# From Fuhg (2021), Problem 3
+class FuhgP3(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 1, values=[2], types=int)
+        self.options.declare("name", "FuhgP3", types=str)
+
+    def _setup(self):
+        self.xlimits[:, 0] = -12.
+        self.xlimits[:, 1] = 12.
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            X = x[i,:]
+            if kx is None:
+                if(X[0] < 0.):
+                    y[i,0] = -np.sinh(0.3*X[0])
+                elif(X[0] >= 0 and X[0] < 5.): 
+                    y[i,0] = -5.*X[0]
+                elif(X[0] >= 5. and X[0] < 8.): 
+                    y[i,0] = (25./3.)*X[0] - (200./3.)
+                else:
+                    y[i,0] = np.sinh(0.9*(X[0] - 8.))
+
+            elif(kx == 0):
+                if(X[0] < 0.):
+                    y[i,0] = -0.3*np.cosh(0.3*X[0])
+                elif(X[0] >= 0 and X[0] < 5.): 
+                    y[i,0] = -5.
+                elif(X[0] >= 5. and X[0] < 8.): 
+                    y[i,0] = (25./3.)
+                else:
+                    y[i,0] = 0.9*np.cosh(0.9*(X[0] - 8.))
+
+
+        return y
+
+
+
+# From Fuhg (2021)
+class FuhgSingleHump(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 1, values=[2], types=int)
+        self.options.declare("name", "FuhgSingleHump", types=str)
+
+    def _setup(self):
+        self.xlimits[:, 0] = -1.5
+        self.xlimits[:, 1] = 5.
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            X = x[i,:]
+            if kx is None:
+                y[i,0] = 3*X[0]
+                y[i,0] -= 0.05/((X[0] - 4.75)**2 + 0.04)
+                y[i,0] -= 0.07/((X[0] - 4.45)**2 + 0.005) - 6.
+
+            elif(kx == 0):
+                y[i,0] = 3.
+                y[i,0] += 2*0.05*(X[0] - 4.75)/((X[0] - 4.75)**2 + 0.04)**2
+                y[i,0] += 2*0.07*(X[0] - 4.45)/((X[0] - 4.45)**2 + 0.005)**2
+
+        return y
+
+
+
+
+
 # From Panda (2019)
 class QuadHadamard(Problem):
     def _initialize(self):
@@ -665,4 +768,51 @@ class FakeShock(Problem):
         if kx is None:
             y += bs
 
+        return y
+
+
+
+# Ishigami function 
+class Ishigami(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 3, values=[2], types=int)
+        self.options.declare("name", "Ishigami", types=str)
+
+    def _setup(self):
+        self.xlimits[:, 0] = -np.pi
+        self.xlimits[:, 1] = np.pi
+
+        self.a = 7.
+        self.b = 0.1
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        for i in range(ne):
+            X = x[i,:]
+            if kx is None:
+                y[i,0] = (1. + self.b*(X[2]**4))*np.sin(X[0]) + self.a*(np.sin(X[1])**2)
+
+            elif(kx == 0):
+                y[i,0] = (1. + self.b*(X[2]**4))*np.cos(X[0])
+            elif(kx == 1):
+                y[i,0] = self.a*(np.sin(2*X[1]))
+            elif(kx == 2):
+                y[i,0] = 4*self.b*(X[2]**3)*np.sin(X[0])
+                
         return y
