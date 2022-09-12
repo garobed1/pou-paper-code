@@ -1,6 +1,7 @@
 import sys, os
 import copy
 import pickle
+import math
 from matplotlib.transforms import Bbox
 sys.path.insert(1,"../surrogate")
 
@@ -241,6 +242,7 @@ plt.loglog(theta_sample, conds, label='GEK')
 plt.axvline(thopt, color='r', linestyle='--', linewidth=1.)
 plt.loglog(theta_sample, conds2, label='Kriging')
 plt.axvline(thopt2, color='m', linestyle='--', linewidth=1.)
+plt.ylim(10**(math.floor(math.log10(min(np.min(conds), np.min(conds2))))-1), 10**(math.ceil(math.log10(max(np.max(conds), np.max(conds2))))+1))
 plt.xscale("log")
 theta_ticks = np.logspace(limits[0], limits[1], num = limits[1] - limits[0] + 1)
 plt.xticks(theta_ticks)
@@ -282,14 +284,17 @@ trx = modelbase.training_points[None][0][0]
 trf = modelbase.training_points[None][0][1]
 
 # Plot Non-Adaptive Error
-plt.plot(x, ZDGEK, linewidth=1., label=f'GEK')
-plt.plot(x, ZKRG, linewidth=1., label=f'Kriging')
-plt.legend()
+plt.plot(x, FDGEK, linewidth=1.2, label=f'GEK')
+plt.plot(x, FKRG, linewidth=1.2, label=f'Kriging')
+plt.plot(x, TF, 'k-', linewidth=1.2, label=f'Original')
+
+# plt.yscale("log")
 plt.xlabel(r"$x$")
-plt.ylabel(r"$\hat{f}(x) - f(x)$")
+plt.ylabel(r"$f(\mathbf{x})$")
 plt.grid()
 #plt.legend(loc=1)
-plt.plot(trx[0:nt0,0], np.zeros_like(trf[0:nt0,0]),"bo", ms=5 )
+plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", ms=4 , label=f'Sample Locations')#min(np.min(ZKRG),np.min(ZDGEK))*np.ones_like(
+plt.legend()
 plt.savefig(f"./gek_issues_err.pdf", bbox_inches="tight")
 plt.clf()
 

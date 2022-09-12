@@ -315,6 +315,8 @@ for k in range(nperr):
         mh2[k][i].train()
         ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
         # import pdb; pdb.set_trace()
+
+
 ma1 = comm.allgather(ma1)
 ear1 = comm.allgather(ear1)
 eam1 = comm.allgather(eam1)
@@ -418,11 +420,11 @@ if rank == 0:
 
     ax = plt.gca()
     plt.loglog(samplehist, ehmm, "b-", label=f'H. Adapt (POU)')
-    plt.loglog(samplehistk, ekmm, 'k-', label='LHS (POU)')
-    plt.loglog(samplehistk, eamm1,  label=f'H. Adapt {alt_model[0]}')
-    plt.loglog(samplehistk, ehmm1,  label=f'LHS {alt_model[0]}')
-    plt.loglog(samplehistk, eamm2,  label=f'H. Adapt {alt_model[1]}')
-    plt.loglog(samplehistk, ehmm2,  label=f'LHS {alt_model[1]}')
+    plt.loglog(samplehistk, ekmm, 'b--', label='LHS (POU)')
+    plt.loglog(samplehistk, eamm1, 'g-', label=f'H. Adapt ({alt_model[0]})')
+    plt.loglog(samplehistk, ehmm1, 'g--',  label=f'LHS ({alt_model[0]})')
+    plt.loglog(samplehistk, eamm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    plt.loglog(samplehistk, ehmm2, 'r--', label=f'LHS ({alt_model[1]})')
     plt.xlabel("Number of samples")
     plt.ylabel("Mean Error")
     plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehmm[0])))
@@ -439,11 +441,11 @@ if rank == 0:
 
     ax = plt.gca()
     plt.loglog(samplehist, ehsm, "b-", label=f'H. Adapt (POU)')
-    plt.loglog(samplehistk, eksm, 'k-', label='LHS (POU)')
-    plt.loglog(samplehistk, easm1,  label=f'H. Adapt {alt_model[0]}')
-    plt.loglog(samplehistk, ehsm1,  label=f'LHS {alt_model[0]}')
-    plt.loglog(samplehistk, easm2,  label=f'H. Adapt {alt_model[1]}')
-    plt.loglog(samplehistk, ehsm2,  label=f'LHS {alt_model[1]}')
+    plt.loglog(samplehistk, eksm, 'b--', label='LHS (POU)')
+    plt.loglog(samplehistk, easm1, 'g-', label=f'H. Adapt ({alt_model[0]})')
+    plt.loglog(samplehistk, ehsm1, 'g--',  label=f'LHS ({alt_model[0]})')
+    plt.loglog(samplehistk, easm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    plt.loglog(samplehistk, ehsm2, 'r--', label=f'LHS ({alt_model[1]})')
     plt.xlabel("Number of samples")
     plt.ylabel(r"$\sigma$ Error")
     plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehsm[0])))
@@ -457,4 +459,6 @@ if rank == 0:
     plt.legend(loc=3)
     plt.savefig(f"./{title}/err_stdv_ensemble_alt.pdf", bbox_inches="tight")
     plt.clf()
+
+
 

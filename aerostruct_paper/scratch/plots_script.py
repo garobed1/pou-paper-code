@@ -268,16 +268,20 @@ if(dim == 1):
     xlimits = trueFunc.xlimits
     x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
 
-    Z = np.zeros([ndir, ndir])
-    F = np.zeros([ndir, ndir])
-    TF = np.zeros([ndir, ndir])
+    Z = np.zeros([ndir])
+    Zh = np.zeros([ndir])
+    F = np.zeros([ndir])
+    Fh = np.zeros([ndir])
+    TF = np.zeros([ndir])
 
     for i in range(ndir):
         xi = np.zeros([1,1])
         xi[0] = x[i]
         TF[i] = trueFunc(xi)
         F[i] = mf[0].predict_values(xi)
+        Fh[i] = mk.predict_values(xi)
         Z[i] = abs(F[i] - TF[i])
+        Zh[i] = abs(Fh[i] - TF[i])
 
     # Plot the target function
     plt.plot(x, TF, "-k", label=f'True')
@@ -301,12 +305,14 @@ if(dim == 1):
 
     # Plot Non-Adaptive Error
     # plt.plot(x, Zgek, "-m", label=f'IGEK')
-    plt.plot(x, Z, "-b", label=f'AS')
+    plt.plot(x, Z, "-k", label=f'H. Adapt (POU)')
+    plt.plot(x, Zh, "--k", label=f'LHS (POU)')
     plt.xlabel(r"$x$")
-    plt.ylabel(r"$err$")
-    #plt.legend(loc=1)
+    plt.ylabel(r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
     plt.plot(trx[0:nt0,0], np.zeros_like(trf[0:nt0,0]), "bo", label='Initial Samples')
-    plt.plot(trx[nt0:,0], np.zeros_like(trf[nt0:,0]), "ro", label='Adaptive Samples')
+    plt.plot(trx[nt0:,0], np.zeros_like(trf[nt0:,0]), "ro", label='Added Samples')
+    plt.plot(trxk, max(np.max(Z), np.max(Zh))*np.ones_like(trxk), "ko", label='LHS Samples')
+    plt.legend()
     plt.savefig(f"./{title}/1derr.pdf", bbox_inches="tight")
 
     plt.clf()
