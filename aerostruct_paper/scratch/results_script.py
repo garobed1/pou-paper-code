@@ -11,6 +11,7 @@ from refinecriteria import looCV, HessianFit, TEAD
 from aniso_criteria import AnisotropicRefine
 from taylor_criteria import TaylorRefine, TaylorExploreRefine
 from hess_criteria import HessianRefine, POUSSA
+from loocv_criteria import POUSFCVT
 from aniso_transform import AnisotropicTransform
 from getxnew import getxnew, adaptivesampling
 from defaults import DefaultOptOptions
@@ -39,10 +40,12 @@ Nruns = size*runs_per_proc
 
 # Generate results folder and list of inputs
 title = f"{header}_{prob}_{dim}D"
+if(path == None):
+    path = "."
 if rank == 0:
-    if not os.path.isdir(title):
-        os.mkdir(title)
-    shutil.copy("./results_settings.py", f"./{title}/settings.py")
+    if not os.path.isdir(f"{path}/{title}"):
+        os.mkdir(f"{path}/{title}")
+    shutil.copy("./results_settings.py", f"{path}/{title}/settings.py")
 
 # Problem Settings
 trueFunc = GetProblem(prob, dim)
@@ -70,7 +73,7 @@ ftest = comm.bcast(ftest, root=0)
 testdata = comm.bcast(testdata, root=0)
 # Adaptive Sampling Conditions
 options = DefaultOptOptions
-options["local"] = False
+options["local"] = local
 options["localswitch"] = True
 options["errorcheck"] = testdata
 options["multistart"] = mstarttype
@@ -260,19 +263,19 @@ if(not skip_LHS):
     errkmean = comm.gather(errkmean, root=0)
     
     # LHS Data
-    with open(f'./{title}/xk.pickle', 'wb') as f:
+    with open(f'{path}/{title}/xk.pickle', 'wb') as f:
         pickle.dump(xtrainK, f)
 
-    with open(f'./{title}/fk.pickle', 'wb') as f:
+    with open(f'{path}/{title}/fk.pickle', 'wb') as f:
         pickle.dump(ftrainK, f)
 
-    with open(f'./{title}/gk.pickle', 'wb') as f:
+    with open(f'{path}/{title}/gk.pickle', 'wb') as f:
         pickle.dump(gtrainK, f)
 
-    with open(f'./{title}/errkrms.pickle', 'wb') as f:
+    with open(f'{path}/{title}/errkrms.pickle', 'wb') as f:
         pickle.dump(errkrms, f)
 
-    with open(f'./{title}/errkmean.pickle', 'wb') as f:
+    with open(f'{path}/{title}/errkmean.pickle', 'wb') as f:
         pickle.dump(errkmean, f)
         
 
@@ -294,9 +297,11 @@ for n in cases[rank]:
     elif(rtype == "taylorexp"):
         RC0.append(TaylorExploreRefine(model0[co], gtrain0[n], xlimits, rscale=rscale, improve=pperb, objective=obj, multistart=multistart) ) 
     elif(rtype == "hess"):
-        RC0.append(HessianRefine(model0[co], gtrain0[n], xlimits, neval=neval, rscale=rscale, improve=pperb, multistart=multistart) )
+        RC0.append(HessianRefine(model0[co], gtrain0[n], xlimits, neval=neval, rscale=rscale, improve=pperb, multistart=multistart, print_rc_plots=rc_print) )
     elif(rtype == "poussa"):
-        RC0.append(POUSSA(model0[co], gtrain0[n], xlimits, improve=pperb, multistart=multistart))
+        RC0.append(POUSSA(model0[co], gtrain0[n], xlimits, improve=pperb, multistart=multistart, print_rc_plots=rc_print))
+    elif(rtype == "pousfcvt"):
+        RC0.append(POUSFCVT(model0[co], gtrain0[n], xlimits, improve=pperb, multistart=multistart, print_rc_plots=rc_print))
     else:
         raise ValueError("Given criteria not valid.")
     co += 1
@@ -335,22 +340,22 @@ if rank == 0:
     print("Experiment Complete")
 
     # Adaptive Data
-    with open(f'./{title}/modelf.pickle', 'wb') as f:
+    with open(f'{path}/{title}/modelf.pickle', 'wb') as f:
         pickle.dump(modelf, f)
 
-    with open(f'./{title}/err0rms.pickle', 'wb') as f:
+    with open(f'{path}/{title}/err0rms.pickle', 'wb') as f:
         pickle.dump(err0rms, f)
 
-    with open(f'./{title}/err0mean.pickle', 'wb') as f:
+    with open(f'{path}/{title}/err0mean.pickle', 'wb') as f:
         pickle.dump(err0mean, f)
 
-    with open(f'./{title}/hist.pickle', 'wb') as f:
+    with open(f'{path}/{title}/hist.pickle', 'wb') as f:
         pickle.dump(hist, f)
 
-    with open(f'./{title}/errhrms.pickle', 'wb') as f:
+    with open(f'{path}/{title}/errhrms.pickle', 'wb') as f:
         pickle.dump(errhrms, f)
 
-    with open(f'./{title}/errhmean.pickle', 'wb') as f:
+    with open(f'{path}/{title}/errhmean.pickle', 'wb') as f:
         pickle.dump(errhmean, f)
 
 

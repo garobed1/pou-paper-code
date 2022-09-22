@@ -30,5 +30,6 @@ DefaultOptOptions = {
     "gtol":0.01,
     "liter":100,
     "ltol":None,
-    "errorcheck":None
+    "errorcheck":None,
+    "multistart":2
 }

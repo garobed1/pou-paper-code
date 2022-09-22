@@ -54,7 +54,7 @@ def getxnew(rcrit, x0, bounds, options=None):
                 bounds_used = lbounds
             args=(bounds_used, i,)
             if(rcrit.condict is not None):
-                rcrit.condict["args"] = [i]
+                rcrit.condict["args"] = [bounds_used, i]
             jac = None
             if(rcrit.supports["obj_derivatives"]):
                 jac = rcrit.eval_grad
@@ -64,28 +64,32 @@ def getxnew(rcrit, x0, bounds, options=None):
                 if(options["multistart"] == 2):
                     resx = np.zeros([m,n])
                     resy = np.zeros(m)
+                    succ = np.full(m, True)
                     for j in range(m):
                         
-                        results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0[j,:])
+                        results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", constraints=rcrit.condict, jac=jac, x0=x0[j,:])
                         resx[j,:] = results.x
                         resy[j] = results.fun
-                    rx = resx[np.argmin(resy)]
+                        succ[j] = results.success
+                    valid = np.where(succ)[0]
+                    rx = resx[valid[np.argmin(resy[valid])]]
+                    # print(rx)
 
                 # start at best point
-                if(options["multistart"] == 1):
+                elif(options["multistart"] == 1):
                     x0b = None
                     y0 = np.zeros(m)
                     for j in range(m):
                         y0[j] = rcrit.evaluate(x0[j], bounds_used, i)
                     ind = np.argmin(y0)
                     x0b = x0[0]
-                    results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0b)
+                    results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", constraints=rcrit.condict, jac=jac, x0=x0b)
                     rx = results.x
 
                 # perform one optimization
                 else:
                     x0b = x0[0]
-                    results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", jac=jac, x0=x0b)
+                    results = optimize(rcrit.evaluate, args=args, bounds=unit_bounds, type="local", constraints=rcrit.condict, jac=jac, x0=x0b)
                     rx = results.x
 
             else:

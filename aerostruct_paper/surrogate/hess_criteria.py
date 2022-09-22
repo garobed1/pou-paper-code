@@ -234,47 +234,58 @@ class HessianRefine(ASCriteria):
         # import pdb; pdb.set_trace()
         if(self.options["print_rc_plots"]):
 
-           if(n == 1):
-               ndir = 75
-               # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
-               # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
-               x = np.linspace(0., 1., ndir)
-               F  = np.zeros([ndir]) 
-               for i in range(ndir):
-                   xi = np.zeros([1])
-                   xi[0] = x[i]
-                   F[i]  = self.evaluate(xi, bounds, dir=dir)    
-               plt.plot(x, F)
-               plt.ylim(top=0.1)
-               plt.ylim(bottom=np.min(F))
-               trxs = self.trx#qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
-               plt.plot(trxs[0:-1,0], np.zeros(trxs[0:-1,0].shape[0]), 'bo')
-               plt.plot(trxs[-1,0], [0], 'ro')
-               plt.savefig(f"taylor_rc_1d.pdf")    
-               plt.clf()
-           # import pdb; pdb.set_trace()
+            if(n == 1):
+                
+                ndir = 200
+                # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+                # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+                x = np.linspace(0., 1., ndir)
+                F  = np.zeros([ndir]) 
+                for i in range(ndir):
+                    xi = np.zeros([1])
+                    xi[0] = x[i]
+                    F[i]  = self.evaluate(xi, bounds, dir=dir)    
+                F /= np.abs(np.min(F))
 
-           if(n == 2):
-               ndir = 75
-               # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
-               # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
-               x = np.linspace(0., 1., ndir)
-               y = np.linspace(0., 1., ndir)   
-               X, Y = np.meshgrid(x, y)
-               F  = np.zeros([ndir, ndir]) 
-               for i in range(ndir):
-                   for j in range(ndir):
-                       xi = np.zeros([2])
-                       xi[0] = x[i]
-                       xi[1] = y[j]
-                       F[i,j]  = self.evaluate(xi, bounds, dir=dir)    
-               cs = plt.contourf(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
-               plt.colorbar(cs)
-               trxs = self.trx #qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
-               plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
-               plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
-               plt.savefig(f"taylor_rc_2d.pdf")    
-               plt.clf()
+                plt.rcParams['font.size'] = '16'
+                ax = plt.gca()  
+                plt.plot(x, F, label='Criteria')
+                plt.xlim(-0.05, 1.05)
+                plt.ylim(top=0.015)
+                plt.ylim(bottom=-1.0)#np.min(F))
+                trxs = self.trx#qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
+                #plt.plot(trxs[0:-1,0], np.zeros(trxs[0:-1,0].shape[0]), 'bo')
+                #plt.plot(trxs[-1,0], [0], 'ro')
+                plt.plot(trxs[0:,0], np.zeros(trxs[0:,0].shape[0]), 'bo', label='Sample Locations')
+                plt.legend(loc=3)
+                plt.xlabel(r'$x_1$')
+                plt.ylabel(r'$-\mathrm{RC}_{\mathrm{Hess},%i}(x_1)$' % (self.ntr-10))
+                plt.axvline(x[np.argmin(F)], color='k', linestyle='--', linewidth=1.)
+                plt.savefig(f"taylor_rc_1d_{self.ntr}.pdf", bbox_inches="tight")    
+                plt.clf()
+                import pdb; pdb.set_trace()
+
+            if(n == 2):
+                ndir = 75
+                # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+                # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+                x = np.linspace(0., 1., ndir)
+                y = np.linspace(0., 1., ndir)   
+                X, Y = np.meshgrid(x, y)
+                F  = np.zeros([ndir, ndir]) 
+                for i in range(ndir):
+                    for j in range(ndir):
+                        xi = np.zeros([2])
+                        xi[0] = x[i]
+                        xi[1] = y[j]
+                        F[i,j]  = self.evaluate(xi, bounds, dir=dir)    
+                cs = plt.contourf(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
+                plt.colorbar(cs)
+                trxs = self.trx #qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
+                plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
+                plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
+                plt.savefig(f"taylor_rc_2d.pdf")    
+                plt.clf()
         # import pdb; pdb.set_trace()
 
 
@@ -338,11 +349,24 @@ class POUSSA(ASCriteria):
             types=int,
             desc="number of optimizations to try per point"
         )
+        
+        declare(
+            "eps", 
+            0.01, 
+            types=float,
+            desc="non clustering parameter, minimum distance to existing samples"
+        )
 
 
 
     def initialize(self, model=None, grad=None):
         
+        # set up constraints
+        self.condict = {
+            "type":"ineq",
+            "fun":self.eval_constraint,
+            "args":[],
+        }
 
 
         if(model is not None):
@@ -372,7 +396,7 @@ class POUSSA(ASCriteria):
         
 
         # Generate kd tree for nearest neighbors lookup
-        # self.tree = KDTree(self.trx)
+        self.tree = KDTree(self.trx)
 
         self.cvmodel = POUCV(pmodel = self.model)
         self.cvmodel.options.update({"pmodel":self.model})
@@ -394,6 +418,16 @@ class POUSSA(ASCriteria):
         
 
         return ans 
+
+    def eval_constraint(self, x, bounds, dir=0):
+        
+        m = self.trx.shape[0]
+
+        xmin = self.tree.query(np.array([x]), 1)
+
+        y = np.linalg.norm(x - xmin) - self.options["eps"]
+
+        return y 
 
 
     def eval_grad(self, x, bounds, dir=0):
@@ -480,7 +514,7 @@ class POUSSA(ASCriteria):
                 plt.plot(trxs[-1,0], [0], 'ro')
                 plt.savefig(f"cvssa_rc_1d.pdf")    
                 plt.clf()
-            # import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
 
             if(n == 2):
                 ndir = 75

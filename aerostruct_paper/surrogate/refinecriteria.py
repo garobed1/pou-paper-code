@@ -77,6 +77,9 @@ class ASCriteria():
     def eval_constraint(self, x, dir=0):
         pass
 
+    def eval_constraint_grad(self, x, dir=0):
+        pass
+
     
 """
 A Continuous Leave-One-Out Cross Validation function

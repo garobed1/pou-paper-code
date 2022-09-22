@@ -37,7 +37,9 @@ sampling, and compare performance.
 # Give directory with desired results as argument
 title = sys.argv[1]
 alt_model = ['KRG','GEK']#sys.argv[2]
-setmod = importlib.import_module(f'{title[:-1]}.settings')
+#impath = title.rsplit('.')
+sys.path.append(title)
+setmod = importlib.import_module(f'settings')
 ssettings = setmod.__dict__
 
 if not os.path.isdir(title):
@@ -48,29 +50,29 @@ plt.rcParams['font.size'] = '13'
 
 
 # Adaptive Data
-with open(f'./{title}/modelf.pickle', 'rb') as f:
+with open(f'{title}/modelf.pickle', 'rb') as f:
     modelf = pickle.load(f)
-with open(f'./{title}/err0rms.pickle', 'rb') as f:
+with open(f'{title}/err0rms.pickle', 'rb') as f:
     err0rms = pickle.load(f)
-with open(f'./{title}/err0mean.pickle', 'rb') as f:
+with open(f'{title}/err0mean.pickle', 'rb') as f:
     err0mean = pickle.load(f)
-with open(f'./{title}/hist.pickle', 'rb') as f:
+with open(f'{title}/hist.pickle', 'rb') as f:
     hist = pickle.load(f)
-with open(f'./{title}/errhrms.pickle', 'rb') as f:
+with open(f'{title}/errhrms.pickle', 'rb') as f:
     errhrms = pickle.load(f)
-with open(f'./{title}/errhmean.pickle', 'rb') as f:
+with open(f'{title}/errhmean.pickle', 'rb') as f:
     errhmean = pickle.load(f)
 # import pdb; pdb.set_trace()
 # LHS Data
-with open(f'./{title}/xk.pickle', 'rb') as f:
+with open(f'{title}/xk.pickle', 'rb') as f:
     xtrainK = pickle.load(f)
-with open(f'./{title}/fk.pickle', 'rb') as f:
+with open(f'{title}/fk.pickle', 'rb') as f:
     ftrainK = pickle.load(f)
-with open(f'./{title}/gk.pickle', 'rb') as f:
+with open(f'{title}/gk.pickle', 'rb') as f:
     gtrainK = pickle.load(f)
-with open(f'./{title}/errkrms.pickle', 'rb') as f:
+with open(f'{title}/errkrms.pickle', 'rb') as f:
     errkrms = pickle.load(f)
-with open(f'./{title}/errkmean.pickle', 'rb') as f:
+with open(f'{title}/errkmean.pickle', 'rb') as f:
     errkmean = pickle.load(f)
 
 # Concatenate lists
@@ -357,6 +359,20 @@ ekrm = np.zeros(itersk)
 ekmm = np.zeros(itersk)
 eksm = np.zeros(itersk)
 
+ehrs = np.zeros(iters)
+ehms = np.zeros(iters)
+ehss = np.zeros(iters) 
+ekrs = np.zeros(itersk)
+ekms = np.zeros(itersk)
+ekss = np.zeros(itersk)
+
+ehrssq = np.zeros(iters)
+ehmssq = np.zeros(iters)
+ehsssq = np.zeros(iters) 
+ekrssq = np.zeros(itersk)
+ekmssq = np.zeros(itersk)
+eksssq = np.zeros(itersk)
+
 eamm1 = np.zeros(itersk)
 earm1 = np.zeros(itersk)
 easm1 = np.zeros(itersk)
@@ -370,6 +386,33 @@ ehmm2 = np.zeros(itersk)
 ehrm2 = np.zeros(itersk)
 ehsm2 = np.zeros(itersk)
 
+eams1 = np.zeros(itersk)
+ears1 = np.zeros(itersk)
+eass1 = np.zeros(itersk)
+eams2 = np.zeros(itersk)
+ears2 = np.zeros(itersk)
+eass2 = np.zeros(itersk)
+ehms1 = np.zeros(itersk)
+ehrs1 = np.zeros(itersk)
+ehss1 = np.zeros(itersk)
+ehms2 = np.zeros(itersk)
+ehrs2 = np.zeros(itersk)
+ehss2 = np.zeros(itersk)
+
+eams1sq = np.zeros(itersk)
+ears1sq = np.zeros(itersk)
+eass1sq = np.zeros(itersk)
+eams2sq = np.zeros(itersk)
+ears2sq = np.zeros(itersk)
+eass2sq = np.zeros(itersk)
+ehms1sq = np.zeros(itersk)
+ehrs1sq = np.zeros(itersk)
+ehss1sq = np.zeros(itersk)
+ehms2sq = np.zeros(itersk)
+ehrs2sq = np.zeros(itersk)
+ehss2sq = np.zeros(itersk)
+
+
 
 for i in range(nruns):
     ehrm += np.array(ehr[i]).T[0]/nruns
@@ -378,6 +421,13 @@ for i in range(nruns):
     ekrm += np.array(ekr[i]).T[0]/nruns
     ekmm += np.array(ekm[i]).T[0][0]/nruns
     eksm += np.array(ekm[i]).T[0][1]/nruns
+    
+    ehrssq += np.square(np.array(ehr[i]).T[0])/nruns
+    ehmssq += np.square(np.array(ehm[i]).T[0][0])/nruns
+    ehsssq += np.square(np.array(ehm[i]).T[0][1])/nruns
+    ekrssq += np.square(np.array(ekr[i]).T[0])/nruns
+    ekmssq += np.square(np.array(ekm[i]).T[0][0])/nruns
+    eksssq += np.square(np.array(ekm[i]).T[0][1])/nruns
 
     earm1 += np.array(ear1[i]).T/nruns
     eamm1 += np.array(eam1[i]).T/nruns
@@ -393,42 +443,86 @@ for i in range(nruns):
     ehmm2 += np.array(ehm2[i]).T/nruns
     ehsm2 += np.array(ehs2[i]).T/nruns
 
+    ears1sq += np.square(np.array(ear1[i]).T)/nruns
+    eams1sq += np.square(np.array(eam1[i]).T)/nruns
+    eass1sq += np.square(np.array(eas1[i]).T)/nruns
+    ears2sq += np.square(np.array(ear2[i]).T)/nruns
+    eams2sq += np.square(np.array(eam2[i]).T)/nruns
+    eass2sq += np.square(np.array(eas2[i]).T)/nruns
 
+    ehrs1sq += np.square(np.array(ehr1[i]).T)/nruns
+    ehms1sq += np.square(np.array(ehm1[i]).T)/nruns
+    ehss1sq += np.square(np.array(ehs1[i]).T)/nruns
+    ehrs2sq += np.square(np.array(ehr2[i]).T)/nruns
+    ehms2sq += np.square(np.array(ehm2[i]).T)/nruns
+    ehss2sq += np.square(np.array(ehs2[i]).T)/nruns
 
+ehrs = np.sqrt(ehrssq - ehrm**2)
+ehms = np.sqrt(ehmssq - ehmm**2)
+ehss = np.sqrt(ehsssq - ehsm**2)
+ekrs = np.sqrt(ekrssq - ekrm**2)
+ekms = np.sqrt(ekmssq - ekmm**2)
+ekss = np.sqrt(eksssq - eksm**2)
+
+eams1 = np.sqrt(ears1sq - earm1**2)
+ears1 = np.sqrt(eams1sq - eamm1**2)
+eass1 = np.sqrt(eass1sq - easm1**2)
+eams2 = np.sqrt(ears2sq - earm2**2)
+ears2 = np.sqrt(eams2sq - eamm2**2)
+eass2 = np.sqrt(eass2sq - easm2**2)
+ehms1 = np.sqrt(ehrs1sq - ehrm1**2)
+ehrs1 = np.sqrt(ehms1sq - ehmm1**2)
+ehss1 = np.sqrt(ehss1sq - ehsm1**2)
+ehms2 = np.sqrt(ehrs2sq - ehrm2**2)
+ehrs2 = np.sqrt(ehms2sq - ehmm2**2)
+ehss2 = np.sqrt(ehss2sq - ehsm2**2)
 
 if rank == 0:
     #NRMSE
     ax = plt.gca()
     plt.loglog(samplehist, ehrm, "b-", label=f'H. Adapt (POU)')
+    #plt.fill_between(samplehist, ehrm - ehrs, ehrm + ehrs, color='b', alpha=0.2)
     plt.loglog(samplehistk, ekrm, 'b--', label='LHS (POU)')
+    #plt.fill_between(samplehistk, ekrm - ekrs, ekrm + ekrs, color='b', alpha=0.1)
     plt.loglog(samplehistk, earm1, 'g-', label=f'H. Adapt ({alt_model[0]})')
+    #plt.fill_between(samplehistk, earm1 - ears1, earm1 + ears1, color='g', alpha=0.2)
     plt.loglog(samplehistk, ehrm1, 'g--',  label=f'LHS ({alt_model[0]})')
+    #plt.fill_between(samplehistk, ehrm1 - ehrs1, ehrm1 + ehrs1, color='g', alpha=0.1)
     plt.loglog(samplehistk, earm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    #plt.fill_between(samplehistk, earm2 - ears2, earm2 + ears2, color='r', alpha=0.2)
     plt.loglog(samplehistk, ehrm2, 'r--', label=f'LHS ({alt_model[1]})')
+    #plt.fill_between(samplehistk, ehrm2 - ehrs2, ehrm2 + ehrs2, color='r', alpha=0.1)
+
     plt.xlabel("Number of samples")
     plt.ylabel("NRMSE")
-    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehrm[0])))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehrm[-1])))
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],earm2[0],ehrm1[0],ehrm2[0]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],earm2[-1],ehrm1[-1],ehrm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
     ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
     # ax.ticklabel_format(style='plain', axis='x')
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_nrmse_ensemble_alt.pdf", bbox_inches="tight")
+    plt.savefig(f"{title}/err_nrmse_ensemble_alt.pdf", bbox_inches="tight")
     plt.clf()
 
     ax = plt.gca()
     plt.loglog(samplehist, ehmm, "b-", label=f'H. Adapt (POU)')
+    #plt.fill_between(samplehist, ehmm - ehms, ehmm + ehms, color='b', alpha=0.2)
     plt.loglog(samplehistk, ekmm, 'b--', label='LHS (POU)')
+    #plt.fill_between(samplehistk, ekmm - ekms, ekmm + ekms, color='b', alpha=0.1)
     plt.loglog(samplehistk, eamm1, 'g-', label=f'H. Adapt ({alt_model[0]})')
+    #plt.fill_between(samplehistk, eamm1 - eams1, eamm1 + eams1, color='g', alpha=0.2)
     plt.loglog(samplehistk, ehmm1, 'g--',  label=f'LHS ({alt_model[0]})')
+    #plt.fill_between(samplehistk, ehmm1 - ehms1, ehmm1 + ehms1, color='g', alpha=0.1)
     plt.loglog(samplehistk, eamm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    #plt.fill_between(samplehistk, eamm2 - eams2, eamm2 + eams2, color='r', alpha=0.2)
     plt.loglog(samplehistk, ehmm2, 'r--', label=f'LHS ({alt_model[1]})')
+    #plt.fill_between(samplehistk, ehmm2 - ehms2, ehmm2 + ehms2, color='r', alpha=0.1)
     plt.xlabel("Number of samples")
     plt.ylabel("Mean Error")
-    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehmm[0])))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehmm[-1])))
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],earm2[0],ehrm1[0],ehrm2[0]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],earm2[-1],ehrm1[-1],ehrm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -436,20 +530,26 @@ if rank == 0:
     # ax.ticklabel_format(style='plain', axis='x')
 
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_mean_ensemble_alt.pdf", bbox_inches="tight")
+    plt.savefig(f"{title}/err_mean_ensemble_alt.pdf", bbox_inches="tight")
     plt.clf()
 
     ax = plt.gca()
     plt.loglog(samplehist, ehsm, "b-", label=f'H. Adapt (POU)')
+    #plt.fill_between(samplehist, ehsm - ehss, ehsm + ehss, color='b', alpha=0.2)
     plt.loglog(samplehistk, eksm, 'b--', label='LHS (POU)')
+    #plt.fill_between(samplehistk, eksm - ekss, eksm + ekss, color='b', alpha=0.1)
     plt.loglog(samplehistk, easm1, 'g-', label=f'H. Adapt ({alt_model[0]})')
+    #plt.fill_between(samplehistk, easm1 - eass1, easm1 + eass1, color='g', alpha=0.2)
     plt.loglog(samplehistk, ehsm1, 'g--',  label=f'LHS ({alt_model[0]})')
+    #plt.fill_between(samplehistk, ehsm1 - ehrs1, ehsm1 + ehss1, color='g', alpha=0.1)
     plt.loglog(samplehistk, easm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    #plt.fill_between(samplehistk, easm2 - eass2, easm2 + eass2, color='r', alpha=0.2)
     plt.loglog(samplehistk, ehsm2, 'r--', label=f'LHS ({alt_model[1]})')
+    #plt.fill_between(samplehistk, ehsm2 - ehss2, ehsm2 + ehss2, color='r', alpha=0.1)
     plt.xlabel("Number of samples")
     plt.ylabel(r"$\sigma$ Error")
-    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehsm[0])))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(ehsm[-1])))
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],earm2[0],ehrm1[0],ehrm2[0]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],earm2[-1],ehrm1[-1],ehrm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -457,7 +557,7 @@ if rank == 0:
     # ax.ticklabel_format(style='plain', axis='x')
 
     plt.legend(loc=3)
-    plt.savefig(f"./{title}/err_stdv_ensemble_alt.pdf", bbox_inches="tight")
+    plt.savefig(f"{title}/err_stdv_ensemble_alt.pdf", bbox_inches="tight")
     plt.clf()
 
 
