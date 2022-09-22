@@ -173,7 +173,7 @@ class POUSFCVT(ASCriteria):
                 plt.axvline(x[valid[np.argmin(F[valid])]], color='k', linestyle='--', linewidth=1.)
                 plt.savefig(f"cvsf_rc_1d_{self.ntr}.pdf", bbox_inches="tight")  
                 plt.clf()
-                import pdb; pdb.set_trace()
+                #import pdb; pdb.set_trace()
 
             if(n == 2):
                 ndir = 75

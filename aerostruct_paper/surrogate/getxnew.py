@@ -72,7 +72,10 @@ def getxnew(rcrit, x0, bounds, options=None):
                         resy[j] = results.fun
                         succ[j] = results.success
                     valid = np.where(succ)[0]
-                    rx = resx[valid[np.argmin(resy[valid])]]
+                    try:
+                        rx = resx[valid[np.argmin(resy[valid])]]
+                    except:
+                        rx = resx[np.argmin(resy)]
                     # print(rx)
 
                 # start at best point
