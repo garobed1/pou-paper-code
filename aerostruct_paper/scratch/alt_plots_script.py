@@ -269,53 +269,67 @@ ehs2 = np.zeros([nperr, itersk])
 for k in range(nperr):
     ind = k + rank*nperr
     for i in range(itersk):
-        ma1[k].append(copy.deepcopy(modelbase1))
-        ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
-        ma1[k][i].train()
-        ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        try:
+            ma1[k].append(copy.deepcopy(modelbase1))
+            ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
+            ma1[k][i].train()
+            ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        except:
+            ear1[k][i], eam1[k][i], eas1[k][i] = np.nan
 
-        ma2[k].append(copy.deepcopy(modelbase2))
-        if(dim > 1):
-            ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
-            for j in range(dim):
-                ma2[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
-        else:
-            dx = 1e-4
-            nex = xa[ind][i].shape[0]
-            xaug = np.zeros([nex, 1])
-            faug = np.zeros([nex, 1])
-            for l in range(nex):
-                xaug[l] = xa[ind][i][l] + dx
-                faug[l] = fa[ind][i][l] + dx*ga[ind][i][l]
-            xtot = np.append(xa[ind][i], xaug, axis=0)
-            ftot = np.append(fa[ind][i], faug, axis=0)
-            ma2[k][i].set_training_values(xtot, ftot)
-        ma2[k][i].train()
-        ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
 
-        mh1[k].append(copy.deepcopy(modelbase1))
-        mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
-        mh1[k][i].train()
-        ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        try:
+            ma2[k].append(copy.deepcopy(modelbase2))
+            if(dim > 1):
+                ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
+                for j in range(dim):
+                    ma2[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
+            else:
+                dx = 1e-4
+                nex = xa[ind][i].shape[0]
+                xaug = np.zeros([nex, 1])
+                faug = np.zeros([nex, 1])
+                for l in range(nex):
+                    xaug[l] = xa[ind][i][l] + dx
+                    faug[l] = fa[ind][i][l] + dx*ga[ind][i][l]
+                xtot = np.append(xa[ind][i], xaug, axis=0)
+                ftot = np.append(fa[ind][i], faug, axis=0)
+                ma2[k][i].set_training_values(xtot, ftot)
+            ma2[k][i].train()
+            ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        except:
+            ear2[k][i], eam2[k][i], eas2[k][i] = np.nan
 
-        mh2[k].append(copy.deepcopy(modelbase2))
-        if(dim > 1):
-            mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
-            for j in range(dim):
-                mh2[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
-        else:
-            dx = 1e-4
-            nex = xh[ind][i].shape[0]
-            xaug = np.zeros([nex, 1])
-            faug = np.zeros([nex, 1])
-            for l in range(nex):
-                xaug[l] = xh[ind][i][l] + dx
-                faug[l] = fh[ind][i][l] + dx*gh[ind][i][l]
-            xtot = np.append(xh[ind][i], xaug, axis=0)
-            ftot = np.append(fh[ind][i], faug, axis=0)
-            mh2[k][i].set_training_values(xtot, ftot)
-        mh2[k][i].train()
-        ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        try:
+            mh1[k].append(copy.deepcopy(modelbase1))
+            mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
+            mh1[k][i].train()
+            ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        except:
+            ehr1[k][i], ehm1[k][i], ehs1[k][i] = np.nan
+
+        try:
+            mh2[k].append(copy.deepcopy(modelbase2))
+            if(dim > 1):
+                mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
+                for j in range(dim):
+                    mh2[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
+            else:
+                dx = 1e-4
+                nex = xh[ind][i].shape[0]
+                xaug = np.zeros([nex, 1])
+                faug = np.zeros([nex, 1])
+                for l in range(nex):
+                    xaug[l] = xh[ind][i][l] + dx
+                    faug[l] = fh[ind][i][l] + dx*gh[ind][i][l]
+                xtot = np.append(xh[ind][i], xaug, axis=0)
+                ftot = np.append(fh[ind][i], faug, axis=0)
+                mh2[k][i].set_training_values(xtot, ftot)
+            mh2[k][i].train()
+            ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        except:
+            ehr2[k][i], ehm2[k][i], ehs2[k][i] = np.nan
+
         # import pdb; pdb.set_trace()
 
 
