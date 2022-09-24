@@ -46,8 +46,8 @@ if not os.path.isdir(title):
     os.mkdir(title)
 
 prob = title.split("_")[-2]
-plt.rcParams['font.size'] = '13'
-
+plt.rcParams['font.size'] = '18'
+plt.rc('legend',fontsize=14)
 
 # Adaptive Data
 with open(f'{title}/modelf.pickle', 'rb') as f:
@@ -207,14 +207,21 @@ itersk = len(ekr[0])
 samplehist = np.zeros(iters, dtype=int)
 samplehistk = np.zeros(itersk, dtype=int)
 
-for i in range(iters-1):
-    samplehist[i] = hi[0][i][0][0].shape[0] #training_points
+#for i in range(iters-1):
+#    samplehist[i] = hi[0][i][0][0].shape[0] #training_points
+samplehist[0] = hi[0][0][0][0].shape[0] #training_points 
+for i in range(1, iters-1):
+    samplehist[i] = samplehist[i-1] + 1
 samplehist[iters-1] = mf[0].training_points[None][0][0].shape[0]
 for i in range(itersk):
     samplehistk[i] = len(xk[i])
 
 # Grab data from the lhs and adaptive sample sets
 ind_alt = np.linspace(0, iters, itersk, dtype=int)
+if("comp_hist" in ssettings):
+    ind_alt = np.arange(ssettings["LHS_batch"])
+
+
 xa = []
 fa = []
 ga = []
@@ -330,7 +337,7 @@ for k in range(nperr):
         except:
             ehr2[k][i], ehm2[k][i], ehs2[k][i] = np.nan
 
-        # import pdb; pdb.set_trace()
+        print(i)
 
 
 ma1 = comm.allgather(ma1)

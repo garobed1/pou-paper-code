@@ -326,6 +326,19 @@ for n in cases[rank]:
     errhmean.append(ef2)
     co += 1
 
+
+try:
+    comp_hist
+    iters = len(ef)
+    itersk = len(LHS_batch)
+    histc = []
+    ind_alt = np.linspace(0, iters, itersk, dtype=int)
+    for n in range(co):
+        histc = hf[n][ind_alt]
+    hist = histc
+except:
+    pass
+
 modelf = comm.gather(modelf, root=0)
 RCF = comm.gather(RCF, root=0)
 hist = comm.gather(hist, root=0)

@@ -165,7 +165,7 @@ class POUSFCVT(ASCriteria):
                 plt.ylabel(r'$-\mathrm{RC}_{\mathrm{CV},%i}(x_1)$' % (self.ntr-10))
                 wheret = np.full([ndir], True)
                 for i in range(self.ntr):
-                    ax.fill_betweenx([-1,0], trxs[i]-self.S, trxs[i]+self.S, color='r', alpha=0.2)
+                    ax.fill_betweenx([-1,0], trxs[i]-self.S, trxs[i]+self.S, color='r', alpha=0.2, set_edgecolor='face')
                     for j in range(ndir):
                         if(x[j] > trxs[i]-self.S and x[j] < trxs[i]+self.S):
                             wheret[j] = False
