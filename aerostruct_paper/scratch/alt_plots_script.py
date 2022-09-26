@@ -290,7 +290,6 @@ for k in range(nperr):
             ear1[k][i] = np.nan
             eam1[k][i] = np.nan
             eas1[k][i] = np.nan
-            pass
 
 
         ma2[k].append(copy.deepcopy(modelbase2))
@@ -316,7 +315,6 @@ for k in range(nperr):
             ear2[k][i] = np.nan
             eam2[k][i] = np.nan
             eas2[k][i] = np.nan
-            pass
 
 
         mh1[k].append(copy.deepcopy(modelbase1))
@@ -328,7 +326,6 @@ for k in range(nperr):
             ehr1[k][i] = np.nan
             ehm1[k][i] = np.nan
             ehs1[k][i] = np.nan
-            pass
 
         mh2[k].append(copy.deepcopy(modelbase2))
         if(dim > 1):
@@ -353,9 +350,8 @@ for k in range(nperr):
             ehr2[k][i] = np.nan
             ehm2[k][i] = np.nan
             ehs2[k][i] = np.nan
-            pass
 
-        print(i)
+        print(f'{i}, {rank}')
 
 
 print("HUGE SUCCESS")
