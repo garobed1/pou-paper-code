@@ -353,6 +353,8 @@ for k in range(nperr):
         print(i)
 
 
+print("HUGE SUCCESS")
+
 ma1 = comm.allgather(ma1)
 ear1 = comm.allgather(ear1)
 eam1 = comm.allgather(eam1)
