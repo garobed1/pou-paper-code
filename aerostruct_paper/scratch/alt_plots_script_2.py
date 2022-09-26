@@ -293,30 +293,30 @@ for k in range(nperr):
             eas1[k][i] = np.nan
 
 
-        ma2[k].append(copy.deepcopy(modelbase2))
-        if(dim > 1):
-            ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
-            for j in range(dim):
-                ma2[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
-        else:
-            dx = 1e-4
-            nex = xa[ind][i].shape[0]
-            xaug = np.zeros([nex, 1])
-            faug = np.zeros([nex, 1])
-            for l in range(nex):
-                xaug[l] = xa[ind][i][l] + dx
-                faug[l] = fa[ind][i][l] + dx*ga[ind][i][l]
-            xtot = np.append(xa[ind][i], xaug, axis=0)
-            ftot = np.append(fa[ind][i], faug, axis=0)
-            ma2[k][i].set_training_values(xtot, ftot)
-        try:
-            ma2[k][i].train()
-            ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
-        except:
-            print(f'{i}, {rank}, oops')
-            ear2[k][i] = np.nan
-            eam2[k][i] = np.nan
-            eas2[k][i] = np.nan
+        # ma2[k].append(copy.deepcopy(modelbase2))
+        # if(dim > 1):
+        #     ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
+        #     for j in range(dim):
+        #         ma2[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
+        # else:
+        #     dx = 1e-4
+        #     nex = xa[ind][i].shape[0]
+        #     xaug = np.zeros([nex, 1])
+        #     faug = np.zeros([nex, 1])
+        #     for l in range(nex):
+        #         xaug[l] = xa[ind][i][l] + dx
+        #         faug[l] = fa[ind][i][l] + dx*ga[ind][i][l]
+        #     xtot = np.append(xa[ind][i], xaug, axis=0)
+        #     ftot = np.append(fa[ind][i], faug, axis=0)
+        #     ma2[k][i].set_training_values(xtot, ftot)
+        # try:
+        #     ma2[k][i].train()
+        #     ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        # except:
+        #     print(f'{i}, {rank}, oops')
+        #     ear2[k][i] = np.nan
+        #     eam2[k][i] = np.nan
+        #     eas2[k][i] = np.nan
 
 
         mh1[k].append(copy.deepcopy(modelbase1))
@@ -400,19 +400,19 @@ ekrm = np.zeros(itersk)
 ekmm = np.zeros(itersk)
 eksm = np.zeros(itersk)
 
-ehrs = np.zeros(iters)
-ehms = np.zeros(iters)
-ehss = np.zeros(iters) 
-ekrs = np.zeros(itersk)
-ekms = np.zeros(itersk)
-ekss = np.zeros(itersk)
+# ehrs = np.zeros(iters)
+# ehms = np.zeros(iters)
+# ehss = np.zeros(iters) 
+# ekrs = np.zeros(itersk)
+# ekms = np.zeros(itersk)
+# ekss = np.zeros(itersk)
 
-ehrssq = np.zeros(iters)
-ehmssq = np.zeros(iters)
-ehsssq = np.zeros(iters) 
-ekrssq = np.zeros(itersk)
-ekmssq = np.zeros(itersk)
-eksssq = np.zeros(itersk)
+# ehrssq = np.zeros(iters)
+# ehmssq = np.zeros(iters)
+# ehsssq = np.zeros(iters) 
+# ekrssq = np.zeros(itersk)
+# ekmssq = np.zeros(itersk)
+# eksssq = np.zeros(itersk)
 
 eamm1 = np.zeros(itersk)
 earm1 = np.zeros(itersk)
@@ -427,31 +427,31 @@ ehmm2 = np.zeros(itersk)
 ehrm2 = np.zeros(itersk)
 ehsm2 = np.zeros(itersk)
 
-eams1 = np.zeros(itersk)
-ears1 = np.zeros(itersk)
-eass1 = np.zeros(itersk)
-eams2 = np.zeros(itersk)
-ears2 = np.zeros(itersk)
-eass2 = np.zeros(itersk)
-ehms1 = np.zeros(itersk)
-ehrs1 = np.zeros(itersk)
-ehss1 = np.zeros(itersk)
-ehms2 = np.zeros(itersk)
-ehrs2 = np.zeros(itersk)
-ehss2 = np.zeros(itersk)
+# eams1 = np.zeros(itersk)
+# ears1 = np.zeros(itersk)
+# eass1 = np.zeros(itersk)
+# eams2 = np.zeros(itersk)
+# ears2 = np.zeros(itersk)
+# eass2 = np.zeros(itersk)
+# ehms1 = np.zeros(itersk)
+# ehrs1 = np.zeros(itersk)
+# ehss1 = np.zeros(itersk)
+# ehms2 = np.zeros(itersk)
+# ehrs2 = np.zeros(itersk)
+# ehss2 = np.zeros(itersk)
 
-eams1sq = np.zeros(itersk)
-ears1sq = np.zeros(itersk)
-eass1sq = np.zeros(itersk)
-eams2sq = np.zeros(itersk)
-ears2sq = np.zeros(itersk)
-eass2sq = np.zeros(itersk)
-ehms1sq = np.zeros(itersk)
-ehrs1sq = np.zeros(itersk)
-ehss1sq = np.zeros(itersk)
-ehms2sq = np.zeros(itersk)
-ehrs2sq = np.zeros(itersk)
-ehss2sq = np.zeros(itersk)
+# eams1sq = np.zeros(itersk)
+# ears1sq = np.zeros(itersk)
+# eass1sq = np.zeros(itersk)
+# eams2sq = np.zeros(itersk)
+# ears2sq = np.zeros(itersk)
+# eass2sq = np.zeros(itersk)
+# ehms1sq = np.zeros(itersk)
+# ehrs1sq = np.zeros(itersk)
+# ehss1sq = np.zeros(itersk)
+# ehms2sq = np.zeros(itersk)
+# ehrs2sq = np.zeros(itersk)
+# ehss2sq = np.zeros(itersk)
 
 
 
@@ -463,19 +463,19 @@ for i in range(nruns):
     ekmm += np.array(ekm[i]).T[0][0]/nruns
     eksm += np.array(ekm[i]).T[0][1]/nruns
     
-    ehrssq += np.square(np.array(ehr[i]).T[0])/nruns
-    ehmssq += np.square(np.array(ehm[i]).T[0][0])/nruns
-    ehsssq += np.square(np.array(ehm[i]).T[0][1])/nruns
-    ekrssq += np.square(np.array(ekr[i]).T[0])/nruns
-    ekmssq += np.square(np.array(ekm[i]).T[0][0])/nruns
-    eksssq += np.square(np.array(ekm[i]).T[0][1])/nruns
+    # ehrssq += np.square(np.array(ehr[i]).T[0])/nruns
+    # ehmssq += np.square(np.array(ehm[i]).T[0][0])/nruns
+    # ehsssq += np.square(np.array(ehm[i]).T[0][1])/nruns
+    # ekrssq += np.square(np.array(ekr[i]).T[0])/nruns
+    # ekmssq += np.square(np.array(ekm[i]).T[0][0])/nruns
+    # eksssq += np.square(np.array(ekm[i]).T[0][1])/nruns
 
     earm1 += np.array(ear1[i]).T/nruns
     eamm1 += np.array(eam1[i]).T/nruns
     easm1 += np.array(eas1[i]).T/nruns
-    earm2 += np.array(ear2[i]).T/nruns
-    eamm2 += np.array(eam2[i]).T/nruns
-    easm2 += np.array(eas2[i]).T/nruns
+    # earm2 += np.array(ear2[i]).T/nruns
+    # eamm2 += np.array(eam2[i]).T/nruns
+    # easm2 += np.array(eas2[i]).T/nruns
 
     ehrm1 += np.array(ehr1[i]).T/nruns
     ehmm1 += np.array(ehm1[i]).T/nruns
@@ -484,39 +484,39 @@ for i in range(nruns):
     ehmm2 += np.array(ehm2[i]).T/nruns
     ehsm2 += np.array(ehs2[i]).T/nruns
 
-    ears1sq += np.square(np.array(ear1[i]).T)/nruns
-    eams1sq += np.square(np.array(eam1[i]).T)/nruns
-    eass1sq += np.square(np.array(eas1[i]).T)/nruns
-    ears2sq += np.square(np.array(ear2[i]).T)/nruns
-    eams2sq += np.square(np.array(eam2[i]).T)/nruns
-    eass2sq += np.square(np.array(eas2[i]).T)/nruns
+    # ears1sq += np.square(np.array(ear1[i]).T)/nruns
+    # eams1sq += np.square(np.array(eam1[i]).T)/nruns
+    # eass1sq += np.square(np.array(eas1[i]).T)/nruns
+    # ears2sq += np.square(np.array(ear2[i]).T)/nruns
+    # eams2sq += np.square(np.array(eam2[i]).T)/nruns
+    # eass2sq += np.square(np.array(eas2[i]).T)/nruns
 
-    ehrs1sq += np.square(np.array(ehr1[i]).T)/nruns
-    ehms1sq += np.square(np.array(ehm1[i]).T)/nruns
-    ehss1sq += np.square(np.array(ehs1[i]).T)/nruns
-    ehrs2sq += np.square(np.array(ehr2[i]).T)/nruns
-    ehms2sq += np.square(np.array(ehm2[i]).T)/nruns
-    ehss2sq += np.square(np.array(ehs2[i]).T)/nruns
+    # ehrs1sq += np.square(np.array(ehr1[i]).T)/nruns
+    # ehms1sq += np.square(np.array(ehm1[i]).T)/nruns
+    # ehss1sq += np.square(np.array(ehs1[i]).T)/nruns
+    # ehrs2sq += np.square(np.array(ehr2[i]).T)/nruns
+    # ehms2sq += np.square(np.array(ehm2[i]).T)/nruns
+    # ehss2sq += np.square(np.array(ehs2[i]).T)/nruns
 
-ehrs = np.sqrt(ehrssq - ehrm**2)
-ehms = np.sqrt(ehmssq - ehmm**2)
-ehss = np.sqrt(ehsssq - ehsm**2)
-ekrs = np.sqrt(ekrssq - ekrm**2)
-ekms = np.sqrt(ekmssq - ekmm**2)
-ekss = np.sqrt(eksssq - eksm**2)
+# ehrs = np.sqrt(ehrssq - ehrm**2)
+# ehms = np.sqrt(ehmssq - ehmm**2)
+# ehss = np.sqrt(ehsssq - ehsm**2)
+# ekrs = np.sqrt(ekrssq - ekrm**2)
+# ekms = np.sqrt(ekmssq - ekmm**2)
+# ekss = np.sqrt(eksssq - eksm**2)
 
-eams1 = np.sqrt(ears1sq - earm1**2)
-ears1 = np.sqrt(eams1sq - eamm1**2)
-eass1 = np.sqrt(eass1sq - easm1**2)
-eams2 = np.sqrt(ears2sq - earm2**2)
-ears2 = np.sqrt(eams2sq - eamm2**2)
-eass2 = np.sqrt(eass2sq - easm2**2)
-ehms1 = np.sqrt(ehrs1sq - ehrm1**2)
-ehrs1 = np.sqrt(ehms1sq - ehmm1**2)
-ehss1 = np.sqrt(ehss1sq - ehsm1**2)
-ehms2 = np.sqrt(ehrs2sq - ehrm2**2)
-ehrs2 = np.sqrt(ehms2sq - ehmm2**2)
-ehss2 = np.sqrt(ehss2sq - ehsm2**2)
+# eams1 = np.sqrt(ears1sq - earm1**2)
+# ears1 = np.sqrt(eams1sq - eamm1**2)
+# eass1 = np.sqrt(eass1sq - easm1**2)
+# eams2 = np.sqrt(ears2sq - earm2**2)
+# ears2 = np.sqrt(eams2sq - eamm2**2)
+# eass2 = np.sqrt(eass2sq - easm2**2)
+# ehms1 = np.sqrt(ehrs1sq - ehrm1**2)
+# ehrs1 = np.sqrt(ehms1sq - ehmm1**2)
+# ehss1 = np.sqrt(ehss1sq - ehsm1**2)
+# ehms2 = np.sqrt(ehrs2sq - ehrm2**2)
+# ehrs2 = np.sqrt(ehms2sq - ehmm2**2)
+# ehss2 = np.sqrt(ehss2sq - ehsm2**2)
 
 if rank == 0:
     #NRMSE
@@ -529,7 +529,7 @@ if rank == 0:
     #plt.fill_between(samplehistk, earm1 - ears1, earm1 + ears1, color='g', alpha=0.2)
     plt.loglog(samplehistk, ehrm1, 'g--',  label=f'LHS ({alt_model[0]})')
     #plt.fill_between(samplehistk, ehrm1 - ehrs1, ehrm1 + ehrs1, color='g', alpha=0.1)
-    plt.loglog(samplehistk, earm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    # plt.loglog(samplehistk, earm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
     #plt.fill_between(samplehistk, earm2 - ears2, earm2 + ears2, color='r', alpha=0.2)
     plt.loglog(samplehistk, ehrm2, 'r--', label=f'LHS ({alt_model[1]})')
     #plt.fill_between(samplehistk, ehrm2 - ehrs2, ehrm2 + ehrs2, color='r', alpha=0.1)
@@ -556,7 +556,7 @@ if rank == 0:
     #plt.fill_between(samplehistk, eamm1 - eams1, eamm1 + eams1, color='g', alpha=0.2)
     plt.loglog(samplehistk, ehmm1, 'g--',  label=f'LHS ({alt_model[0]})')
     #plt.fill_between(samplehistk, ehmm1 - ehms1, ehmm1 + ehms1, color='g', alpha=0.1)
-    plt.loglog(samplehistk, eamm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    # plt.loglog(samplehistk, eamm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
     #plt.fill_between(samplehistk, eamm2 - eams2, eamm2 + eams2, color='r', alpha=0.2)
     plt.loglog(samplehistk, ehmm2, 'r--', label=f'LHS ({alt_model[1]})')
     #plt.fill_between(samplehistk, ehmm2 - ehms2, ehmm2 + ehms2, color='r', alpha=0.1)
@@ -583,7 +583,7 @@ if rank == 0:
     #plt.fill_between(samplehistk, easm1 - eass1, easm1 + eass1, color='g', alpha=0.2)
     plt.loglog(samplehistk, ehsm1, 'g--',  label=f'LHS ({alt_model[0]})')
     #plt.fill_between(samplehistk, ehsm1 - ehrs1, ehsm1 + ehss1, color='g', alpha=0.1)
-    plt.loglog(samplehistk, easm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
+    # plt.loglog(samplehistk, easm2, 'r-', label=f'H. Adapt ({alt_model[1]})')
     #plt.fill_between(samplehistk, easm2 - eass2, easm2 + eass2, color='r', alpha=0.2)
     plt.loglog(samplehistk, ehsm2, 'r--', label=f'LHS ({alt_model[1]})')
     #plt.fill_between(samplehistk, ehsm2 - ehss2, ehsm2 + ehss2, color='r', alpha=0.1)
