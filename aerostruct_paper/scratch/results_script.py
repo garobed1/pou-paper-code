@@ -66,7 +66,13 @@ testdata = None
 if rank == 0:
     xtest = sampling(Nerr)
     ftest = trueFunc(xtest)
-    testdata = [xtest, ftest]
+    if(dim > 3):
+        intervals = np.arange(0, ntr, dim)
+        intervals = np.append(intervals, ntr - 1)
+        intervals = np.delete(intervals, 0)
+    else:
+        intervals = np.arange(0, ntr)
+    testdata = [xtest, ftest, intervals]
 
 xtest = comm.bcast(xtest, root=0)
 ftest = comm.bcast(ftest, root=0)
@@ -370,6 +376,10 @@ if rank == 0:
 
     with open(f'{path}/{title}/errhmean.pickle', 'wb') as f:
         pickle.dump(errhmean, f)
+
+    if(dim > 3):
+        with open(f'{path}/{title}/intervals.pickle', 'wb') as f:
+            pickle.dump(intervals, f)
 
 
 

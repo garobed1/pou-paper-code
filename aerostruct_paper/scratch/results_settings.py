@@ -1,13 +1,13 @@
 
-header = "pou_test_compress"
+header = "pou_test_compress_2"
 path = None#"/home/garobed"
-skip_LHS = False
+skip_LHS = True
 LHS_batch = 5
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "fuhgsh"    #problem
-dim = 1     #problem dimension
+prob  = "arctan"    #problem
+dim = 4     #problem dimension
 
 
 # Surrogate Settings
@@ -32,7 +32,7 @@ rho = 10          #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = dim*20      #number of points to add
+ntr = dim*5      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000*dim       #number of test points to evaluate the error

@@ -150,7 +150,7 @@ class POUSFCVT(ASCriteria):
                     F[i]  = self.evaluate(xi, bounds, dir=dir)    
                 F /= np.abs(np.min(F))
 
-                plt.rcParams['font.size'] = '16'
+                plt.rcParams['font.size'] = '18'
                 ax = plt.gca()  
                 plt.plot(x, F, label='Criteria')
                 plt.xlim(-0.05, 1.05)

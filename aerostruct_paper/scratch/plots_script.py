@@ -69,6 +69,7 @@ with open(f'{title}/errkrms.pickle', 'rb') as f:
 with open(f'{title}/errkmean.pickle', 'rb') as f:
     errkmean = pickle.load(f)
 
+
 # Concatenate lists
 xk = []
 fk = []
@@ -113,7 +114,6 @@ nruns = len(mf)
 dim = xk[0].shape[1]
 
 
-
 # Problem Settings
 trueFunc = GetProblem(prob, dim)
 
@@ -129,6 +129,13 @@ for i in range(nruns):
 
 # Plot Error History
 iters = len(ehr[0])
+if(dim > 3):
+    with open(f'{title}/intervals.pickle', 'rb') as f:
+        intervals = pickle.load(f)
+    iters = intervals.shape[0] + 1
+else:
+    intervals = np.arange(iters)
+
 itersk = len(ekr[0])
 if(title2):
     iterst = len(ehrt[0])
@@ -138,8 +145,9 @@ if(title2):
 samplehist = np.zeros(iters, dtype=int)
 samplehistk = np.zeros(itersk, dtype=int)
 
-for i in range(iters-1):
-    samplehist[i] = hi[0][i][0][0].shape[0]
+samplehist[0] = hi[0][0][0][0].shape[0] #training_points 
+for i in range(1, iters-1):
+    samplehist[i] = samplehist[i-1] + (intervals[1] - intervals[0])
 samplehist[iters-1] = mf[0].training_points[None][0][0].shape[0]
 for i in range(itersk):
     samplehistk[i] = len(xk[i])
