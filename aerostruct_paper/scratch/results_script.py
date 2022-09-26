@@ -340,8 +340,10 @@ try:
     histc = []
     ind_alt = np.linspace(0, iters, itersk, dtype=int)
     for n in range(co):
-        histc = hf[n][ind_alt]
+        histc.append(hf[n][ind_alt])
     hist = histc
+    if rank == 0:
+        print("hello from comp hist")
 except:
     pass
 

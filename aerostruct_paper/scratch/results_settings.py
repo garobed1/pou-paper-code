@@ -62,4 +62,4 @@ nmatch = dim
 
 
 rc_print = False#False#
-comp_hist = True
+#comp_hist = False
