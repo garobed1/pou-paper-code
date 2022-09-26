@@ -285,7 +285,7 @@ for k in range(nperr):
         ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
         try:
             ma1[k][i].train()
-            ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+            ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
         except:
             print(f'{i}, {rank}, oops')
             ear1[k][i] = np.nan
@@ -311,7 +311,7 @@ for k in range(nperr):
         #     ma2[k][i].set_training_values(xtot, ftot)
         # try:
         #     ma2[k][i].train()
-        #     ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+        #     ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
         # except:
         #     print(f'{i}, {rank}, oops')
         #     ear2[k][i] = np.nan
@@ -323,7 +323,7 @@ for k in range(nperr):
         mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
         try:
             mh1[k][i].train()
-            ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+            ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
         except:
             print(f'{i}, {rank}, oops')
             ehr1[k][i] = np.nan
@@ -348,7 +348,7 @@ for k in range(nperr):
             mh2[k][i].set_training_values(xtot, ftot)
         try:
             mh2[k][i].train()
-            ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
+            ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
         except:
             print(f'{i}, {rank}, oops')
             ehr2[k][i] = np.nan
@@ -536,8 +536,8 @@ if rank == 0:
 
     plt.xlabel("Number of samples")
     plt.ylabel("NRMSE")
-    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],earm2[0],ehrm1[0],ehrm2[0]]))))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],earm2[-1],ehrm1[-1],ehrm2[-1]]))))
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],ehrm1[0],ehrm2[0]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],ehrm1[-1],ehrm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -562,8 +562,8 @@ if rank == 0:
     #plt.fill_between(samplehistk, ehmm2 - ehms2, ehmm2 + ehms2, color='r', alpha=0.1)
     plt.xlabel("Number of samples")
     plt.ylabel("Mean Error")
-    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],earm2[0],ehrm1[0],ehrm2[0]]))))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],earm2[-1],ehrm1[-1],ehrm2[-1]]))))
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],ehrm1[0],ehrm2[0]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],ehrm1[-1],ehrm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -589,8 +589,8 @@ if rank == 0:
     #plt.fill_between(samplehistk, ehsm2 - ehss2, ehsm2 + ehss2, color='r', alpha=0.1)
     plt.xlabel("Number of samples")
     plt.ylabel(r"$\sigma$ Error")
-    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],earm2[0],ehrm1[0],ehrm2[0]]))))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],earm2[-1],ehrm1[-1],ehrm2[-1]]))))
+    plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], earm1[0],ehrm1[0],ehrm2[0]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], earm1[-1],ehrm1[-1],ehrm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
