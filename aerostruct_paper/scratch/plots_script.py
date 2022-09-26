@@ -341,7 +341,7 @@ if(dim == 2):
     
     plt.clf()
     # Plot Training Points
-    plt.plot(trxk[:,0], trx[:,1], "bo", label='LHS Points')
+    plt.plot(trxk[:,0], trxk[:,1], "bo", label='LHS Points')
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)

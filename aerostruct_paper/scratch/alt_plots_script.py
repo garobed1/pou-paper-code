@@ -287,7 +287,9 @@ for k in range(nperr):
             ma1[k][i].train()
             ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
         except:
-            ear1[k][i], eam1[k][i], eas1[k][i] = np.nan
+            ear1[k][i] = np.nan
+            eam1[k][i] = np.nan
+            eas1[k][i] = np.nan
 
 
         try:
@@ -310,7 +312,9 @@ for k in range(nperr):
             ma2[k][i].train()
             ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
         except:
-            ear2[k][i], eam2[k][i], eas2[k][i] = np.nan
+            ear2[k][i] = np.nan
+            eam2[k][i] = np.nan
+            eas2[k][i] = np.nan
 
         try:
             mh1[k].append(copy.deepcopy(modelbase1))
@@ -318,7 +322,9 @@ for k in range(nperr):
             mh1[k][i].train()
             ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
         except:
-            ehr1[k][i], ehm1[k][i], ehs1[k][i] = np.nan
+            ehr1[k][i] = np.nan
+            ehm1[k][i] = np.nan
+            ehs1[k][i] = np.nan
 
         try:
             mh2[k].append(copy.deepcopy(modelbase2))
@@ -340,7 +346,9 @@ for k in range(nperr):
             mh2[k][i].train()
             ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000, xdata=xtest, fdata=ftest)
         except:
-            ehr2[k][i], ehm2[k][i], ehs2[k][i] = np.nan
+            ehr2[k][i] = np.nan
+            ehm2[k][i] = np.nan
+            ehs2[k][i] = np.nan
 
         print(i)
 
