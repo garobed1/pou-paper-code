@@ -2,6 +2,7 @@ import sys, os
 import shutil
 import copy
 import pickle
+import importlib
 from mpi4py import MPI
 sys.path.insert(1,"../surrogate")
 
@@ -35,6 +36,11 @@ Perform adaptive sampling and estimate error
 
 # All variables not initialized come from this import
 from results_settings import *
+
+
+#sys.path.append(title)
+setmod = importlib.import_module(f'results_settings')
+ssettings = setmod.__dict__
 
 Nruns = size*runs_per_proc
 
@@ -333,19 +339,21 @@ for n in cases[rank]:
     co += 1
 
 
-try:
-    comp_hist
+#try:
+if("comp_hist" in ssettings):
     iters = len(ef)
-    itersk = len(LHS_batch)
+    itersk = LHS_batch
     histc = []
-    ind_alt = np.linspace(0, iters, itersk, dtype=int)
+    ind_alt = np.linspace(0, iters-1, itersk, dtype=int)
     for n in range(co):
-        histc.append(hf[n][ind_alt])
+        dummy = []
+        for p in ind_alt:
+            dummy.append(hist[n][p])
+        histc.append(dummy)
     hist = histc
     if rank == 0:
         print("hello from comp hist")
-except:
-    pass
+
 
 modelf = comm.gather(modelf, root=0)
 RCF = comm.gather(RCF, root=0)
@@ -382,8 +390,3 @@ if rank == 0:
     if(dim > 3):
         with open(f'{path}/{title}/intervals.pickle', 'wb') as f:
             pickle.dump(intervals, f)
-
-
-
-
-

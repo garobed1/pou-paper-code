@@ -27,6 +27,7 @@ class HessianRefine(ASCriteria):
         self.bounds = bounds
 
         super().__init__(model, **kwargs)
+        self.scaler = 0
 
         self.supports["obj_derivatives"] = True  
         
@@ -245,7 +246,9 @@ class HessianRefine(ASCriteria):
                     xi = np.zeros([1])
                     xi[0] = x[i]
                     F[i]  = self.evaluate(xi, bounds, dir=dir)    
-                F /= np.abs(np.min(F))
+                if(self.ntr == 10):
+                    self.scaler = np.min(F)  
+                F /= np.abs(self.scaler)
 
                 plt.rcParams['font.size'] = '18'
                 ax = plt.gca()  

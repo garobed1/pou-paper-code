@@ -23,6 +23,7 @@ class POUSFCVT(ASCriteria):
         self.bounds = bounds
 
         super().__init__(model, **kwargs)
+        self.scaler = 0
 
         self.supports["obj_derivatives"] = False  
         
@@ -147,8 +148,10 @@ class POUSFCVT(ASCriteria):
                 for i in range(ndir):
                     xi = np.zeros([1])
                     xi[0] = x[i]
-                    F[i]  = self.evaluate(xi, bounds, dir=dir)    
-                F /= np.abs(np.min(F))
+                    F[i]  = self.evaluate(xi, bounds, dir=dir) 
+                if(self.ntr == 10):
+                    self.scaler = np.min(F)  
+                F /= np.abs(self.scaler)
 
                 plt.rcParams['font.size'] = '18'
                 ax = plt.gca()  
@@ -165,15 +168,17 @@ class POUSFCVT(ASCriteria):
                 plt.ylabel(r'$-\mathrm{RC}_{\mathrm{CV},%i}(x_1)$' % (self.ntr-10))
                 wheret = np.full([ndir], True)
                 for i in range(self.ntr):
-                    ax.fill_betweenx([-1,0], trxs[i]-self.S, trxs[i]+self.S, color='r', alpha=0.2, set_edgecolor='face')
+                    # ax.fill_betweenx([-1,0], trxs[i]-self.S, trxs[i]+self.S, color='r', alpha=0.2, set_edgecolor='face')
                     for j in range(ndir):
                         if(x[j] > trxs[i]-self.S and x[j] < trxs[i]+self.S):
                             wheret[j] = False
                 valid = np.where(wheret)[0]
+                yfill = np.zeros(ndir)
+                ax.fill_between(x, -1., 0., where=wheret, color = 'g', alpha=0.2)
                 plt.axvline(x[valid[np.argmin(F[valid])]], color='k', linestyle='--', linewidth=1.)
                 plt.savefig(f"cvsf_rc_1d_{self.ntr}.pdf", bbox_inches="tight")  
                 plt.clf()
-                #import pdb; pdb.set_trace()
+                import pdb; pdb.set_trace()
 
             if(n == 2):
                 ndir = 75
