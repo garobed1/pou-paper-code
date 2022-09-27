@@ -26,7 +26,7 @@ if not os.path.isdir(title):
     os.mkdir(title)
 
 prob = title.split("_")[-2]
-plt.rcParams['font.size'] = '13'
+plt.rcParams['font.size'] = '16'
 
 if(title2):
     
@@ -313,14 +313,14 @@ if(dim == 1):
 
     # Plot Non-Adaptive Error
     # plt.plot(x, Zgek, "-m", label=f'IGEK')
-    plt.plot(x, Z, "-k", label=f'H. Adapt (POU)')
+    plt.plot(x, Z, "-k", label=f'Adaptive (POU)')
     plt.plot(x, Zh, "--k", label=f'LHS (POU)')
     plt.xlabel(r"$x$")
     plt.ylabel(r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
     plt.plot(trx[0:nt0,0], np.zeros_like(trf[0:nt0,0]), "bo", label='Initial Samples')
     plt.plot(trx[nt0:,0], np.zeros_like(trf[nt0:,0]), "ro", label='Added Samples')
     plt.plot(trxk, max(np.max(Z), np.max(Zh))*np.ones_like(trxk), "ko", label='LHS Samples')
-    plt.legend()
+    plt.legend(fontsize='13')
     plt.savefig(f"{title}/1derr.pdf", bbox_inches="tight")
 
     plt.clf()
@@ -384,7 +384,7 @@ if(dim == 2):
     plt.clf()
 
     cs = plt.contourf(X, Y, Za, levels = 40)
-    plt.colorbar(cs, aspect=20)
+    plt.colorbar(cs, aspect=20, label = r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
     #plt.legend(loc=1)
@@ -396,7 +396,7 @@ if(dim == 2):
 
     # Plot Non-Adaptive Error
     tk = mk.training_points[None][0][0]
-    plt.contourf(X, Y, Zk, levels = cs.levels)
+    plt.contourf(X, Y, Zk, levels = cs.levels, label = r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
     plt.colorbar(cs, )
     plt.xlabel(r"$x_1$")
     plt.ylabel(r"$x_2$")
