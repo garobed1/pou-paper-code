@@ -111,7 +111,7 @@ xlimits = trueFunc.xlimits
 
 # Get the original testing data
 testdata = None
-Nerr = 5000
+Nerr = 5000*dim
 sampling = LHS(xlimits=xlimits, criterion='m')
 
 # Error
