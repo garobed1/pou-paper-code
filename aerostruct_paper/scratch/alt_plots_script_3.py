@@ -111,7 +111,7 @@ xlimits = trueFunc.xlimits
 
 # Get the original testing data
 testdata = None
-Nerr = 5000*dim
+Nerr = 5000*4
 sampling = LHS(xlimits=xlimits, criterion='m')
 
 # Error
@@ -323,7 +323,7 @@ for k in range(nperr):
         mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
         # try:
         mh1[k][i].train()
-        ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
+        ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000*4, xdata=xtest, fdata=ftest)
         # except:
         #     print(f'{i}, {rank}, oops')
         #     ehr1[k][i] = np.nan
@@ -348,7 +348,7 @@ for k in range(nperr):
             mh2[k][i].set_training_values(xtot, ftot)
         # try:
         mh2[k][i].train()
-        ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
+        ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000*4, xdata=xtest, fdata=ftest)
         # except:
         #     print(f'{i}, {rank}, oops')
         #     ehr2[k][i] = np.nan
