@@ -283,14 +283,14 @@ for k in range(nperr):
     for i in range(itersk):
         ma1[k].append(copy.deepcopy(modelbase1))
         ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
-        try:
-            ma1[k][i].train()
-            ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
-        except:
-            print(f'{i}, {rank}, oops')
-            ear1[k][i] = np.nan
-            eam1[k][i] = np.nan
-            eas1[k][i] = np.nan
+        # try:
+        ma1[k][i].train()
+        ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        # except:
+        #     print(f'{i}, {rank}, oops')
+        #     ear1[k][i] = np.nan
+        #     eam1[k][i] = np.nan
+        #     eas1[k][i] = np.nan
 
 
         ma2[k].append(copy.deepcopy(modelbase2))
@@ -309,26 +309,26 @@ for k in range(nperr):
             xtot = np.append(xa[ind][i], xaug, axis=0)
             ftot = np.append(fa[ind][i], faug, axis=0)
             ma2[k][i].set_training_values(xtot, ftot)
-        try:
-            ma2[k][i].train()
-            ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
-        except:
-            print(f'{i}, {rank}, oops')
-            ear2[k][i] = np.nan
-            eam2[k][i] = np.nan
-            eas2[k][i] = np.nan
+        # try:
+        ma2[k][i].train()
+        ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        # except:
+        #     print(f'{i}, {rank}, oops')
+        #     ear2[k][i] = np.nan
+        #     eam2[k][i] = np.nan
+        #     eas2[k][i] = np.nan
 
 
         mh1[k].append(copy.deepcopy(modelbase1))
         mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
-        try:
-            mh1[k][i].train()
-            ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
-        except:
-            print(f'{i}, {rank}, oops')
-            ehr1[k][i] = np.nan
-            ehm1[k][i] = np.nan
-            ehs1[k][i] = np.nan
+        # try:
+        mh1[k][i].train()
+        ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        # except:
+        #     print(f'{i}, {rank}, oops')
+        #     ehr1[k][i] = np.nan
+        #     ehm1[k][i] = np.nan
+        #     ehs1[k][i] = np.nan
 
         mh2[k].append(copy.deepcopy(modelbase2))
         if(dim > 1):
@@ -346,14 +346,14 @@ for k in range(nperr):
             xtot = np.append(xh[ind][i], xaug, axis=0)
             ftot = np.append(fh[ind][i], faug, axis=0)
             mh2[k][i].set_training_values(xtot, ftot)
-        try:
-            mh2[k][i].train()
-            ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=5000*dim, xdata=xtest, fdata=ftest)
-        except:
-            print(f'{i}, {rank}, oops')
-            ehr2[k][i] = np.nan
-            ehm2[k][i] = np.nan
-            ehs2[k][i] = np.nan
+        # try:
+        mh2[k][i].train()
+        ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        # except:
+        #     print(f'{i}, {rank}, oops')
+        #     ehr2[k][i] = np.nan
+        #     ehm2[k][i] = np.nan
+        #     ehs2[k][i] = np.nan
 
         print(f'{i}, {rank}')
 

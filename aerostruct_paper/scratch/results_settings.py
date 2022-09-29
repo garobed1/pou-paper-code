@@ -1,12 +1,11 @@
-
-header = "pou_paper_hess"
+header = "pou_get_rcs"
 path = None
-skip_LHS = False
-LHS_batch = 7
+skip_LHS = True
+LHS_batch = 10
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "arctan"    #problem
+prob  = "fuhgsh"    #problem
 dim = 1     #problem dimension
 
 
@@ -21,20 +20,22 @@ local = False
 # opt = 'SLSQP' #for SFCVT constraint
 # local = True
 
-corr  = "matern32"  #kriging correlation
+
+corr  = "squar_exp"  #kriging correlation
 poly  = "linear"    #kriging regression 
 extra = dim           #gek extra points
 t0 = [1e-0]
 tb = [1e-5, 2e+1]
-rscale = 5.5
-rho = 10           #POU parameter
+C = 5.5
+rscale = 5.5 #0.5 for 2D
+rho = 10          #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = dim*30       #number of points to add
+ntr = dim*20      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
-Nerr = 5000*dim       #number of test points to evaluate the error
+Nerr = 5000       #number of test points to evaluate the error
 pperb = batch
 pperbk = int(ntr/LHS_batch)
 mstarttype = 2            # 0: No multistart
@@ -49,7 +50,7 @@ if(pperb == 0):
     pperb = 1
 
 # Refinement Settings
-neval = 1+(dim+2)
+neval = 1+(dim+1)
 hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
@@ -59,5 +60,5 @@ obj = "inv"
 nscale = 10.0 #1.0 for 2D
 nmatch = dim
 
-rc_print = False#False
-comp_hist = True
+
+rc_print = True#False#
