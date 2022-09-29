@@ -1,12 +1,12 @@
-header = "pou_get_rcs"
+header = "pou_test_gek_no_pls"
 path = None
-skip_LHS = True
+skip_LHS = False
 LHS_batch = 10
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "fuhgsh"    #problem
-dim = 1     #problem dimension
+prob  = "arctan"    #problem
+dim = 2     #problem dimension
 
 
 # Surrogate Settings
@@ -35,7 +35,7 @@ nt0  = dim*10       #initial design size
 ntr = dim*20      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
-Nerr = 5000       #number of test points to evaluate the error
+Nerr = 5000*dim       #number of test points to evaluate the error
 pperb = batch
 pperbk = int(ntr/LHS_batch)
 mstarttype = 2            # 0: No multistart
@@ -50,7 +50,7 @@ if(pperb == 0):
     pperb = 1
 
 # Refinement Settings
-neval = 1+(dim+1)
+neval = 1+(dim+2)
 hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"

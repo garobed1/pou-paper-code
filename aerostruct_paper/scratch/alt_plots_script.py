@@ -136,6 +136,8 @@ if(dim > 1):
     modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
     modelbase2.options.update({"poly":ssettings["poly"]})
     modelbase2.options.update({"n_start":5})
+    if(dim > 2):
+        modelbase2.options.update({"zero_out_y":True})
 else:
     modelbase2 = KRG()
     #modelgek.options.update({"hyper_opt":"TNC"})
