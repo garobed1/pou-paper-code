@@ -1,4 +1,4 @@
-header = "pou_test_gek_no_pls"
+header = "pou_test_divide_err"
 path = None
 skip_LHS = False
 LHS_batch = 10

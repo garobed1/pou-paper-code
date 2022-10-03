@@ -34,7 +34,18 @@ def rmse(model, prob, N=5000, xdata=None, fdata=None):
         tf = prob(tx)
 
     # compute RMSE
-    vals = model.predict_values(tx)
+    dim = tx.shape[1]
+    vals = np.zeros([N,1])
+    if(N > 5000):
+        arrs = np.array_split(tx, dim)
+        l1 = 0
+        l2 = 0
+        for k in range(dim):
+            l2 += arrs[k].shape[0]
+            vals[l1:l2,:] = model.predict_values(arrs[k])
+            l1 += arrs[k].shape[0]
+    else:
+        vals = model.predict_values(tx)
     for i in range(N):
         work = tf[i] - vals[i]
         err += work*work
@@ -87,7 +98,18 @@ def meane(model, prob, N=5000, xdata=None, fdata=None, return_values=False):
 
 
     # compute error of mean
-    vals = model.predict_values(tx)
+    dim = tx.shape[1]
+    vals = np.zeros([N,1])
+    if(N > 5000):
+        arrs = np.array_split(tx, dim)
+        l1 = 0
+        l2 = 0
+        for k in range(dim):
+            l2 += arrs[k].shape[0]
+            vals[l1:l2,:] = model.predict_values(arrs[k])
+            l1 += arrs[k].shape[0]
+    else:
+        vals = model.predict_values(tx)
     mmean = sum(vals)/N
     mstdev = np.sqrt((sum(vals*vals)/N) - (sum(vals)/N)**2)
 
@@ -138,7 +160,18 @@ def full_error(model, prob, N=5000, xdata=None, fdata=None , return_values=False
         tf = prob(tx)
 
     # compute NRMSE
-    vals = model.predict_values(tx)
+    dim = tx.shape[1]
+    vals = np.zeros([N,1])
+    if(N > 5000):
+        arrs = np.array_split(tx, dim)
+        l1 = 0
+        l2 = 0
+        for k in range(dim):
+            l2 += arrs[k].shape[0]
+            vals[l1:l2,:] = model.predict_values(arrs[k])
+            l1 += arrs[k].shape[0]
+    else:
+        vals = model.predict_values(tx)
     for i in range(N):
         work = tf[i] - vals[i]
         err += work*work
