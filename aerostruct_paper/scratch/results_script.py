@@ -339,20 +339,20 @@ for n in cases[rank]:
     co += 1
 
 
-#try:
-if("comp_hist" in ssettings):
-    iters = len(ef)
-    itersk = LHS_batch
-    histc = []
-    ind_alt = np.linspace(0, iters-1, itersk, dtype=int)
-    for n in range(co):
-        dummy = []
-        for p in ind_alt:
-            dummy.append(hist[n][p])
-        histc.append(dummy)
-    hist = histc
-    if rank == 0:
-        print("hello from comp hist")
+# #try:
+# if("comp_hist" in ssettings):
+#     iters = len(ef)
+#     itersk = LHS_batch
+#     histc = []
+#     ind_alt = np.linspace(0, iters-1, itersk, dtype=int)
+#     for n in range(co):
+#         dummy = []
+#         for p in ind_alt:
+#             dummy.append(hist[n][p])
+#         histc.append(dummy)
+#     hist = histc
+#     if rank == 0:
+#         print("hello from comp hist")
 
 
 modelf = comm.gather(modelf, root=0)
