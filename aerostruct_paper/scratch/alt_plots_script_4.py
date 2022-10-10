@@ -113,14 +113,13 @@ xlimits = trueFunc.xlimits
 
 # Get the original testing data
 testdata = None
-Nerr = 5000*2
+Nerr = 5000*dim
 sampling = LHS(xlimits=xlimits, criterion='m')
 
 # Error
 xtest = None 
 ftest = None
 testdata = None
-import pdb; pdb.set_trace()
 
 if rank == 0:
     xtest = sampling(Nerr)
@@ -209,25 +208,33 @@ iters = len(ehr[0])
 if(dim > 3):
     with open(f'{title}/intervals.pickle', 'rb') as f:
         intervals = pickle.load(f)
+    if(intervals[0] != 0):
+        intervals = np.insert(intervals, 0, 0)
 else:
     intervals = np.arange(iters)
 
 itersk = len(ekr[0])
 
-samplehist = np.zeros(intervals.shape[0] + 1, dtype=int)
-samplehistk = np.zeros(itersk, dtype=int)
+samplehist = np.zeros(intervals.shape[0], dtype=int)
+
 
 #for i in range(iters-1):
 #    samplehist[i] = hi[0][i][0][0].shape[0] #training_points
 samplehist[0] = hi[0][0][0][0].shape[0] #training_points 
-for i in range(1, iters-1):
-    samplehist[i] = samplehist[i-1] + (intervals[1] - intervals[0])
-samplehist[iters-1] = mf[0].training_points[None][0][0].shape[0]
-for i in range(itersk):
-    samplehistk[i] = len(xk[i])
+for i in range(1, iters):
+    samplehist[i] = samplehist[i-1] + (intervals[i] - intervals[i-1])
+samplehist[-1] = mf[0].training_points[None][0][0].shape[0]
+
+
+idx = np.round(np.linspace(0, len(intervals)-1, itersk)).astype(int)
+intervalsk = intervals[idx]
+samplehistk = intervalsk + samplehist[0]*np.ones(len(intervalsk), dtype=int)
+samplehistk[-1] += 1
+
 
 # Grab data from the lhs and adaptive sample sets
-ind_alt = np.linspace(0, iters, itersk, dtype=int)
+#ind_alt = np.linspace(0, iters, itersk, dtype=int)
+ind_alt = idx
 # if("comp_hist" in ssettings):
 #     ind_alt = np.arange(ssettings["LHS_batch"])
 
@@ -264,7 +271,6 @@ for k in range(nruns):
     fh[k].append(fk[itersk-1+k*itersk])
     gh[k].append(gk[itersk-1+k*itersk])
     
-import pdb; pdb.set_trace()
 
 
 # Train alternative surrogates
@@ -366,7 +372,6 @@ for k in range(nperr):
         #     ehs2[k][i] = np.nan
 
         print(f'{i}, {rank}')
-        import pdb; pdb.set_trace()
 
 print("HUGE SUCCESS")
 

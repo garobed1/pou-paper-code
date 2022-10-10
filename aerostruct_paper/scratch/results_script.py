@@ -69,15 +69,17 @@ cases = divide_cases(Nruns, size)
 xtest = None 
 ftest = None
 testdata = None
+
+if(dim > 3):
+    intervals = np.arange(0, ntr, dim)
+    intervals = np.append(intervals, ntr-1)
+else:
+    intervals = np.arange(0, ntr)
+
 if rank == 0:
     xtest = sampling(Nerr)
     ftest = trueFunc(xtest)
-    if(dim > 3):
-        intervals = np.arange(0, ntr, dim)
-        intervals = np.append(intervals, ntr - 1)
-        intervals = np.delete(intervals, 0)
-    else:
-        intervals = np.arange(0, ntr)
+    
     testdata = [xtest, ftest, intervals]
 
 xtest = comm.bcast(xtest, root=0)
@@ -143,8 +145,11 @@ xtrain0 = comm.bcast(xtrain0, root=0)
 ftrain0 = comm.bcast(ftrain0, root=0)
 gtrain0 = comm.bcast(gtrain0, root=0)
 
+idx = np.round(np.linspace(0, len(intervals)-1, LHS_batch+1)).astype(int)
 
-samplehistK = np.linspace(nt0, ntot, LHS_batch+1, dtype=int)
+intervalsk = intervals[idx]
+samplehistK = intervalsk + nt0*np.ones(len(intervalsk), dtype=int)
+samplehistK[-1] += 1
 
 if rank == 0:
     print("Computing Non-Adaptive Designs ...")
@@ -160,9 +165,9 @@ if(not skip_LHS):
             ftrainK.append([])
             gtrainK.append([])
             for m in range(len(samplehistK)):
-                xtrainK[n].append(sampling(nt0+m*pperbk))
+                xtrainK[n].append(sampling(samplehistK[m]))
                 ftrainK[n].append(trueFunc(xtrainK[n][m]))
-                gtrainK[n].append(np.zeros([nt0+m*pperbk,dim]))
+                gtrainK[n].append(np.zeros([samplehistK[m],dim]))
                 for i in range(dim):
                     gtrainK[n][m][:,i:i+1] = trueFunc(xtrainK[n][m],i)
 

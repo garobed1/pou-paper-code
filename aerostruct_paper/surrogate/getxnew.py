@@ -145,7 +145,7 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
             xdata, fdata, intervals = options["errorcheck"]
             # err = rmse(model, func, xdata=xdata, fdata=fdata)
             # err2 = meane(model, func, xdata=xdata, fdata=fdata)
-            if i in intervals.tolist():
+            if(i in intervals.tolist() and i !=0):
                 err = full_error(model, func, xdata=xdata, fdata=fdata)
                 errh.append(err[0])
                 errh2.append(err[1:])

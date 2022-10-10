@@ -1,17 +1,16 @@
-header = "pou_test_divide_err"
+header = "TEST_paper_hess"
 path = None
 skip_LHS = False
-LHS_batch = 10
+LHS_batch = 3
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "arctan"    #problem
-dim = 2     #problem dimension
+prob  = "rosenbrock"    #problem
+dim = 4     #problem dimension
 
 
 # Surrogate Settings
 stype = "pouhess"    #surrogate type
-
 rtype =  "hess"
 opt = 'L-BFGS-B' #'SLSQP'#
 local = False
@@ -19,20 +18,17 @@ local = False
 # rtype =  "pousfcvt"
 # opt = 'SLSQP' #for SFCVT constraint
 # local = True
-
-
-corr  = "squar_exp"  #kriging correlation
+corr  = "matern32"  #kriging correlation
 poly  = "linear"    #kriging regression 
 extra = dim           #gek extra points
 t0 = [1e-0]
 tb = [1e-5, 2e+1]
-C = 5.5
-rscale = 5.5 #0.5 for 2D
-rho = 10          #POU parameter
+rscale = 5.5
+rho = 10           #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = dim*20      #number of points to add
+ntr = dim*4       #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000*dim       #number of test points to evaluate the error
@@ -59,6 +55,6 @@ bpen = False
 obj = "inv"
 nscale = 10.0 #1.0 for 2D
 nmatch = dim
+opt = 'L-BFGS-B' #'SLSQP'#
 
-
-rc_print = True#False#
+rc_print = False#False
