@@ -298,14 +298,14 @@ for k in range(nperr):
         ma1[k].append(copy.deepcopy(modelbase1))
         ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
         # try:
-        if(xa[ind][i].shape[0]<200):
-            ma1[k][i].train()
-            ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-        else:
-            print(f'{i}, {rank}, oops')
-            ear1[k][i] = np.nan
-            eam1[k][i] = np.nan
-            eas1[k][i] = np.nan
+        # if(xa[ind][i].shape[0]<200):
+        ma1[k][i].train()
+        ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        # else:
+        #     print(f'{i}, {rank}, oops')
+        #     ear1[k][i] = np.nan
+        #     eam1[k][i] = np.nan
+        #     eas1[k][i] = np.nan
 
 
         # ma2[k].append(copy.deepcopy(modelbase2))
@@ -337,14 +337,14 @@ for k in range(nperr):
         mh1[k].append(copy.deepcopy(modelbase1))
         mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
         # try: 
-        if(xa[ind][i].shape[0]<100):
-            mh1[k][i].train()
-            ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-        else:
-            print(f'{i}, {rank}, oops')
-            ehr1[k][i] = np.nan
-            ehm1[k][i] = np.nan
-            ehs1[k][i] = np.nan
+        # if(xa[ind][i].shape[0]<200):
+        mh1[k][i].train()
+        ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        # else:
+        #     print(f'{i}, {rank}, oops')
+        #     ehr1[k][i] = np.nan
+        #     ehm1[k][i] = np.nan
+        #     ehs1[k][i] = np.nan
 
         #mh2[k].append(copy.deepcopy(modelbase2))
         #if(dim > 1):
