@@ -113,7 +113,7 @@ xlimits = trueFunc.xlimits
 
 # Get the original testing data
 testdata = None
-Nerr = 5000*dim
+Nerr = 5000*2
 sampling = LHS(xlimits=xlimits, criterion='m')
 
 # Error
@@ -298,7 +298,7 @@ for k in range(nperr):
         ma1[k].append(copy.deepcopy(modelbase1))
         ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
         # try:
-        if(xa[ind][i].shape[0]<100):
+        if(xa[ind][i].shape[0]<200):
             ma1[k][i].train()
             ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
         else:
