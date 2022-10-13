@@ -245,25 +245,25 @@ class HessianRefine(ASCriteria):
                 for i in range(ndir):
                     xi = np.zeros([1])
                     xi[0] = x[i]
-                    F[i]  = self.evaluate(xi, bounds, dir=dir)    
+                    F[i]  = -self.evaluate(xi, bounds, dir=dir)    
                 if(self.ntr == 10):
-                    self.scaler = np.min(F)  
+                    self.scaler = np.max(F)  
                 F /= np.abs(self.scaler)
 
                 plt.rcParams['font.size'] = '18'
                 ax = plt.gca()  
                 plt.plot(x, F, label='Criteria')
                 plt.xlim(-0.05, 1.05)
-                plt.ylim(top=0.015)
-                plt.ylim(bottom=-1.0)#np.min(F))
+                plt.ylim(bottom=-0.015)
+                plt.ylim(top=1.0)#np.min(F))
                 trxs = self.trx#qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
                 #plt.plot(trxs[0:-1,0], np.zeros(trxs[0:-1,0].shape[0]), 'bo')
                 #plt.plot(trxs[-1,0], [0], 'ro')
                 plt.plot(trxs[0:,0], np.zeros(trxs[0:,0].shape[0]), 'bo', label='Sample Locations')
-                plt.legend(loc=3)
+                plt.legend(loc=0)
                 plt.xlabel(r'$x_1$')
-                plt.ylabel(r'$-\mathrm{RC}_{\mathrm{Hess},%i}(x_1)$' % (self.ntr-10))
-                plt.axvline(x[np.argmin(F)], color='k', linestyle='--', linewidth=1.)
+                plt.ylabel(r'$\psi_{\mathrm{Hess},%i}(x_1)$' % (self.ntr-10))
+                plt.axvline(x[np.argmax(F)], color='k', linestyle='--', linewidth=1.2)
                 plt.savefig(f"taylor_rc_1d_{self.ntr}.pdf", bbox_inches="tight")    
                 plt.clf()
                 import pdb; pdb.set_trace()

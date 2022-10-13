@@ -113,7 +113,7 @@ xlimits = trueFunc.xlimits
 
 # Get the original testing data
 testdata = None
-Nerr = 5000*2
+Nerr = 5000*dim
 sampling = LHS(xlimits=xlimits, criterion='m')
 
 # Error
@@ -308,26 +308,27 @@ for k in range(nperr):
         #     eas1[k][i] = np.nan
 
 
-        # ma2[k].append(copy.deepcopy(modelbase2))
-        # if(dim > 1):
-        #     ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
-        #     for j in range(dim):
-        #         ma2[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
-        # else:
-        #     dx = 1e-4
-        #     nex = xa[ind][i].shape[0]
-        #     xaug = np.zeros([nex, 1])
-        #     faug = np.zeros([nex, 1])
-        #     for l in range(nex):
-        #         xaug[l] = xa[ind][i][l] + dx
-        #         faug[l] = fa[ind][i][l] + dx*ga[ind][i][l]
-        #     xtot = np.append(xa[ind][i], xaug, axis=0)
-        #     ftot = np.append(fa[ind][i], faug, axis=0)
-        #     ma2[k][i].set_training_values(xtot, ftot)
+        ma2[k].append(copy.deepcopy(modelbase2))
+        if(dim > 1):
+            ma2[k][i].set_training_values(xa[ind][i], fa[ind][i])
+            for j in range(dim):
+                ma2[k][i].set_training_derivatives(xa[ind][i], ga[ind][i][:,j:j+1], j)
+        else:
+            dx = 1e-4
+            nex = xa[ind][i].shape[0]
+            xaug = np.zeros([nex, 1])
+            faug = np.zeros([nex, 1])
+            for l in range(nex):
+                xaug[l] = xa[ind][i][l] + dx
+                faug[l] = fa[ind][i][l] + dx*ga[ind][i][l]
+            xtot = np.append(xa[ind][i], xaug, axis=0)
+            ftot = np.append(fa[ind][i], faug, axis=0)
+            ma2[k][i].set_training_values(xtot, ftot)
         # try:
-        #     ma2[k][i].train()
-        #     ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-        # except:
+        # if(xa[ind][i].shape[0]<200):
+        ma2[k][i].train()
+        ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        # else:
         #     print(f'{i}, {rank}, oops')
         #     ear2[k][i] = np.nan
         #     eam2[k][i] = np.nan
@@ -346,26 +347,26 @@ for k in range(nperr):
         #     ehm1[k][i] = np.nan
         #     ehs1[k][i] = np.nan
 
-        #mh2[k].append(copy.deepcopy(modelbase2))
-        #if(dim > 1):
-        #    mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
-        #    for j in range(dim):
-        #        mh2[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
-        #else:
-        #    dx = 1e-4
-        #    nex = xh[ind][i].shape[0]
-        #    xaug = np.zeros([nex, 1])
-        #    faug = np.zeros([nex, 1])
-        #    for l in range(nex):
-        #        xaug[l] = xh[ind][i][l] + dx
-        #        faug[l] = fh[ind][i][l] + dx*gh[ind][i][l]
-        #    xtot = np.append(xh[ind][i], xaug, axis=0)
-        #    ftot = np.append(fh[ind][i], faug, axis=0)
-        #    mh2[k][i].set_training_values(xtot, ftot)
-        # try:
+        mh2[k].append(copy.deepcopy(modelbase2))
+        if(dim > 1):
+           mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
+           for j in range(dim):
+               mh2[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
+        else:
+           dx = 1e-4
+           nex = xh[ind][i].shape[0]
+           xaug = np.zeros([nex, 1])
+           faug = np.zeros([nex, 1])
+           for l in range(nex):
+               xaug[l] = xh[ind][i][l] + dx
+               faug[l] = fh[ind][i][l] + dx*gh[ind][i][l]
+           xtot = np.append(xh[ind][i], xaug, axis=0)
+           ftot = np.append(fh[ind][i], faug, axis=0)
+           mh2[k][i].set_training_values(xtot, ftot)
+        # if(xa[ind][i].shape[0]<200):
         #mh2[k][i].train()
         #ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-        # except:
+        # else:
         #     print(f'{i}, {rank}, oops')
         #     ehr2[k][i] = np.nan
         #     ehm2[k][i] = np.nan
