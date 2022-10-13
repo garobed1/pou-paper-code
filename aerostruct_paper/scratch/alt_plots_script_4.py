@@ -553,7 +553,7 @@ if rank == 0:
     plt.xlabel("Number of samples")
     plt.ylabel("NRMSE")
     plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], ehrm1[0],ehrm2[0]]))))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehrm[-1], ekrm[-1], ehrm1[-1],ehrm2[-1]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(np.nanmin([ehrm[-1], ekrm[-1], ehrm1[-1],ehrm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
