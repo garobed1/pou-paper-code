@@ -165,7 +165,7 @@ class POUSFCVT(ASCriteria):
                 plt.plot(trxs[0:,0], np.zeros(trxs[0:,0].shape[0]), 'bo', label='Sample Locations')
                 plt.legend(loc=0)
                 plt.xlabel(r'$x_1$')
-                plt.ylabel(r'$\mathrm{RC}_{\mathrm{CV},%i}(x_1)$' % (self.ntr-10))
+                plt.ylabel(r'$\psi_{\mathrm{CV},%i}(x_1)$' % (self.ntr-10))
                 wheret = np.full([ndir], True)
                 for i in range(self.ntr):
                     # ax.fill_betweenx([-1,0], trxs[i]-self.S, trxs[i]+self.S, color='r', alpha=0.2, set_edgecolor='face')

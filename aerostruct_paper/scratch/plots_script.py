@@ -132,7 +132,7 @@ iters = len(ehr[0])
 if(dim > 3):
     with open(f'{title}/intervals.pickle', 'rb') as f:
         intervals = pickle.load(f)
-    iters = intervals.shape[0] + 1
+    #iters = intervals.shape[0] + 1
 else:
     intervals = np.arange(iters)
 
@@ -256,7 +256,30 @@ trxk = mk.training_points[None][0][0]
 trfk = mk.training_points[None][0][1]
 mk.options.update({"print_global":False})
 mf[0].options.update({"print_global":False})
+pmod = mf[0]
 
+#snapshot is proc, iteration
+snapshot = [30, 60] 
+#snapshot = 0
+if(snapshot):
+    trx = hi[snapshot[0]][snapshot[1]][0][0]
+    trf = hi[snapshot[0]][snapshot[1]][0][1]
+    trg = np.zeros_like(trx)
+    if(isinstance(mf[0], GEKPLS) or isinstance(mf[0], POUSurrogate) or isinstance(mf[0], POUHessian)):
+        for j in range(dim):
+            trg[:,j:j+1] = hi[snapshot[0]][snapshot[1]][j+1][1]
+    m, n = trx.shape
+
+
+    pmod = copy.deepcopy(mf[0])
+    pmod.set_training_values(trx, trf)
+    if(isinstance(mk, GEKPLS) or isinstance(mk, POUSurrogate) or isinstance(mk, POUHessian)):
+        for j in range(dim):
+            pmod.set_training_derivatives(trx, trg[:,j:j+1], j)
+    pmod.train()
+    pmod.options.update({"print_global":False})
+
+    import pdb; pdb.set_trace()
 
 # # Plot points
 
@@ -286,7 +309,7 @@ if(dim == 1):
         xi = np.zeros([1,1])
         xi[0] = x[i]
         TF[i] = trueFunc(xi)
-        F[i] = mf[0].predict_values(xi)
+        F[i] = pmod.predict_values(xi)
         Fh[i] = mk.predict_values(xi)
         Z[i] = abs(F[i] - TF[i])
         Zh[i] = abs(Fh[i] - TF[i])
@@ -367,7 +390,7 @@ if(dim == 2):
             xi = np.zeros([1,2])
             xi[0,0] = x[i]
             xi[0,1] = y[j]
-            F[j,i]  = mf[0].predict_values(xi)
+            F[j,i]  = pmod.predict_values(xi)
             FK[j,i] = mk.predict_values(xi)
             TF[j,i] = trueFunc(xi)
             Za[j,i] = abs(F[j,i] - TF[j,i])
