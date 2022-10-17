@@ -84,7 +84,7 @@ with open(f'{title}/stdvsgek.pickle', 'rb') as f:
 [ehrs, ehms, ehss, ekrs, ekms, ekss] = stdvspou 
 [ears1, eams1, eass1, ehrs1, ehms1, ehss1] = stdvskrg 
 [ears2, eams2, eass2, ehrs2, ehms2, ehss2] = stdvsgek 
-
+import pdb; pdb.set_trace()
 if rank == 0:
     #NRMSE
     ax = plt.gca()

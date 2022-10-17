@@ -291,6 +291,8 @@ ehr2 = np.zeros([nperr, itersk])
 ehm2 = np.zeros([nperr, itersk])
 ehs2 = np.zeros([nperr, itersk])
 
+slim = 250
+
 for k in range(nperr):
     ind = k + rank*nperr
     for i in range(itersk):
@@ -298,14 +300,14 @@ for k in range(nperr):
         ma1[k].append(copy.deepcopy(modelbase1))
         ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
         # try:
-        # if(xa[ind][i].shape[0]<200):
-        ma1[k][i].train()
-        ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-        # else:
-        #     print(f'{i}, {rank}, oops')
-        #     ear1[k][i] = np.nan
-        #     eam1[k][i] = np.nan
-        #     eas1[k][i] = np.nan
+        if(xa[ind][i].shape[0]<slim):
+            ma1[k][i].train()
+            ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        else:
+            print(f'{i}, {rank}, oops')
+            ear1[k][i] = np.nan
+            eam1[k][i] = np.nan
+            eas1[k][i] = np.nan
 
 
         ma2[k].append(copy.deepcopy(modelbase2))
@@ -325,52 +327,52 @@ for k in range(nperr):
             ftot = np.append(fa[ind][i], faug, axis=0)
             ma2[k][i].set_training_values(xtot, ftot)
         # try:
-        # if(xa[ind][i].shape[0]<200):
-        ma2[k][i].train()
-        ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-        # else:
-        #     print(f'{i}, {rank}, oops')
-        #     ear2[k][i] = np.nan
-        #     eam2[k][i] = np.nan
-        #     eas2[k][i] = np.nan
+        if(xa[ind][i].shape[0]<slim):
+            ma2[k][i].train()
+            ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        else:
+            print(f'{i}, {rank}, oops')
+            ear2[k][i] = np.nan
+            eam2[k][i] = np.nan
+            eas2[k][i] = np.nan
 
 
         mh1[k].append(copy.deepcopy(modelbase1))
         mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
         # try: 
-        # if(xa[ind][i].shape[0]<200):
-        mh1[k][i].train()
-        ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-        # else:
-        #     print(f'{i}, {rank}, oops')
-        #     ehr1[k][i] = np.nan
-        #     ehm1[k][i] = np.nan
-        #     ehs1[k][i] = np.nan
+        if(xa[ind][i].shape[0]<slim or dim < 8):
+            mh1[k][i].train()
+            ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        else:
+            print(f'{i}, {rank}, oops')
+            ehr1[k][i] = np.nan
+            ehm1[k][i] = np.nan
+            ehs1[k][i] = np.nan
 
         mh2[k].append(copy.deepcopy(modelbase2))
         if(dim > 1):
-           mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
-           for j in range(dim):
-               mh2[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
+            mh2[k][i].set_training_values(xh[ind][i], fh[ind][i])
+            for j in range(dim):
+                mh2[k][i].set_training_derivatives(xh[ind][i], gh[ind][i][:,j:j+1], j)
         else:
-           dx = 1e-4
-           nex = xh[ind][i].shape[0]
-           xaug = np.zeros([nex, 1])
-           faug = np.zeros([nex, 1])
-           for l in range(nex):
-               xaug[l] = xh[ind][i][l] + dx
-               faug[l] = fh[ind][i][l] + dx*gh[ind][i][l]
-           xtot = np.append(xh[ind][i], xaug, axis=0)
-           ftot = np.append(fh[ind][i], faug, axis=0)
-           mh2[k][i].set_training_values(xtot, ftot)
-        # if(xa[ind][i].shape[0]<200):
-        #mh2[k][i].train()
-        #ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
-        # else:
-        #     print(f'{i}, {rank}, oops')
-        #     ehr2[k][i] = np.nan
-        #     ehm2[k][i] = np.nan
-        #     ehs2[k][i] = np.nan
+            dx = 1e-4
+            nex = xh[ind][i].shape[0]
+            xaug = np.zeros([nex, 1])
+            faug = np.zeros([nex, 1])
+            for l in range(nex):
+                xaug[l] = xh[ind][i][l] + dx
+                faug[l] = fh[ind][i][l] + dx*gh[ind][i][l]
+            xtot = np.append(xh[ind][i], xaug, axis=0)
+            ftot = np.append(fh[ind][i], faug, axis=0)
+            mh2[k][i].set_training_values(xtot, ftot)
+        if(xa[ind][i].shape[0]<slim or dim < 8):
+            mh2[k][i].train()
+            ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
+        else:
+            print(f'{i}, {rank}, oops')
+            ehr2[k][i] = np.nan
+            ehm2[k][i] = np.nan
+            ehs2[k][i] = np.nan
 
         print(f'{i}, {rank}')
 
