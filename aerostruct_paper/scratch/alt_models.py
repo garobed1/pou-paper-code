@@ -293,6 +293,11 @@ ehs2 = np.zeros([nperr, itersk])
 
 slim = 250
 
+slima1 = slim*10
+slima2 = slim
+slimh1 = slim*10
+slimh2 = slim
+
 for k in range(nperr):
     ind = k + rank*nperr
     for i in range(itersk):
@@ -300,7 +305,7 @@ for k in range(nperr):
         ma1[k].append(copy.deepcopy(modelbase1))
         ma1[k][i].set_training_values(xa[ind][i], fa[ind][i])
         # try:
-        if(xa[ind][i].shape[0]<slim):
+        if(xa[ind][i].shape[0]<slima1):
             ma1[k][i].train()
             ear1[k][i], eam1[k][i], eas1[k][i] = full_error(ma1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
         else:
@@ -327,7 +332,7 @@ for k in range(nperr):
             ftot = np.append(fa[ind][i], faug, axis=0)
             ma2[k][i].set_training_values(xtot, ftot)
         # try:
-        if(xa[ind][i].shape[0]<slim):
+        if(xa[ind][i].shape[0]<slima2):
             ma2[k][i].train()
             ear2[k][i], eam2[k][i], eas2[k][i] = full_error(ma2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
         else:
@@ -340,7 +345,7 @@ for k in range(nperr):
         mh1[k].append(copy.deepcopy(modelbase1))
         mh1[k][i].set_training_values(xh[ind][i], fh[ind][i])
         # try: 
-        if(xa[ind][i].shape[0]<slim or dim < 8):
+        if(xa[ind][i].shape[0]<slimh1 or dim < 8):
             mh1[k][i].train()
             ehr1[k][i], ehm1[k][i], ehs1[k][i] = full_error(mh1[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
         else:
@@ -365,7 +370,7 @@ for k in range(nperr):
             xtot = np.append(xh[ind][i], xaug, axis=0)
             ftot = np.append(fh[ind][i], faug, axis=0)
             mh2[k][i].set_training_values(xtot, ftot)
-        if(xa[ind][i].shape[0]<slim or dim < 8):
+        if(xa[ind][i].shape[0]<slimh2 or dim < 8):
             mh2[k][i].train()
             ehr2[k][i], ehm2[k][i], ehs2[k][i] = full_error(mh2[k][i], trueFunc, N=Nerr, xdata=xtest, fdata=ftest)
         else:
