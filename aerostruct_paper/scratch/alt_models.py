@@ -294,9 +294,9 @@ ehs2 = np.zeros([nperr, itersk])
 slim = 250
 
 slima1 = slim*10
-slima2 = slim
+slima2 = slim*10
 slimh1 = slim*10
-slimh2 = slim
+slimh2 = slim*10
 
 for k in range(nperr):
     ind = k + rank*nperr
