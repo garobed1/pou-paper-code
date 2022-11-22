@@ -1,5 +1,5 @@
 
-header = "pou_get_rcs_2"
+header = "pou_get_rcs"
 path = None
 skip_LHS = True
 LHS_batch = 10
@@ -17,7 +17,7 @@ stype = "pouhess"    #surrogate type
 #opt = 'L-BFGS-B' #'SLSQP'#
 #local = False
 
-rtype =  "pousfcvt"
+rtype =  "hess"
 opt = 'SLSQP' #for SFCVT constraint
 local = True
 

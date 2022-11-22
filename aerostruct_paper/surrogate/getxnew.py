@@ -53,7 +53,7 @@ def getxnew(rcrit, x0, bounds, options=None):
             if(lbounds is not None):
                 bounds_used = lbounds
             args=(bounds_used, i,)
-            if(rcrit.condict is not None):
+            if(rcrit.condict is not None and rcrit.condict is not ()):
                 rcrit.condict["args"] = [bounds_used, i]
             jac = None
             if(rcrit.supports["obj_derivatives"]):

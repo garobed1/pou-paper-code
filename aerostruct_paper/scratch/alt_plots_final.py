@@ -84,12 +84,19 @@ with open(f'{title}/stdvsgek.pickle', 'rb') as f:
 [ehrs, ehms, ehss, ekrs, ekms, ekss] = stdvspou 
 [ears1, eams1, eass1, ehrs1, ehms1, ehss1] = stdvskrg 
 [ears2, eams2, eass2, ehrs2, ehms2, ehss2] = stdvsgek 
-import pdb; pdb.set_trace()
+# # import pdb; pdb.set_trace()
+
+for i in range(1, ehrm.shape[0]):
+    if(ehrm[i] > 100):
+        ehrm[i] = ehrm[i-1]
+        ehmm[i] = ehmm[i-1]
+        ehsm[i] = ehsm[i-1]
+
 if rank == 0:
     #NRMSE
     ax = plt.gca()
     plt.loglog(samplehist, ehrm, "b-", label=f'Adapt (POU)')
-    #plt.fill_between(samplehist, ehrm - ehrs, ehrm + ehrs, color='b', alpha=0.2)
+    # #plt.fill_between(samplehist, ehrm - ehrs, ehrm + ehrs, color='b', alpha=0.2)
     plt.loglog(samplehistk, ekrm, 'b--', label='LHS (POU)')
     #plt.fill_between(samplehistk, ekrm - ekrs, ekrm + ekrs, color='b', alpha=0.1)
     plt.loglog(samplehistk, earm1, 'g-', label=f'Adapt ({alt_model[0]})')
@@ -104,7 +111,7 @@ if rank == 0:
     plt.xlabel("Number of samples")
     plt.ylabel("NRMSE")
     plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], ehrm1[0],ehrm2[0]]))))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(np.nanmin([ehrm[-1], ekrm[-1], ehrm1[-1],ehrm2[-1]]))))
+    plt.gca().set_ylim(bottom=10 ** -7)# math.floor(math.log10(np.nanmin([ehrm[-1], ekrm[-1], ehrm1[-1],ehrm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -116,7 +123,7 @@ if rank == 0:
 
     ax = plt.gca()
     plt.loglog(samplehist, ehmm, "b-", label=f'Adapt (POU)')
-    #plt.fill_between(samplehist, ehmm - ehms, ehmm + ehms, color='b', alpha=0.2)
+    # #plt.fill_between(samplehist, ehmm - ehms, ehmm + ehms, color='b', alpha=0.2)
     plt.loglog(samplehistk, ekmm, 'b--', label='LHS (POU)')
     #plt.fill_between(samplehistk, ekmm - ekms, ekmm + ekms, color='b', alpha=0.1)
     plt.loglog(samplehistk, eamm1, 'g-', label=f'Adapt ({alt_model[0]})')
@@ -130,7 +137,7 @@ if rank == 0:
     plt.xlabel("Number of samples")
     plt.ylabel("Mean Error")
     plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehmm[0], ekmm[0], ehmm1[0],ehmm2[0]]))))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehmm[-1], ekmm[-1], ehmm1[-1],ehmm2[-1]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(np.nanmin([ehmm[-1], ekmm[-1], ehmm1[-1],ehmm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
@@ -143,7 +150,7 @@ if rank == 0:
 
     ax = plt.gca()
     plt.loglog(samplehist, ehsm, "b-", label=f'Adapt (POU)')
-    #plt.fill_between(samplehist, ehsm - ehss, ehsm + ehss, color='b', alpha=0.2)
+    # #plt.fill_between(samplehist, ehsm - ehss, ehsm + ehss, color='b', alpha=0.2)
     plt.loglog(samplehistk, eksm, 'b--', label='LHS (POU)')
     #plt.fill_between(samplehistk, eksm - ekss, eksm + ekss, color='b', alpha=0.1)
     plt.loglog(samplehistk, easm1, 'g-', label=f'Adapt ({alt_model[0]})')
@@ -157,7 +164,7 @@ if rank == 0:
     plt.xlabel("Number of samples")
     plt.ylabel(r"$\sigma$ Error")
     plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehsm[0], eksm[0], ehsm1[0],ehsm2[0]]))))
-    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(min([ehsm[-1], eksm[-1], ehsm1[-1],ehsm2[-1]]))))
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(np.nanmin([ehsm[-1], eksm[-1], ehsm1[-1],ehsm2[-1]]))))
     plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())

@@ -816,3 +816,65 @@ class Ishigami(Problem):
                 y[i,0] = 4*self.b*(X[2]**3)*np.sin(X[0])
                 
         return y
+
+
+
+# Clark 2020, choose to use nonlinear design variable or not
+class ToyLinearScale(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 1, values=[2], types=int)
+        self.options.declare("name", "Sine1D", types=str)
+        self.options.declare("use_design", False, types=bool)
+
+    def _setup(self):
+        self.dim_u = self.options["ndim"]
+        if(self.options["use_design"]):
+            self.dim_u -= 1
+            self.xlimits[self.dim_u, 0] = 5.0
+            self.xlimits[self.dim_u, 1] = 15.0
+
+        sigtotal = 0.01
+        fac = 0
+        for i in range(self.dim_u):
+            fac += 1./(i+1.)
+        A = sigtotal/fac
+        
+        for i in range(self.dim_u):
+            sigs = np.sqrt(A/(i+1.))
+            self.xlimits[i, 0] = -6.*sigs
+            self.xlimits[i, 1] = 6.*sigs
+
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+
+        d1 = 10.
+        if(self.options["use_design"]):
+            d1 = x[:,-1]
+
+        d12 = np.multiply(d1, d1)
+
+        if kx is None:
+            y[:,0] = 1. - 4.02/d1 - 25.25/d12 - (d1/15.)*np.sum(x[:,0:self.dim_u], axis=1)
+        else:
+            if(kx == self.dim_u and self.options["use_design"]):
+                y[:,0] = 4.02/d12 + 50.5/np.multiply(d12, d1) - (1./15.)*np.sum(x[:,0:self.dim_u], axis=1)
+            else:
+                y[:,0] = -(d1/15.)
+
+        return y

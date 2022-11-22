@@ -250,7 +250,7 @@ class HessianRefine(ASCriteria):
                     self.scaler = np.max(F)  
                 F /= np.abs(self.scaler)
 
-                plt.rcParams['font.size'] = '18'
+                plt.rcParams['font.size'] = '16'
                 ax = plt.gca()  
                 plt.plot(x, F, label='Criteria')
                 plt.xlim(-0.05, 1.05)
@@ -265,6 +265,24 @@ class HessianRefine(ASCriteria):
                 plt.ylabel(r'$\psi_{\mathrm{Hess},%i}(x_1)$' % (self.ntr-10))
                 plt.axvline(x[np.argmax(F)], color='k', linestyle='--', linewidth=1.2)
                 plt.savefig(f"taylor_rc_1d_{self.ntr}.pdf", bbox_inches="tight")    
+                plt.clf()
+
+                xmod = np.linspace(bounds[0][0], bounds[0][1], ndir)
+                trxmod = self.model.training_points[None][0][0]
+                fmod = self.model.predict_values(xmod)
+                from problem_picker import GetProblem
+                origfunc = GetProblem('fuhgsh', 1)
+                forig = origfunc(xmod)
+                plt.plot(xmod, fmod, 'b', label='Model')
+                plt.plot(xmod, forig, 'k', label='Original')
+                plt.ylim(0,21)
+                trf = self.model.training_points[None][0][1]
+                plt.plot(trxmod, trf, 'bo', label='Sample Locations')
+                plt.legend(loc=2)
+                plt.xlabel(r'$x_1$')
+                plt.ylabel(r'$\hat{f}_{POU,%i}(x_1)$' % (self.ntr-10))
+                plt.axvline(xmod[np.argmax(F)], color='k', linestyle='--', linewidth=1.2)
+                plt.savefig(f"taylor_md_1d_{self.ntr}.pdf", bbox_inches="tight")    
                 plt.clf()
                 import pdb; pdb.set_trace()
 

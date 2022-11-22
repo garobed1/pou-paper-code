@@ -52,7 +52,7 @@ class ASCriteria():
         
         self.nnew = 1
         self.opt = True
-        self.condict = None #for constrained optimization
+        self.condict = () #for constrained optimization
 
         self.initialize(self.model)
 

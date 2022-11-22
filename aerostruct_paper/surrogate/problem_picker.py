@@ -1,12 +1,12 @@
 
-from example_problems import Ishigami, Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgSingleHump, FuhgP3, FuhgP8, FuhgP9, FuhgP10, FakeShock
+from example_problems import ToyLinearScale, Ishigami, Peaks2D, QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgSingleHump, FuhgP3, FuhgP8, FuhgP9, FuhgP10, FakeShock
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam, WingWeight
 from shock_problem import ImpingingShock
 from mpi4py import MPI
 
-def GetProblem(prob, dim):
+def GetProblem(prob, dim, alpha = 8., use_design=False):
     # Problem Settings
-    alpha = 8.       #arctangent jump strength
+    #alpha = 8.       #arctangent jump strength
     if(prob == "arctan"):
         trueFunc = MultiDimJump(ndim=dim, alpha=alpha)
     elif(prob == "arctantaper"):
@@ -41,6 +41,8 @@ def GetProblem(prob, dim):
         trueFunc = CantileverBeam(ndim=dim)
     elif(prob == "hadamard"):
         trueFunc = QuadHadamard(ndim=dim)
+    elif(prob == "toylinear"):
+        trueFunc = ToyLinearScale(ndim=dim, use_design=use_design)
     elif(prob == "lpnorm"):
         trueFunc = LpNorm(ndim=dim)
     elif(prob == "wingweight"):

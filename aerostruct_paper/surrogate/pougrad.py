@@ -119,6 +119,10 @@ class POUSurrogate(SurrogateModel):
             dist = D[0][:] + delta#np.sqrt(D[0][i] + delta)
             expfac = np.exp(-rho*(dist-mindist))
             local = np.zeros(numsample)
+            # if(self.counter < 6):
+            #     i = self.counter
+            #     local[i] = f[i] + self.higher_terms(work[i], g[i], h[i])
+            # else:
             for i in range(numsample):
                 local[i] = f[i] + self.higher_terms(work[i], g[i], h[i])
             numer = np.dot(local, expfac)
@@ -130,7 +134,6 @@ class POUSurrogate(SurrogateModel):
             
 
             y_[k] = numer/denom
-
         y = (self.y_mean + self.y_std * y_).ravel()
         # print("mindist  = ", exec1)
         # print("evaluate = ", exec2)
@@ -262,6 +265,10 @@ class POUHessian(POUSurrogate):
         self.h = hess
 
         # self.dV = estimate_pou_volume(self.training_points[None][0][0], self.options["bounds"])
+
+
+
+
 
 
 
