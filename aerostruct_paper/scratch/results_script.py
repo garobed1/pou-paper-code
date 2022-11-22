@@ -54,7 +54,9 @@ if rank == 0:
     shutil.copy("./results_settings.py", f"{path}/{title}/settings.py")
 
 # Problem Settings
-trueFunc = GetProblem(prob, dim)
+ud = False
+ud = perturb
+trueFunc = GetProblem(prob, dim, use_design=ud)
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m')
 if(rtype == 'anisotransform'):
