@@ -10,5 +10,7 @@ Dependencies:
 - tacs
 - funtofem
 - mphys
+- SMT: Surrogate Modeling Toolbox
 
-Directories are generally organized by the particular paper I used the code for.
+
+Currently reorganizing the file structure to assist further development, some refactoring may be involved
