@@ -84,7 +84,7 @@ with open(f'{title}/stdvsgek.pickle', 'rb') as f:
 [ehrs, ehms, ehss, ekrs, ekms, ekss] = stdvspou 
 [ears1, eams1, eass1, ehrs1, ehms1, ehss1] = stdvskrg 
 [ears2, eams2, eass2, ehrs2, ehms2, ehss2] = stdvsgek 
-# # import pdb; pdb.set_trace()
+#import pdb; pdb.set_trace()
 
 for i in range(1, ehrm.shape[0]):
     if(ehrm[i] > 100):
@@ -95,15 +95,15 @@ for i in range(1, ehrm.shape[0]):
 if rank == 0:
     #NRMSE
     ax = plt.gca()
-    plt.loglog(samplehist, ehrm, "b-", label=f'Adapt (POU)')
+    #plt.loglog(samplehist, ehrm, "b-", label=f'Adapt (POU)')
     # #plt.fill_between(samplehist, ehrm - ehrs, ehrm + ehrs, color='b', alpha=0.2)
     plt.loglog(samplehistk, ekrm, 'b--', label='LHS (POU)')
     #plt.fill_between(samplehistk, ekrm - ekrs, ekrm + ekrs, color='b', alpha=0.1)
-    plt.loglog(samplehistk, earm1, 'g-', label=f'Adapt ({alt_model[0]})')
+    # plt.loglog(samplehistk, earm1, 'g-', label=f'Adapt ({alt_model[0]})')
     #plt.fill_between(samplehistk, earm1 - ears1, earm1 + ears1, color='g', alpha=0.2)
-    plt.loglog(samplehistk, ehrm1, 'g--',  label=f'LHS ({alt_model[0]})')
+    # plt.loglog(samplehistk, ehrm1, 'g--',  label=f'LHS ({alt_model[0]})')
     #plt.fill_between(samplehistk, ehrm1 - ehrs1, ehrm1 + ehrs1, color='g', alpha=0.1)
-    plt.loglog(samplehistk, earm2, 'r-', label=f'Adapt ({alt_model[1]})')
+    #plt.loglog(samplehistk, earm2, 'r-', label=f'Adapt ({alt_model[1]})')
     #plt.fill_between(samplehistk, earm2 - ears2, earm2 + ears2, color='r', alpha=0.2)
     plt.loglog(samplehistk, ehrm2, 'r--', label=f'LHS ({alt_model[1]})')
     #plt.fill_between(samplehistk, ehrm2 - ehrs2, ehrm2 + ehrs2, color='r', alpha=0.1)
@@ -111,8 +111,8 @@ if rank == 0:
     plt.xlabel("Number of samples")
     plt.ylabel("NRMSE")
     plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], ehrm1[0],ehrm2[0]]))))
-    plt.gca().set_ylim(bottom=10 ** -7)# math.floor(math.log10(np.nanmin([ehrm[-1], ekrm[-1], ehrm1[-1],ehrm2[-1]]))))
-    plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 40), labels=np.arange(min(samplehist), max(samplehist), 40) )
+    plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(np.nanmin([ehrm[-1], ekrm[-1], ehrm1[-1],ehrm2[-1]]))))
+    plt.xticks(ticks=np.arange(min(samplehist), max(samplehist), 50), labels=np.arange(min(samplehist), max(samplehist), 50) )
     plt.grid()
     ax.xaxis.set_minor_formatter(mticker.ScalarFormatter())
     ax.xaxis.set_major_formatter(mticker.ScalarFormatter())
