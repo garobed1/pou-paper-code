@@ -5,13 +5,13 @@ from matplotlib import pyplot as plt
 from smt.utils.options_dictionary import OptionsDictionary
 from smt.sampling_methods import LHS
 from smt.surrogate_models import GEKPLS
-from pougrad import POUMetric, POUSurrogate
-from refinecriteria import ASCriteria
+from surrogate.pougrad import POUMetric, POUSurrogate
+from infill.refinecriteria import ASCriteria
 from scipy.linalg import lstsq, eig
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds, least_squares, root
 from scipy.stats import qmc
-from sutils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
+from utils.sutils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
 
 
 # Hessian estimation to generate an anisotropic mapping of the space

@@ -1,7 +1,7 @@
 
-header = "pou_get_rcs"
-path = None
-skip_LHS = True
+header = "pou_test_reorg"
+path = "./surrogate_results"
+skip_LHS = False
 LHS_batch = 10
 runs_per_proc = 1
 
@@ -32,10 +32,10 @@ rho = 10          #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = dim*20      #number of points to add
+ntr = dim*10      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
-Nerr = 5000       #number of test points to evaluate the error
+Nerr = 5000*dim       #number of test points to evaluate the error
 pperb = batch
 pperbk = int(ntr/LHS_batch)
 mstarttype = 2            # 0: No multistart
@@ -61,4 +61,4 @@ nscale = 10.0 #1.0 for 2D
 nmatch = dim
 
 
-rc_print = True#False#
+rc_print = False#False#

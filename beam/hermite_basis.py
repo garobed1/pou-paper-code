@@ -1,5 +1,5 @@
 import numpy as np
-from utils import Error
+from beam.utils import Error
 
 """
 Evaluates Cubic Hermitian Basis Functions and their first and second derivatives on the interval [-1,1]

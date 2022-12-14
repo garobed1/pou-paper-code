@@ -1,6 +1,6 @@
 import scipy.sparse as sps
 import numpy as np
-from integration import CalcElemStiff, CalcElemLoad
+from beam.integration import CalcElemStiff, CalcElemLoad
 
 def StiffAssemble(L, E, Iyy, Nelem):
     """

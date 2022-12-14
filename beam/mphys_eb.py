@@ -2,7 +2,7 @@ import numpy as np
 import copy
 import openmdao.api as om
 from mphys.builder import Builder
-from beam_solver import EulerBeamSolver
+from beam.beam_solver import EulerBeamSolver
 from scipy.sparse.linalg.dsolve import spsolve
 
 """

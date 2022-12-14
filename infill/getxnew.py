@@ -1,13 +1,13 @@
-from optimizers import optimize
+from optimization.optimizers import optimize
 from mpi4py import MPI
 import copy
-from defaults import DefaultOptOptions
+from optimization.defaults import DefaultOptOptions
 import numpy as np
 from smt.surrogate_models import GEKPLS
-from direct_gek import DGEK
+from surrogate.direct_gek import DGEK
 from scipy.stats import qmc
-from pougrad import POUSurrogate
-from error import rmse, meane, full_error
+from surrogate.pougrad import POUSurrogate
+from utils.error import rmse, meane, full_error
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()

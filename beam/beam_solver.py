@@ -1,9 +1,9 @@
 from scipy.sparse.linalg.dsolve import spsolve
 import numpy as np
 from scipy.sparse.linalg.dsolve.linsolve import spsolve_triangular
-from hermite_basis import cubicHermite, cubicHermiteD, cubicHermiteD2
-import assembly as asm
-from utils import Error
+from beam.hermite_basis import cubicHermite, cubicHermiteD, cubicHermiteD2
+import beam.assembly as asm
+from beam.utils import Error
 import copy
 
 """

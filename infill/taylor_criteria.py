@@ -5,13 +5,13 @@ from matplotlib import pyplot as plt
 from smt.utils.options_dictionary import OptionsDictionary
 from smt.sampling_methods import LHS
 from smt.surrogate_models import GEKPLS, KPLS, KRG
-from pougrad import POUError, POUErrorVol, POUMetric, POUSurrogate
-from refinecriteria import ASCriteria
+from surrogate.pougrad import POUError, POUErrorVol, POUMetric, POUSurrogate
+from infill.refinecriteria import ASCriteria
 from scipy.linalg import lstsq, eig
 from scipy.stats import qmc
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds
-from sutils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
+from utils.sutils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
 
 
 # Refine based on a first-order Taylor approximation using the gradient

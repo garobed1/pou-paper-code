@@ -5,14 +5,14 @@ from matplotlib import pyplot as plt
 from smt.utils.options_dictionary import OptionsDictionary
 from smt.sampling_methods import LHS
 from smt.surrogate_models import GEKPLS, KPLS, KRG
-from pougrad import POUCV, POUError, POUErrorVol, POUMetric, POUSurrogate
-from refinecriteria import ASCriteria
+from surrogate.pougrad import POUCV, POUError, POUErrorVol, POUMetric, POUSurrogate
+from infill.refinecriteria import ASCriteria
 from scipy.linalg import lstsq, eig
 from scipy.stats import qmc
 from scipy.spatial import KDTree
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds
-from sutils import innerMatrixProduct, linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, estimate_pou_volume
+from utils.sutils import innerMatrixProduct, linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, estimate_pou_volume
 
 
 # SFCVT

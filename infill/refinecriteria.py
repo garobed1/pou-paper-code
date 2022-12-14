@@ -6,11 +6,11 @@ from matplotlib import pyplot as plt
 from smt.utils.options_dictionary import OptionsDictionary
 from smt.sampling_methods import LHS
 from smt.surrogate_models import GEKPLS
-from pougrad import POUSurrogate
+from surrogate.pougrad import POUSurrogate
 from scipy.linalg import lstsq, eig
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds
-from sutils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
+from utils.sutils import linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
 
 """Base Class for Adaptive Sampling Criteria Functions"""
 class ASCriteria():

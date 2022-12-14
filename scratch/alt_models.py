@@ -2,24 +2,23 @@ import sys, os
 import copy
 import pickle
 from mpi4py import MPI
-sys.path.insert(1,"../surrogate")
 
 import numpy as np
 import math
 import importlib
 import matplotlib.pyplot as plt
-from refinecriteria import looCV, HessianFit
-from aniso_criteria import AnisotropicRefine
-from getxnew import getxnew, adaptivesampling
-from defaults import DefaultOptOptions
-from sutils import divide_cases
-from error import rmse, meane, full_error
+from infill.refinecriteria import looCV, HessianFit
+from infill.aniso_criteria import AnisotropicRefine
+from infill.getxnew import getxnew, adaptivesampling
+from optimization.defaults import DefaultOptOptions
+from utils.sutils import divide_cases
+from utils.error import rmse, meane, full_error
 
-from problem_picker import GetProblem
+from functions.problem_picker import GetProblem
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
-from pougrad import POUSurrogate, POUHessian
-from direct_gek import DGEK
+from surrogate.pougrad import POUSurrogate, POUHessian
+from surrogate.direct_gek import DGEK
 import matplotlib as mpl
 import matplotlib.ticker as mticker
 from smt.sampling_methods import LHS

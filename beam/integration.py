@@ -1,7 +1,7 @@
 import numpy as np
-from utils import Error
+from beam.utils import Error
 from math import sqrt
-from hermite_basis import cubicHermite, cubicHermiteD, cubicHermiteD2
+from beam.hermite_basis import cubicHermite, cubicHermiteD, cubicHermiteD2
 
 def CalcElemStiff(E, IL, IR, dx):
     """

@@ -5,14 +5,12 @@ from cmath import cos, sin
 import numpy as np
 from mpi4py import MPI
 import sys
-sys.path.insert(1,"../mphys/")
-sys.path.insert(1,"../surrogate")
 
 import openmdao.api as om
 from smt.problems.problem import Problem
-from impinge_analysis import Top
-import impinge_setup
-from sutils import divide_cases
+from mphys_comp.impinge_analysis import Top
+import mphys_comp.impinge_setup as impinge_setup
+from utils.sutils import divide_cases
 
 # comm = MPI.COMM_WORLD
 # rank = comm.Get_rank()

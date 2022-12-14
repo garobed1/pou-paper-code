@@ -1,5 +1,5 @@
 from scipy.optimize import minimize, differential_evolution, NonlinearConstraint
-from defaults import DefaultOptOptions
+from optimization.defaults import DefaultOptOptions
 import numpy as np
 
 """

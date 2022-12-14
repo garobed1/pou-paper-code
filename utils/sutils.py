@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import qr
 from scipy.linalg import lstsq, lu_factor, lu_solve, solve, inv, eig
 from scipy.spatial.distance import cdist
-from example_problems import Heaviside, MultiDimJump, Quad2D
+from functions.example_problems import Heaviside, MultiDimJump, Quad2D
 from smt.problems import RobotArm
 from smt.sampling_methods import LHS
 

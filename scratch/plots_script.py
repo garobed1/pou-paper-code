@@ -8,10 +8,10 @@ sys.path.insert(1,"../surrogate")
 import numpy as np
 import matplotlib.pyplot as plt
 
-from problem_picker import GetProblem
+from functions.problem_picker import GetProblem
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
-from pougrad import POUSurrogate, POUHessian
+from surrogate.pougrad import POUSurrogate, POUHessian
 import matplotlib as mpl
 import matplotlib.ticker as mticker
 from smt.sampling_methods import LHS
