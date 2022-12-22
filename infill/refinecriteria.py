@@ -80,6 +80,10 @@ class ASCriteria():
     def eval_constraint_grad(self, x, dir=0):
         pass
 
+    # self determined stopping criteria, e.g. validation error
+    def get_energy(self):
+        return np.inf
+
     
 """
 A Continuous Leave-One-Out Cross Validation function

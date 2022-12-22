@@ -32,19 +32,19 @@ xnew : ndarray
 
 """
 
-def getxnew(rcrit, x0, bounds, options=None):
+def getxnew(rcrit, bounds, nnew, options=None):
     
     # set default options if None is provided
     if(options == None):
         options = DefaultOptOptions
-    m, n = x0.shape
     xnew = []
     bounds_used = bounds
+    n = len(bounds)
     unit_bounds = np.zeros([n,2])
     unit_bounds[:,1] = 1.
 
     # loop over batch
-    for i in range(rcrit.nnew):
+    for i in range(nnew):
         rx = None
         if(rcrit.opt): #for methods that don't use optimization
             x0, lbounds = rcrit.pre_asopt(bounds, dir=i)
@@ -123,10 +123,10 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         f0 = model.training_points[None][0][1]
         g0 = rcrit.grad
         nt, dim = t0.shape
-        x0 = np.zeros([1, dim])
+        #x0 = np.zeros([1, dim])
 
         # get the new points
-        xnew = np.array(getxnew(rcrit, x0, bounds, options))
+        xnew = np.array(getxnew(rcrit, bounds, rcrit.nnew, options))
         # import pdb; pdb.set_trace()
         # add the new points to the model
         t0 = np.append(t0, xnew, axis=0)
@@ -134,6 +134,8 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         g0 = np.append(g0, np.zeros([xnew.shape[0], xnew.shape[1]]), axis=0)
         for j in range(dim):
             g0[nt:,j] = func(xnew, j)[:,0]
+
+
         model.set_training_values(t0, f0)
         if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate) or isinstance(model0, DGEK)):
             for j in range(dim):
