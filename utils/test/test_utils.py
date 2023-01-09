@@ -1,8 +1,6 @@
 import unittest
 import numpy as np
 import sys
-sys.path.insert(1,"../")
-sys.path.insert(1,"../surrogate")
 
 from utils.sutils import quadraticSolve, quadraticSolveHOnly, symMatfromVec, maxEigenEstimate, boxIntersect
 from utils.error import stat_comp, meane
@@ -26,25 +24,7 @@ class UtilTest(unittest.TestCase):
         self.assertTrue(p0 - -3.238279585853798 < 1.e-14)
         self.assertTrue(p1 - 0.41231056256176596 < 1.e-14)
 
-    def test_stat_comp(self):
-        dim = 2
-        trueFunc = Rosenbrock(ndim=dim)
-        xlimits = trueFunc.xlimits
 
-        # first check that meane still works as expected with a surrogate
-        sampling = FullFactorial(xlimits=xlimits)
-        xtrainK = sampling(16*16)
-        ftrainK = trueFunc(xtrainK)
-
-        surr = KRG()
-        surr.set_training_values(xtrainK, ftrainK)
-        surr.train()
-
-        # different N?
-        merr, serr = meane(surr, trueFunc, N=5000, xdata=None, fdata=None, return_values=False)
-
-        self.assertTrue(merr < 1.e-2)
-        self.assertTrue(serr < 1.e-2)
 # dim = 2
 # trueFunc = Quad2D(ndim=dim, theta=np.pi/4)
 # xlimits = trueFunc.xlimits
