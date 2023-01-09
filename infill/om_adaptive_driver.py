@@ -14,6 +14,7 @@ from openmdao.drivers.doe_generators import DOEGenerator, ListGenerator
 from openmdao.utils.mpi import MPI
 
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
+from openmdao.recorders.case_reader import CaseReader
 
 from infill.getxnew import getxnew, adaptivesampling
 from infill.refinecriteria import ASCriteria
@@ -22,6 +23,9 @@ from infill.refinecriteria import ASCriteria
 from smt.surrogate_models import SurrogateModel as SMT_SM
 
 from optimization.defaults import DefaultOptOptions
+
+from utils.om_utils import get_om_dict
+from utils.sutils import divide_cases
 
 #TODO: NEED TO SEPARATE OUT adaptivesampling FUNCTION INTO 3 PARTS
 
@@ -36,11 +40,11 @@ class AdaptiveDriver(Driver):
             if inspect.isclass(criteria):
                 raise TypeError("AdaptiveDriver requires an instance of ASCriteria, "
                                 "but a class object was found: %s"
-                                % generator.__name__)
+                                % criteria.__name__)
             else:
                 raise TypeError("AdaptiveDriver requires an instance of ASCriteria, "
                                 "but an instance of %s was found."
-                                % type(generator).__name__)
+                                % type(criteria).__name__)
 
         super().__init__(**kwargs)
 
@@ -57,6 +61,13 @@ class AdaptiveDriver(Driver):
         self._name = ''
         self._problem_comm = None
         self._color = None
+        self._cr = None # case reader
+        self._ins_all = None
+        self._ins_search_list = None
+        
+        self.first_run = True
+
+        
 
     def _declare_options(self):
         """
@@ -66,15 +77,23 @@ class AdaptiveDriver(Driver):
         # This also contains number of points per batch, won't be too relevant
         self.options.declare('init_criteria', types=(ASCriteria), default=ASCriteria(),
                              desc='The refinement/infill criteria. If default, no cases are generated.')
-        self.options.declare('smt_model', types=(SMT_SM), default=SMT_SM(),
+        self.options.declare('smt_model', types=list, default=[SMT_SM()], #(SMT_SM)
                              desc='The SMT surrogate to use')
+        
+        # 0: om name to smt index variable mapping
+        self.options.declare('smt_meta', types=tuple, default=(),
+                             desc='SMT metadata, required across components and driver that rely on SMT')
+        
+        self.options.declare('ref_outs', types=(str, list), default=None,
+                             desc='outputs to refine about, most methods only take one. default picks first output')
+        
         self.options.declare('run_parallel', types=bool, default=False,
                              desc='Set to True to execute cases in parallel.')
         self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
         self.options.declare('max_runs', types=int, default=1, lower=1,
                              desc='Maximum number of points to add, if stopping criteria not met.')
-        self.options.declare('crit_tol', types=double, default=0.0, lower=0.0,
+        self.options.declare('crit_tol', types=float, default=0.0, lower=0.0,
                              desc='Stopping criteria')                     
         self.options.declare('opt_options', types=dict, default=DefaultOptOptions,
                              desc='Options for optimizations over infill criteria functions')                     
@@ -143,46 +162,9 @@ class AdaptiveDriver(Driver):
         """
         return self._name
 
-    def _map_smt_variables(self, xnew):
-        """
-        Map OM design vars to SMT-like ordering and vice-versa as specified
 
-        Returns
-        -------
-        smt_map
-            
-        """
-
-        # TODO: Need OM to SMT interface
-        #{name:index}
-        dvs = self._designvars
-        self.smt_ord = {}
-
-        smt_map = {}
-
-        # from onerahub
-        xlimits = []
-        for name, meta in dvs.items():
-            size = meta["size"]
-            meta_low = meta["lower"]
-            meta_high = meta["upper"]
-            for j in range(size):
-                if isinstance(meta_low, np.ndarray):
-                    p_low = meta_low[j]
-                else:
-                    p_low = meta_low
-
-                if isinstance(meta_high, np.ndarray):
-                    p_high = meta_high[j]
-                else:
-                    p_high = meta_high
-
-                xlimits.append((p_low, p_high))
-
-        self.xlimits = xlimits
-
-        return 
-
+    
+        
 #TODO: Get X New Step
     def run(self):
         """
@@ -197,11 +179,23 @@ class AdaptiveDriver(Driver):
         max_iter = self.options['max_iter']
         crit_tol = self.options['crit_tol']
         opt_options = self.options['opt_options']
-        surrogate = self.options['SMT_SM']
+        surrogates = self.options['SMT_SM']
+        smt_map = self.options['smt_meta'][0]
+        xlimits = self.options['smt_meta'][1]
+
+        # get list of inputs to refine over (usually either dvs or ucs)
+        # TODO: criteria needs knowledge of this too
+        self._ins_all = list(self._designvars)
+        self._search_list = self.options['search_list']
+
+        # get list of relevant outputs temporary solution
+        # TODO: distinguish between surrogate outs and non-surrogate
+        all_outs = self._problem.model.list_outputs()
+        ref_outs = self.options['ref_outs']
 
         # get criteria (it is updated with surrogate)
         criteria = self.criteria
-        if self.first_run
+        if self.first_run:
             criteria = self.options['init_criteria']
 
         # set driver name with current criteria
@@ -218,22 +212,63 @@ class AdaptiveDriver(Driver):
             xnews = getxnew(criteria, 
                 xlimits, 
                 nnew, 
-                options=optoptions)
+                options=opt_options)
 
-            # convert xnews to cases
+
+            # parallelization if possible
+            rcases = divide_cases(xnews.shape[0], self._problem_comm.size)
+
             cases = []
-            for i in range(xnews.shape[0]):
-                cases.append((xnews[i], None)) # replace second element with outputs
 
-            # run cases
-            for case in cases:
+            # convert xnews to cases and run
+            for i in rcases[self._problem_comm.rank]:
+                case = get_om_dict(xnews[i], smt_map)
                 self._run_case(case)
-                self.iter_count += 1
-                cases
+                
+                out_dict = {}
+                for item in all_outs:
+                    out_dict[item] = self._problem.get_val(item)
 
-            # update surrogate
+                # compute grads if the surrogates support it
+                grad_dict = {}
+                if surrogates[0].supports["training_derivatives"]:
+                    # returned in a flat dict
+                    grad = self._run_grad(case)
 
+                cases.append((case, out_dict)) # need all outputs for the surrogates if needed
 
+            cases = self._problem_comm.Allgather(cases)
+            self.iter_count += xnews.shape[0]
+
+            for i in range(len(rcases)):
+                for j in range(len(rcases[i])):
+                    
+
+            # update surrogate(s)
+            for surr in surrogates:
+                # get existing points
+                xt = surr.training_points[None][0][0]
+                yt = surr.training_points[None][0][1]
+                nt = xt.shape[0]
+                dim = xt.shape[1]
+                if surr.supports["training_derivatives"]:
+                    gt = np.zeros([nt,dim])
+                    for j in range(dim):
+                        gt[:,j] = surr.training_points[None][j+1][1]
+
+                # add new points to the model
+                xt = np.append(xt, xnews, axis=0)
+                yt = np.append(yt, func(xnew), axis=0)
+                gt = np.append(gt, np.zeros([xnews.shape[0], dim]), axis=0)
+
+                # retrain
+
+            #NOTE: Criteria may depend on just one output, or pareto solution for several
+            # Need to implement multi output criteria/option to choose which output to adapt for
+
+            # update criteria
+
+        self.first_run = False
 
         return False
 
@@ -248,11 +283,6 @@ class AdaptiveDriver(Driver):
             list of name, value tuples for the variables.
         """
         metadata = {}
-
-        #TODO: Change dv_ names to generic?
-
-        # call model component attached to this
-        self.original_model
 
         for dv_name, dv_val in case:
             try:
@@ -284,6 +314,43 @@ class AdaptiveDriver(Driver):
             self._metadata = metadata
 
 
+    def _run_grad(self, case):
+        """
+        Evaluate and return the total gradients of the model
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing input values at new design point.
+
+        Returns
+        -------
+        ndarray
+            Gradient of objective with respect to input array.
+        """
+        try:
+            grad = self._compute_totals(of=self._problem.model.list_outputs(), 
+                                        wrt=self._ins_all,
+                                        return_format='array')
+            self._grad_cache = grad
+
+            # First time through, check for zero row/col.
+            if self._check_jac:
+                raise_error = self.options['singular_jac_behavior'] == 'error'
+                self._total_jac.check_total_jac(raise_error=raise_error,
+                                                tol=self.options['singular_jac_tol'])
+                self._check_jac = False
+
+        except Exception as msg:
+            self._exc_info = msg
+            return np.array([[]])
+
+        # print("Gradients calculated for objective")
+        # print('   xnew', x_new)
+        # print('   grad', grad[0, :])
+
+        return grad
+
 #TODO: Add points to model/retrain
 
 
@@ -291,6 +358,18 @@ class AdaptiveDriver(Driver):
         """
         Set up case recording.
         """
+
+        # Internal recorder for using new data
+        rname = f'{self._get_name}_adapt_rec'
+        self_rec = SqliteRecorder(rname)
+        self_rec.options['record_params'] = True
+        self_rec.options['record_metadata'] = True
+        self_rec.options['record_derivatives'] = True
+        self.add_recorder(self_rec)
+
+        # Internal reader
+        self._cr = CaseReader(rname)
+
         if MPI:
             procs_per_model = self.options['procs_per_model']
 

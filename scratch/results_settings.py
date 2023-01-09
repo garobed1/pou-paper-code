@@ -45,7 +45,6 @@ if(mstarttype == 1):
     multistart = 50*dim
 if(mstarttype == 2):
     multistart = 10*dim
-
 if(pperb == 0):
     pperb = 1
 
@@ -57,7 +56,6 @@ criteria = "distance"
 perturb = True
 bpen = False
 obj = "inv"
-nscale = 10.0 #1.0 for 2D
 nmatch = dim
 
 

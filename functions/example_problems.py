@@ -918,6 +918,72 @@ class Ellipse(Problem):
 
         return y
 
+"""
+2D (1D design x_d, 1D uncertain x_u) robust mean optimization benchmark given a beta 
+distribution of x_u with alpha = 3, beta = 1
+
+f(x_u,x_d) = (1/3)(-(3/8)D(x_d) + (1/20)x_u^3 + (1/64)D(x_d)x_u^5)
+
+x_u \in [0,1]
+x_d \in [0,10]
+
+The mean with respect to x_u reduces to D(x_d) = x_d\sin(x_d) + 0.5333, which we want to optimize.
+
+"""
+class BetaRobust1D(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("name", "BetaRobust1D", types=str)
+
+    def _setup(self):
+        self.xlimits[0, 0] = 0.0
+        self.xlimits[0, 1] = 1.0
+        self.xlimits[1, 0] = 0.0
+        self.xlimits[1, 1] = 10.0
+
+        self.a = -3./8.
+        self.b = 1./20.
+        self.c = 1./64.
+
+        self.alpha = 3.
+        self.beta = 1.
+        self.sh = self.alpha/self.beta # beta shape param ratio
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+
+        y = np.zeros((ne, 1), complex)
+        D = x[:,1]*np.sin(x[:,1])
+        if kx is None:
+            y[:,0] = self.a*D + self.b*x[:,0]*x[:,0]*x[:,0]
+            y[:,0] += self.c*D*x[:,0]*x[:,0]*x[:,0]*x[:,0]*x[:,0]
+            y[:,0] *= self.sh
+        elif kx == 0:
+            y[:,0] = 3*self.b*x[:,0]*x[:,0]
+            y[:,0] += 5*self.c*D*x[:,0]*x[:,0]*x[:,0]*x[:,0]
+            y[:,0] *= self.sh
+        elif kx == 1:
+            dD = np.sin(x[:,1]) + x[:,1]*np.cos(x[:,1])
+            y[:,0] = self.a*dD
+            y[:,0] += self.c*dD*x[:,0]*x[:,0]*x[:,0]*x[:,0]*x[:,0]
+            y[:,0] *= self.sh
+
+        return y
+
 # from matplotlib import pyplot as plt
 
 # prob = Ellipse(foci = [1, 3])
