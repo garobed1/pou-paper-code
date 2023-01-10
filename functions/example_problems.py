@@ -721,7 +721,7 @@ class FakeShock(Problem):
         self.options.declare("name", "FakeShock", types=str)
 
     def _setup(self):
-        self.xlimits[0,:] = [23., 27.]
+        self.xlimits[0,:] = [23., 27.] #[23., 26.]
         self.xlimits[1,:] = [0.36, 0.51]
 
     def _evaluate(self, x, kx):

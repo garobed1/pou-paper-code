@@ -21,7 +21,7 @@ errorcheck : list, [xdata, fdata]
 DefaultOptOptions = {
     "method":"ga",
     "local":True,
-    "localswitch": False,
+    "localswitch": True,
     "strategy":'best1bin', 
     "lmethod":'SLSQP', 
     "lstrategy":None,

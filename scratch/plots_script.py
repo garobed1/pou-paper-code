@@ -259,8 +259,8 @@ mf[0].options.update({"print_global":False})
 pmod = mf[0]
 
 #snapshot is proc, iteration
-snapshot = [30, 60] 
-#snapshot = 0
+#snapshot = [30, 60] 
+snapshot = 0
 if(snapshot):
     trx = hi[snapshot[0]][snapshot[1]][0][0]
     trf = hi[snapshot[0]][snapshot[1]][0][1]

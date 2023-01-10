@@ -67,7 +67,6 @@ def rmse(model, prob, N=5000, xdata=None, fdata=None):
 def meane(model, prob, N=5000, xdata=None, fdata=None, return_values=False):
 
     rval1, rval2, rval3, rval4, rval5, rval6 = stat_comp(model, prob, N=N, xdata=xdata, fdata=fdata, pdfs=["uniform"], compute_error = not return_values)
-    import pdb; pdb.set_trace()
     return rval1, rval2
 
 def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], compute_error=False):
@@ -83,8 +82,12 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
 
         prob : smt problem object
         N : number of points to evaluate the error
-        xdata : predefined set of points to evaluate the error
-        fdata : predefined true function data
+        xdata : predefined set of points to compute statistics
+            NOTE: If xdata is provided, static input dimensions should not vary and should match the corresponding value in pdfs
+        fdata : predefined true function data for the given xdata
+
+        TODO: separate set of args for error comparison?
+
         pdfs : str or list
             probability distribution functions associated with each uncertain variable 
             if str, consider all variables in that way
@@ -94,17 +97,12 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
         
     """
 
+    #NOTE: NEED TO SPEED THIS UP BY CACHING LOTS OF SETTINGS, POTENTIALLY
+    # SPLIT INTO A .setup() AND .comp() CLASS
+
     xlimits = prob.xlimits
 
-    # generate sample points
-    if(xdata is not None):
-        tx = xdata
-        N = xdata.shape[0]
-    else:
-        sampling = LHS(xlimits=xlimits, criterion='maximin')
-        tx = sampling(N)
-
-    dim = tx.shape[1]
+    dim = len(xlimits)#tx.shape[1]
 
     # if pdfs is of length 1, treat each variable the same
     if isinstance(pdfs, str):
@@ -116,19 +114,27 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
 
     # get scales for uncertain variables, and preset pdf funcs for each
     #TODO: find a way to deal with normal dist/truncated normal at least
-    scales = np.zeros(dim)
-    pdf_list = []
-    for j in range(dim):
-        scales[j] = (xlimits[j][1] - xlimits[j][0]) # not necessarily the case
-        # if dist needs more args, (e.g. beta shape params) pass the dist as a
-        # list with the name as the first argument and remaining args as the next ones
-        if isinstance(pdfs[j], list):   
-            args = pdfs[j][1:]
-            pdf_list.append(_pdf_handle[pdfs[j][0]](*args))
-        elif pdfs[j] == None: # treat as if uniform
-            pdf_list.append(_pdf_handle['uniform'])
-        else:
-            pdf_list.append(_pdf_handle[pdfs[j]])
+    pdf_list, uncert_list, static_list, scales = _gen_var_lists(pdfs, xlimits)
+
+    u_dim = len(uncert_list)
+    d_dim = len(static_list)
+
+    assert(u_dim + d_dim == dim, f'{u_dim} uncertain and {d_dim} static vars do not sum to the total {dim} vars!')
+
+    # generate sample points, with fixed static values
+    if(xdata is not None):
+        tx = xdata
+        N = xdata.shape[0]
+    else:
+        # generate points
+        u_xlimits = xlimits[uncert_list] 
+        sampling = LHS(xlimits=u_xlimits, criterion='maximin') # different sampling techniques?
+        u_tx = sampling(N)
+        tx = np.zeros([N, dim])
+        tx[:, uncert_list] = u_tx
+        tx[:, static_list] = [pdf_list[i] for i in static_list]
+
+
 
     # compute statistics
     if(model):
@@ -155,11 +161,10 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
         tmean, tstdev = _actual_stat_comp(prob, Nt, tx, xlimits, scales, pdf_list, tf)
 
 
-    serr = abs(tstdev - mstdev)
-    merr = abs(tmean - mmean)
+        serr = abs(tstdev - mstdev)
+        merr = abs(tmean - mmean)
     
-    # return errors first if requested
-    if(compute_error):
+        # return errors first if requested
         return merr, serr, mmean, mstdev, tmean, tstdev # to scale error if you want
         
     return mmean, mstdev
@@ -174,19 +179,22 @@ def _actual_stat_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None):
     dens = np.ones([N,1])
     summand = np.zeros([N,1])
     
+
+
     arrs = np.array_split(tx, dim)
     l1 = 0
     l2 = 0
     for k in range(dim):
         l2 += arrs[k].shape[0]
-        if(tf): #data
+        if(tf is not None): #data
             vals[l1:l2,:] = tf[l1:l2,:]
         else:   #function
             vals[l1:l2,:] = func_handle(arrs[k])
         for j in range(dim):
             #import pdb; pdb.set_trace()
             # do i need to divide by N?
-            dens[l1:l2,:] = np.multiply(dens[l1:l2,:], pdf_list[j].pdf(arrs[k][:,j], loc=xlimits[j][0], scale=scales[j]).reshape((l2-l1, 1))) #TODO: loc must be different for certain dists
+            if not isinstance(pdf_list[j], float):
+                dens[l1:l2,:] = np.multiply(dens[l1:l2,:], pdf_list[j].pdf(arrs[k][:,j]).reshape((l2-l1, 1))) #TODO: loc must be different for certain dists
         summand[l1:l2,:] = dens[l1:l2,:]*vals[l1:l2,:]
         l1 += arrs[k].shape[0]
 
@@ -273,3 +281,39 @@ def full_error(model, prob, N=5000, xdata=None, fdata=None , return_values=False
         return mmean, mstdev, tmean, tstdev
 
     return nrmse, merr, serr
+
+
+def _gen_var_lists(pdfs, xlimits):
+
+    dim = len(pdfs)
+    pdf_list = []
+    uncert_list = []
+    static_list = []
+    scales = np.zeros(dim)
+    for j in range(dim):
+        scales[j] = (xlimits[j][1] - xlimits[j][0]) # not necessarily the case
+        # if dist needs more args, (e.g. beta shape params) pass the dist as a
+        # list with the name as the first argument and remaining args as the next ones
+        if isinstance(pdfs[j], list):   
+            args = pdfs[j][1:]
+            args.append(xlimits[j][0])#loc=
+            args.append(scales[j])#scale=
+            pdf_list.append(_pdf_handle[pdfs[j][0]](*args))
+            uncert_list.append(j)
+        elif isinstance(pdfs[j], float): # consider these variables to be fixed (e.g. design vars)
+            pdf_list.append(pdfs[j])
+            static_list.append(j)
+        elif pdfs[j] == None: # treat as if uniform
+            args = []
+            args.append(xlimits[j][0])#loc=
+            args.append(scales[j])#scale=
+            pdf_list.append(_pdf_handle['uniform'])
+            uncert_list.append(j)
+        else:
+            args = []
+            args.append(xlimits[j][0])#loc=
+            args.append(scales[j])#scale=
+            pdf_list.append(_pdf_handle[pdfs[j]])
+            uncert_list.append(j)
+
+    return pdf_list, uncert_list, static_list, scales
