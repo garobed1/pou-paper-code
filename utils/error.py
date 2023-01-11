@@ -96,10 +96,7 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
     Outputs:
         
     """
-
-    #NOTE: NEED TO SPEED THIS UP BY CACHING LOTS OF SETTINGS, POTENTIALLY
-    # SPLIT INTO A .setup() AND .comp() CLASS
-
+    
     xlimits = prob.xlimits
 
     dim = len(xlimits)#tx.shape[1]
@@ -122,6 +119,7 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
     assert(u_dim + d_dim == dim, f'{u_dim} uncertain and {d_dim} static vars do not sum to the total {dim} vars!')
 
     # generate sample points, with fixed static values
+    # TODO: need some kind of all-encompassing sampling function
     if(xdata is not None):
         tx = xdata
         N = xdata.shape[0]
@@ -135,16 +133,16 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
         tx[:, static_list] = [pdf_list[i] for i in static_list]
 
 
-
     # compute statistics
     if(model):
         func_handle = model.predict_values
     else:
         func_handle = prob
 
+    
     mmean, mstdev = _actual_stat_comp(func_handle, N, tx, xlimits, scales, pdf_list)
-
-
+    
+    
     # Error comp if requested
     if(compute_error):
         #TODO: refactor this
@@ -165,8 +163,8 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
         merr = abs(tmean - mmean)
     
         # return errors first if requested
-        return merr, serr, mmean, mstdev, tmean, tstdev # to scale error if you want
-        
+        return merr, serr, mmean, mstdev, tmean, tstdev # to scale error if you want 
+    
     return mmean, mstdev
 
 
@@ -207,7 +205,7 @@ def _actual_stat_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None):
 
 
 
-def full_error(model, prob, N=5000, xdata=None, fdata=None , return_values=False):
+def full_error(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], return_values=False):
     """
     Compute the root mean square error of a surrogate model, either with provided 
     data or data sampled through LHS.
@@ -263,19 +261,8 @@ def full_error(model, prob, N=5000, xdata=None, fdata=None , return_values=False
     
     # compute mean error
     # get benchmark values for mean and stdev
-    if("mean" in prob.__dict__):
-        tmean = prob.mean
-        tstdev = prob.stdev
-    else:
-        tmean = sum(tf)/N
-        tstdev = np.sqrt((sum(tf*tf)/N) - (sum(tf)/N)**2)
+    merr, serr, mmean, mstdev, tmean, tstdev = stat_comp(model, prob, N=N, xdata=xdata, fdata=fdata, pdfs=pdfs, compute_error=True)
 
-    # compute error of mean
-    mmean = sum(vals)/N
-    mstdev = np.sqrt((sum(vals*vals)/N) - (sum(vals)/N)**2)
-
-    serr = abs(tstdev - mstdev)
-    merr = abs(tmean - mmean)
 
     if(return_values):
         return mmean, mstdev, tmean, tstdev

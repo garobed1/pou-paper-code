@@ -984,6 +984,63 @@ class BetaRobust1D(Problem):
 
         return y
 
+
+class BetaRobustEx1D(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("name", "BetaRobust1D", types=str)
+
+    def _setup(self):
+        self.xlimits[0, 0] = 0.0
+        self.xlimits[0, 1] = 1.0
+        self.xlimits[1, 0] = 0.0
+        self.xlimits[1, 1] = 10.0
+
+        self.a = 1.
+        self.b = 1.
+        self.c = 1.
+
+        # self.alpha = 3.
+        # self.beta = 1.
+        # self.sh = self.alpha/self.beta # beta shape param ratio
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+
+        y = np.zeros((ne, 1), complex)
+        D0 = 0
+        D1 = -x[:,1]*np.sin(x[:,1])
+        D2 = x[:,1]*x[:,1] - 10.
+        if kx is None:
+            y[:,0] = self.a*D0 
+            y[:,0] += self.b*D1*x[:,0]
+            y[:,0] += self.c*D2*(1.-x[:,0])
+        elif kx == 0:
+            y[:,0] = 3*self.b*x[:,0]*x[:,0]
+            y[:,0] += 5*self.c*D*x[:,0]*x[:,0]*x[:,0]*x[:,0]
+            y[:,0] *= self.sh
+        elif kx == 1:
+            dD = np.sin(x[:,1]) + x[:,1]*np.cos(x[:,1])
+            y[:,0] = self.a*dD
+            y[:,0] += self.c*dD*x[:,0]*x[:,0]*x[:,0]*x[:,0]*x[:,0]
+            y[:,0] *= self.sh
+
+        return y
+
 # from matplotlib import pyplot as plt
 
 # prob = Ellipse(foci = [1, 3])
