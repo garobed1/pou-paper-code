@@ -6,13 +6,17 @@ sys.path.insert(1,"../surrogate")
 
 import numpy as np
 #import matplotlib.pyplot as plt
-from refinecriteria import looCV, HessianFit, TEAD
-from aniso_criteria import AnisotropicRefine
-from aniso_transform import AnisotropicTransform
-from getxnew import getxnew, adaptivesampling
-from defaults import DefaultOptOptions
-from sutils import divide_cases
-from error import rmse, meane
+from infill.refinecriteria import looCV, HessianFit, TEAD
+from infill.aniso_criteria import AnisotropicRefine
+from infill.taylor_criteria import TaylorRefine, TaylorExploreRefine
+from infill.hess_criteria import HessianRefine, POUSSA
+from infill.loocv_criteria import POUSFCVT
+from infill.aniso_transform import AnisotropicTransform
+from infill.getxnew import getxnew, adaptivesampling
+from optimization.defaults import DefaultOptOptions
+from utils.sutils import divide_cases
+from utils.error import rmse, meane
+from functions.problem_picker import GetProblem
 from shock_problem import ImpingingShock
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
@@ -54,7 +58,7 @@ if(pperb == 0):
 
 
 # Refinement Settings
-neval = 1+2*dim
+neval = 1+(dim+1)
 hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
@@ -82,8 +86,10 @@ testdata = None
 
 # Adaptive Sampling Conditions
 options = DefaultOptOptions
+options["local"] = local
 options["localswitch"] = True
 options["errorcheck"] = testdata
+options["multistart"] = mstarttype
 options["lmethod"] = opt
 
 # Print Conditions

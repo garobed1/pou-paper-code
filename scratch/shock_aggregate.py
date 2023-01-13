@@ -6,18 +6,17 @@ sys.path.insert(1,"../surrogate")
 
 import numpy as np
 import matplotlib.pyplot as plt
-from refinecriteria import looCV, HessianFit
-from aniso_criteria import AnisotropicRefine
-from getxnew import getxnew, adaptivesampling
-from defaults import DefaultOptOptions
-from sutils import divide_cases
-from error import rmse, meane
+from infill.refinecriteria import looCV, HessianFit
+from infill.aniso_criteria import AnisotropicRefine
+from infill.getxnew import getxnew, adaptivesampling
+from optimization.defaults import DefaultOptOptions
+from utils.sutils import divide_cases
+from utils.error import rmse, meane
 
-from example_problems import  QuadHadamard, MultiDimJump, MultiDimJumpTaper, FuhgP8, FuhgP9, FuhgP10
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
-from pougrad import POUSurrogate
+from surrogate.pougrad import POUSurrogate
 import matplotlib as mpl
 from smt.sampling_methods import LHS
 

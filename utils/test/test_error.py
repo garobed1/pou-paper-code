@@ -65,11 +65,11 @@ class StatsTest(unittest.TestCase):
             print(f'{i}, took {t2-t1} secs')
             y[i] = out1
         
-        # import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt
         plt.plot(x, y)
         plt.savefig('betarobtest.png')
         plt.clf()
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
 
         #TODO: need to finish this part up
 

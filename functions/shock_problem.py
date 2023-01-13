@@ -9,8 +9,9 @@ import sys
 import openmdao.api as om
 from smt.problems.problem import Problem
 from mphys_comp.impinge_analysis import Top
-import mphys_comp.impinge_setup as impinge_setup
 from utils.sutils import divide_cases
+
+import mphys_comp.impinge_setup as default_impinge_setup
 
 # comm = MPI.COMM_WORLD
 # rank = comm.Get_rank()
@@ -22,6 +23,7 @@ class ImpingingShock(Problem):
         self.options.declare("name", "ImpingingShock", types=str)
         
         
+        self.options.declare("problem_settings", default=default_impinge_setup)
         self.options.declare("inputs", ["shock_angle", "rsak"], types=list)
         self.options.declare("input_bounds", np.zeros([2,2]), types=np.ndarray)
         self.options.declare("output", ["test.aero_post.cd_def"], types=list) #surrogate only returns the first element but we'll store the others
@@ -40,6 +42,7 @@ class ImpingingShock(Problem):
 
         # list of inputs we would need to finite difference
         self.fdlist = ['M0', 'P0', 'T0', 'shock_angle']
+        self.fdlist = [] # try this? and lower tolerance on solver
 
         # list of inputs we can get exact derivatives for
         #self.adlist = self.options["inputs"]
@@ -54,18 +57,20 @@ class ImpingingShock(Problem):
 
 
         # ensure we can get SA derivatives
+        actual_settings = self.options["problem_settings"]
+
         saconsts = ['rsak','rsacb1','rsacb2','rsacb3','rsacv1','rsacw2','rsacw3','rsact1','rsact2','rsact3','rsact4','rsacrot']
         salist = []
         for key in self.options["inputs"]:
             if(key in saconsts):
                 salist = salist + [key]
-        impinge_setup.aeroOptions["SAGrads"] = salist
+        actual_settings.aeroOptions["SAGrads"] = salist
 
         self.xlimits[:, 0] = self.options["input_bounds"][:,0]
         self.xlimits[:, 1] = self.options["input_bounds"][:,1]
 
         self.prob = om.Problem(comm=MPI.COMM_SELF)
-        self.prob.model = Top()
+        self.prob.model = Top(problem_settings=actual_settings)
 
         # set up model inputs
         dim = self.options["ndim"]
