@@ -9,11 +9,14 @@ import numpy as np
 import mphys_comp.impinge_setup as default_impinge_setup
 
 
+
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-Ncase = 12
+args = sys.argv[1:]
+
+Ncase = int(args[0])#12
 
 inputs = ["shock_angle", "rsak"]
 dim = len(inputs)
@@ -38,8 +41,8 @@ problem_settings.aeroOptions['printIterations'] = False
 problem_settings.aeroOptions['printTiming'] = False
 
 func = ImpingingShock(ndim=dim, input_bounds=xlimits, inputs=inputs, problem_settings=problem_settings)
-sta = 0
-sto = 12
+sta = int(args[1])#0
+sto = int(args[2])#12
 y = func(x[sta:sto])
 
 g = np.zeros_like(x[sta:sto])
