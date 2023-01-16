@@ -17,64 +17,99 @@ from optimization.defaults import DefaultOptOptions
 from utils.sutils import divide_cases
 from utils.error import rmse, meane
 from functions.problem_picker import GetProblem
-from shock_problem import ImpingingShock
+from functions.shock_problem import ImpingingShock
 from smt.surrogate_models import KPLS, GEKPLS, KRG
 #from smt.surrogate_models.rbf import RBF
-from pougrad import POUSurrogate
+from surrogate.pougrad import POUSurrogate
 from smt.sampling_methods import LHS
 from scipy.stats import qmc
+
+import mphys_comp.impinge_setup as default_impinge_setup
+
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
+
+
 """
 Perform adaptive sampling and estimate error
 """
-prob  = "SHOCK"    #problem
 
-
-# Conditions
-dim = 2      #problem dimension
+header = "pou_paper_hess"
+path = None
 skip_LHS = True
-LHS_batch = 10
-Nruns = 5
-multistart = 25*dim     #aniso opt multistart
-stype = "gekpls"    #surrogate type
-rtype = "aniso"     #criteria type
-corr  = "squar_exp" #kriging correlation
+LHS_batch = 7
+runs_per_proc = 1
+
+# Problem Conditions
+prob  = "shock"    #problem
+dim = 2     #problem dimension
+
+
+# Surrogate Settings
+stype = "pouhess"    #surrogate type
+rtype =  "hess"
+opt = 'L-BFGS-B' #'SLSQP'#
+local = False
+
+# rtype =  "pousfcvt"
+# opt = 'SLSQP' #for SFCVT constraint
+# local = True
+corr  = "squar_exp"  #kriging correlation
 poly  = "linear"    #kriging regression 
-extra = 1           #gek extra points
-rho = 10            #POU parameter
+extra = dim           #gek extra points
+t0 = [1e-0]
+tb = [1e-5, 2e+1]
+rscale = 5.5
+rho = 10           #POU parameter
+
+# Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = dim*50       #number of points to add
+ntr = dim*30       #number of points to add
 ntot = nt0 + ntr    #total number of points
-batch = 0.1         #batch size for refinement, as a percentage of ntr
-Nerr = 5000       #number of test points to evaluate the error
-pperb = int(batch*ntr)
+batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
+Nerr = 5000*dim       #number of test points to evaluate the error
+pperb = batch
 pperbk = int(ntr/LHS_batch)
+mstarttype = 2            # 0: No multistart
+                          # 1: Start at the best out of a number of samples
+                          # 2: Perform multiple optimizations
+if(mstarttype == 1):   
+    multistart = 50*dim
+if(mstarttype == 2):
+    multistart = 5*dim
+
 if(pperb == 0):
     pperb = 1
 
-
 # Refinement Settings
-neval = 1+(dim+1)
+neval = 1+(dim+2)
 hess  = "neighborhood"
 interp = "honly"
 criteria = "distance"
 perturb = True
 bpen = False
 obj = "inv"
-rscale = 0.5 #0.5 for 2D
-nscale = 1.0 #1.0 for 2D
+nscale = 10.0 #1.0 for 2D
 nmatch = dim
-opt = 'L-BFGS-B' #'SLSQP'#
+
+rc_print = False#False
+
+
 
 # Problem Settings
 xlimits = np.zeros([dim,2])
 xlimits[0,:] = [23., 27.]
 xlimits[1,:] = [0.36, 0.51]
-trueFunc = ImpingingShock(ndim=dim, input_bounds=xlimits, comm=MPI.COMM_WORLD)
+
+problem_settings = default_impinge_setup
+problem_settings.aeroOptions['L2Convergence'] = 1e-15
+problem_settings.aeroOptions['printIterations'] = False
+problem_settings.aeroOptions['printTiming'] = False
+
+trueFunc = ImpingingShock(ndim=dim, input_bounds=xlimits, comm=MPI.COMM_WORLD, )
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m')
 
