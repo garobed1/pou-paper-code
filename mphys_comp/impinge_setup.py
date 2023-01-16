@@ -76,7 +76,7 @@ aeroOptions = { #ADflow aero solver options
     "CFL": 1.5,
     "CFLCoarse": 1.25,
     'MGCycle':'sg',
-    'nCycles':100000,
+    'nCycles':5000,
     'monitorvariables':["resrho", "resturb"],
     'useNKSolver':True,
     'NKSwitchTol':1e-6,#e-1,

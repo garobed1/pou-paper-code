@@ -117,17 +117,25 @@ class ImpingingShock(Problem):
                 for j in range(nx):
                     self.prob.set_val(self.options["inputs"][j], x[i, j])
                 self.prob.run_model()
-                self.fcur[i] = self.prob.get_val(self.options["output"][0])
-                #analytic
-                work = [self.options["inputs"][k] for k in self.adind]
-                adgrads = self.prob.compute_totals(of=self.options["output"][0], wrt=work, return_format="array")
-                self.gcur[i][self.adind] = adgrads[:,0]
+                if not self.prob.driver.fail:
+                    self.fcur[i] = self.prob.get_val(self.options["output"][0])
+
+                    #analytic
+                    work = [self.options["inputs"][k] for k in self.adind]
+                    adgrads = self.prob.compute_totals(of=self.options["output"][0], wrt=work, return_format="array")
+                    self.gcur[i][self.adind] = adgrads[:,0]
+                else:
+                    self.fcur[i] = np.nan
+                    self.gcur[i][self.adind] = np.nan
+
+                
+                
                 #finite diff
-                for key in self.fdind:
-                    self.prob.set_val(self.options["inputs"][key], x[i, key] + h)
-                    self.prob.run_model()
-                    self.gcur[i][key] = (self.prob.get_val(self.options["output"][0]) - self.fcur[i])/h
-                    self.prob.set_val(self.options["inputs"][key], x[i, key])
+                # for key in self.fdind:
+                #     self.prob.set_val(self.options["inputs"][key], x[i, key] + h)
+                #     self.prob.run_model()
+                #     self.gcur[i][key] = (self.prob.get_val(self.options["output"][0]) - self.fcur[i])/h
+                #     self.prob.set_val(self.options["inputs"][key], x[i, key])
 
 
             self.fcur = self.comm.allreduce(self.fcur)
