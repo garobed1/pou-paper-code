@@ -60,10 +60,9 @@ for i in range(dim):
 #import pdb; pdb.set_trace()
 #prob.model.list_outputs()
 if rank == 0:
-    title = f'{Ncase}_shock_results'
-    with open(f'./{title}/x{sta}to{sto}.pickle', 'wb') as f:
+    with open(f'./{title}/x.npy', 'wb') as f:
         pickle.dump(x, f)
-    with open(f'./{title}/y{sta}to{sto}.pickle', 'wb') as f:
+    with open(f'./{title}/y{sta}to{sto}.npy', 'wb') as f:
         pickle.dump(y, f)
-    with open(f'./{title}/g{sta}to{sto}.pickle', 'wb') as f:
+    with open(f'./{title}/g{sta}to{sto}.npy', 'wb') as f:
         pickle.dump(g, f)
