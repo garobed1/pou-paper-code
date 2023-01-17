@@ -3,6 +3,8 @@ from functions.example_problems import BetaRobust1D, ToyLinearScale, Ishigami, P
 from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam, WingWeight
 from functions.shock_problem import ImpingingShock
 from mpi4py import MPI
+import mphys_comp.impinge_setup as default_impinge_setup
+
 
 def GetProblem(prob, dim, alpha = 8., use_design=False):
     # Problem Settings
@@ -53,7 +55,13 @@ def GetProblem(prob, dim, alpha = 8., use_design=False):
         xlimits = np.zeros([dim,2])
         xlimits[0,:] = [23., 27.]
         xlimits[1,:] = [0.36, 0.51]
-        trueFunc = ImpingingShock(ndim=dim, input_bounds=xlimits, comm=MPI.COMM_SELF)
+
+        problem_settings = default_impinge_setup
+        problem_settings.aeroOptions['L2Convergence'] = 1e-15
+        problem_settings.aeroOptions['printIterations'] = False
+        problem_settings.aeroOptions['printTiming'] = False
+
+        trueFunc = ImpingingShock(ndim=dim, input_bounds=xlimits, comm=MPI.COMM_SELF, problem_settings=problem_settings)
     elif(prob == "betatest"):
         trueFunc = BetaRobust1D(ndim=dim)
     else:

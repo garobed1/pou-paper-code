@@ -34,24 +34,53 @@ size = comm.Get_size()
 Perform adaptive sampling and estimate error
 """
 
-# All variables not initialized come from this import
+fresh = True
+
+# If folder and integer arg are given, start from there
+if len(sys.argv) > 1:
+    fresh = False
+    args = sys.argv[1:]
+    fulltitle = args[0]
+    ntr = args[1]
+
+    tsplit = fulltitle.split('/')
+    if len(tsplit) == 1:
+        path = "."
+    else:
+        path = tsplit[:-1]
+    title = tsplit[-1]
+
+    if rank == 0:
+        shutil.copy(f"{path}/{title}/settings.py", "./results_settings.py")
+    #sys.path.append(title)
+
+    #need to load the current model
+    with open(f'{path}/{title}/modelf.pickle', 'rb') as f:
+        model0 = pickle.load(f)
+
+else:
+    # All variables not initialized come from this import
+    from results_settings import * 
+    # Generate results folder and list of inputs
+    title = f"{header}_{prob}_{dim}D"
+    if(path == None):
+        path = "."
+    if rank == 0:
+        if not os.path.isdir(f"{path}/{title}"):
+            os.mkdir(f"{path}/{title}")
+        shutil.copy("./results_settings.py", f"{path}/{title}/settings.py")
+
 from results_settings import *
 
+# override the added points with what's on the command line
+if len(sys.argv) > 1:
+    ntr = args[1]
+    nt0 = model0[0].training_points[None][0][0].shape[0]
 
-#sys.path.append(title)
-setmod = importlib.import_module(f'results_settings')
-ssettings = setmod.__dict__
 
 Nruns = size*runs_per_proc
 
-# Generate results folder and list of inputs
-title = f"{header}_{prob}_{dim}D"
-if(path == None):
-    path = "."
-if rank == 0:
-    if not os.path.isdir(f"{path}/{title}"):
-        os.mkdir(f"{path}/{title}")
-    shutil.copy("./results_settings.py", f"{path}/{title}/settings.py")
+
 
 # Problem Settings
 ud = False
@@ -72,21 +101,22 @@ xtest = None
 ftest = None
 testdata = None
 
-if(dim > 3):
-    intervals = np.arange(0, ntr, dim)
-    intervals = np.append(intervals, ntr-1)
-else:
-    intervals = np.arange(0, ntr)
+if(prob is not 'shock'):
+    if(dim > 3):
+        intervals = np.arange(0, ntr, dim)
+        intervals = np.append(intervals, ntr-1)
+    else:
+        intervals = np.arange(0, ntr)
 
-if rank == 0:
-    xtest = sampling(Nerr)
-    ftest = trueFunc(xtest)
-    
-    testdata = [xtest, ftest, intervals]
+    if rank == 0:
+        xtest = sampling(Nerr)
+        ftest = trueFunc(xtest)
 
-xtest = comm.bcast(xtest, root=0)
-ftest = comm.bcast(ftest, root=0)
-testdata = comm.bcast(testdata, root=0)
+        testdata = [xtest, ftest, intervals]
+
+    xtest = comm.bcast(xtest, root=0)
+    ftest = comm.bcast(ftest, root=0)
+    testdata = comm.bcast(testdata, root=0)
 # Adaptive Sampling Conditions
 options = DefaultOptOptions
 options["local"] = local
@@ -124,24 +154,32 @@ xtrain0 = []
 ftrain0 = []
 gtrain0 = []
 if rank == 0:
-    if(rtype == 'anisotransform'):
-        for n in range(Nruns):
-            sample = sequencer[n].random(nt0)
-            sample = qmc.scale(sample, xlimits[:,0], xlimits[:,1])
-            xtrain0.append(sample)
-            ftrain0.append(trueFunc(xtrain0[n]))
-            gtrain0.append(np.zeros([nt0,dim]))
-            for i in range(dim):
-                gtrain0[n][:,i:i+1] = trueFunc(xtrain0[n],i)
+    if fresh:
+        if(rtype == 'anisotransform'):
+            for n in range(Nruns):
+                sample = sequencer[n].random(nt0)
+                sample = qmc.scale(sample, xlimits[:,0], xlimits[:,1])
+                xtrain0.append(sample)
+                ftrain0.append(trueFunc(xtrain0[n]))
+                gtrain0.append(np.zeros([nt0,dim]))
+                for i in range(dim):
+                    gtrain0[n][:,i:i+1] = trueFunc(xtrain0[n],i)
 
 
+        else:
+            for n in range(Nruns):
+                xtrain0.append(sampling(nt0))
+                ftrain0.append(trueFunc(xtrain0[n]))
+                gtrain0.append(np.zeros([nt0,dim]))
+                for i in range(dim):
+                    gtrain0[n][:,i:i+1] = trueFunc(xtrain0[n],i)
     else:
         for n in range(Nruns):
-            xtrain0.append(sampling(nt0))
-            ftrain0.append(trueFunc(xtrain0[n]))
+            xtrain0.append(model0[n].training_points[None][0][0])
+            ftrain0.append(model0[n].training_points[None][0][1])
             gtrain0.append(np.zeros([nt0,dim]))
             for i in range(dim):
-                gtrain0[n][:,i:i+1] = trueFunc(xtrain0[n],i)
+                gtrain0[n][:,i:i+1] = model0[n].training_points[None][n+1][1]
 
 xtrain0 = comm.bcast(xtrain0, root=0)
 ftrain0 = comm.bcast(ftrain0, root=0)
@@ -181,75 +219,83 @@ if rank == 0:
     print("Training Initial Surrogate ...")
 
 # Initial Design Surrogate
-if(stype == "gekpls"):
-    modelbase = GEKPLS(xlimits=xlimits)
-    # modelbase.options.update({"hyper_opt":'TNC'})
-    # modelbase.options.update({"theta0":t0g})
-    # modelbase.options.update({"theta_bounds":tbg})
-    modelbase.options.update({"n_comp":dim})
-    modelbase.options.update({"extra_points":extra})
-    modelbase.options.update({"corr":corr})
-    modelbase.options.update({"poly":poly})
-    modelbase.options.update({"n_start":5})
-elif(stype == "dgek"):
-    modelbase = DGEK(xlimits=xlimits)
-    # modelbase.options.update({"hyper_opt":'TNC'})
-    modelbase.options.update({"corr":corr})
-    modelbase.options.update({"poly":poly})
-    modelbase.options.update({"n_start":5})
-    modelbase.options.update({"theta0":t0})
-    modelbase.options.update({"theta_bounds":tb})
-elif(stype == "pou"):
-    modelbase = POUSurrogate()
-    modelbase.options.update({"rho":rho})
-elif(stype == "pouhess"):
-    modelbase = POUHessian(bounds=xlimits, rscale=rscale)
-    modelbase.options.update({"rho":rho})
-    modelbase.options.update({"neval":neval})
-elif(stype == "kpls"):
-    modelbase = KPLS()
-    # modelbase.options.update({"hyper_opt":'TNC'})
-    modelbase.options.update({"n_comp":dim})
-    modelbase.options.update({"corr":corr})
-    modelbase.options.update({"poly":poly})
-    modelbase.options.update({"n_start":5})
+if fresh:
+    if(stype == "gekpls"):
+        modelbase = GEKPLS(xlimits=xlimits)
+        # modelbase.options.update({"hyper_opt":'TNC'})
+        # modelbase.options.update({"theta0":t0g})
+        # modelbase.options.update({"theta_bounds":tbg})
+        modelbase.options.update({"n_comp":dim})
+        modelbase.options.update({"extra_points":extra})
+        modelbase.options.update({"corr":corr})
+        modelbase.options.update({"poly":poly})
+        modelbase.options.update({"n_start":5})
+    elif(stype == "dgek"):
+        modelbase = DGEK(xlimits=xlimits)
+        # modelbase.options.update({"hyper_opt":'TNC'})
+        modelbase.options.update({"corr":corr})
+        modelbase.options.update({"poly":poly})
+        modelbase.options.update({"n_start":5})
+        modelbase.options.update({"theta0":t0})
+        modelbase.options.update({"theta_bounds":tb})
+    elif(stype == "pou"):
+        modelbase = POUSurrogate()
+        modelbase.options.update({"rho":rho})
+    elif(stype == "pouhess"):
+        modelbase = POUHessian(bounds=xlimits, rscale=rscale)
+        modelbase.options.update({"rho":rho})
+        modelbase.options.update({"neval":neval})
+    elif(stype == "kpls"):
+        modelbase = KPLS()
+        # modelbase.options.update({"hyper_opt":'TNC'})
+        modelbase.options.update({"n_comp":dim})
+        modelbase.options.update({"corr":corr})
+        modelbase.options.update({"poly":poly})
+        modelbase.options.update({"n_start":5})
+    else:
+        modelbase = KRG()
+        # modelbase.options.update({"hyper_opt":'TNC'})
+        modelbase.options.update({"corr":corr})
+        modelbase.options.update({"poly":poly})
+        modelbase.options.update({"n_start":5})
+    modelbase.options.update({"print_global":False})
+
+    model0 = []
+    co = 0
+
+    for n in cases[rank]: #range(Nruns):
+        model0.append(copy.deepcopy(modelbase))
+        model0[co].set_training_values(xtrain0[n], ftrain0[n])
+        if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK) or isinstance(model0[co], POUHessian)):
+            for i in range(dim):
+                model0[co].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
+        model0[co].train()
+        co += 1
 else:
-    modelbase = KRG()
-    # modelbase.options.update({"hyper_opt":'TNC'})
-    modelbase.options.update({"corr":corr})
-    modelbase.options.update({"poly":poly})
-    modelbase.options.update({"n_start":5})
-modelbase.options.update({"print_global":False})
-# modelbase.options.update({"print_training":True})
-# modelbase.options.update({"print_prediction":True})
-# modelbase.options.update({"print_problem":True})
-# modelbase.options.update({"print_solver":True})
-
-model0 = []
-co = 0
-
-for n in cases[rank]: #range(Nruns):
-    model0.append(copy.deepcopy(modelbase))
-    model0[co].set_training_values(xtrain0[n], ftrain0[n])
-    if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK) or isinstance(model0[co], POUHessian)):
-        for i in range(dim):
-            model0[co].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
-    model0[co].train()
-    co += 1
+    modelbase = copy.deepcopy(model)
+    # modelbase.options.update({"print_training":True})
+    # modelbase.options.update({"print_prediction":True})
+    # modelbase.options.update({"print_problem":True})
+    # modelbase.options.update({"print_solver":True})
 
 
 
-if rank == 0:
-    print("Computing Initial Surrogate Error ...")
+
+
+
 
 # Initial Model Error
 err0rms = []
 err0mean = []
-co = 0
-for n in cases[rank]:
-    err0rms.append(rmse(model0[co], trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-    err0mean.append(meane(model0[co], trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-    co += 1
+if(prob is not 'shock'):
+    if rank == 0:
+        print("Computing Initial Surrogate Error ...")
+
+    co = 0
+    for n in cases[rank]:
+        err0rms.append(rmse(model0[co], trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+        err0mean.append(meane(model0[co], trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+        co += 1
 
 
 if rank == 0:
@@ -375,25 +421,30 @@ if rank == 0:
     print("\n")
     print("Experiment Complete")
 
+    if(fresh):
+        affix = ""
+    else:
+        affix = f"_{nt0}"
+
     # Adaptive Data
-    with open(f'{path}/{title}/modelf.pickle', 'wb') as f:
+    with open(f'{path}/{title}/modelf{affix}.pickle', 'wb') as f:
         pickle.dump(modelf, f)
 
-    with open(f'{path}/{title}/err0rms.pickle', 'wb') as f:
+    with open(f'{path}/{title}/err0rms{affix}.pickle', 'wb') as f:
         pickle.dump(err0rms, f)
 
-    with open(f'{path}/{title}/err0mean.pickle', 'wb') as f:
+    with open(f'{path}/{title}/err0mean{affix}.pickle', 'wb') as f:
         pickle.dump(err0mean, f)
 
-    with open(f'{path}/{title}/hist.pickle', 'wb') as f:
+    with open(f'{path}/{title}/hist{affix}.pickle', 'wb') as f:
         pickle.dump(hist, f)
 
-    with open(f'{path}/{title}/errhrms.pickle', 'wb') as f:
+    with open(f'{path}/{title}/errhrms{affix}.pickle', 'wb') as f:
         pickle.dump(errhrms, f)
 
-    with open(f'{path}/{title}/errhmean.pickle', 'wb') as f:
+    with open(f'{path}/{title}/errhmean{affix}.pickle', 'wb') as f:
         pickle.dump(errhmean, f)
 
     if(dim > 3):
-        with open(f'{path}/{title}/intervals.pickle', 'wb') as f:
+        with open(f'{path}/{title}/intervals{affix}.pickle', 'wb') as f:
             pickle.dump(intervals, f)
