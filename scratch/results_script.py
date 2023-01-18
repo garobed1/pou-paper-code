@@ -36,6 +36,8 @@ Perform adaptive sampling and estimate error
 
 fresh = True
 
+
+
 # If folder and integer arg are given, start from there
 if len(sys.argv) > 1:
     fresh = False
@@ -47,7 +49,7 @@ if len(sys.argv) > 1:
     if len(tsplit) == 1:
         path = "."
     else:
-        path = tsplit[:-1]
+        path = '/'.join(tsplit[:-1])
     title = tsplit[-1]
 
     if rank == 0:
@@ -56,7 +58,7 @@ if len(sys.argv) > 1:
 
     #need to load the current model
     with open(f'{path}/{title}/modelf.pickle', 'rb') as f:
-        model0 = pickle.load(f)
+        model0lists = pickle.load(f)
 
 else:
     # All variables not initialized come from this import
@@ -71,16 +73,20 @@ else:
         shutil.copy("./results_settings.py", f"{path}/{title}/settings.py")
 
 from results_settings import *
+Nruns = size*runs_per_proc
+# Fan out parallel cases
+cases = divide_cases(Nruns, size)
 
 # override the added points with what's on the command line
-if len(sys.argv) > 1:
-    ntr = args[1]
-    nt0 = model0[0].training_points[None][0][0].shape[0]
+if(not fresh):
+    ntr = int(args[1])
+    nt0 = model0lists[0][0].training_points[None][0][0].shape[0]
 
-
-Nruns = size*runs_per_proc
-
-
+    model0 = [None]*Nruns
+    # put model0s in order
+    for s in range(size):
+        for n in range(len(cases[s])):
+            model0[cases[s][n]] = model0lists[s][n]
 
 # Problem Settings
 ud = False
@@ -93,15 +99,14 @@ if(rtype == 'anisotransform'):
     for n in range(Nruns):
         sequencer.append(qmc.Halton(d=dim))
 
-# Fan out parallel cases
-cases = divide_cases(Nruns, size)
+
 
 # Error
 xtest = None 
 ftest = None
 testdata = None
 
-if(prob is not 'shock'):
+if(prob != 'shock'):
     if(dim > 3):
         intervals = np.arange(0, ntr, dim)
         intervals = np.append(intervals, ntr-1)
@@ -139,7 +144,7 @@ if rank == 0:
     print("Problem Dimension    : ", dim)
     print("Initial Sample Size  : ", nt0)
     print("Refined Points Size  : ", ntr)
-    print("Total Points         : ", ntot)
+    print("Total Points         : ", nt0+ntr)
     print("Points Per Iteration : ", batch)
     print("RMSE Size            : ", Nerr)
     print("\n")
@@ -153,37 +158,58 @@ if rank == 0:
 xtrain0 = []
 ftrain0 = []
 gtrain0 = []
-if rank == 0:
-    if fresh:
-        if(rtype == 'anisotransform'):
-            for n in range(Nruns):
-                sample = sequencer[n].random(nt0)
-                sample = qmc.scale(sample, xlimits[:,0], xlimits[:,1])
-                xtrain0.append(sample)
-                ftrain0.append(trueFunc(xtrain0[n]))
-                gtrain0.append(np.zeros([nt0,dim]))
-                for i in range(dim):
-                    gtrain0[n][:,i:i+1] = trueFunc(xtrain0[n],i)
+
+if fresh:
+    # if(rtype == 'anisotransform'):
+    #     for n in range(Nruns):
+    #         sample = sequencer[n].random(nt0)
+    #         sample = qmc.scale(sample, xlimits[:,0], xlimits[:,1])
+    #         xtrain0.append(sample)
+    #         ftrain0.append(trueFunc(xtrain0[n]))
+    #         gtrain0.append(np.zeros([nt0,dim]))
+    #         for i in range(dim):
+    #             gtrain0[n][:,i:i+1] = trueFunc(xtrain0[n],i)
+    # else:
+    #for n in range(Nruns):
+    co = 0
+    for n in cases[rank]:
+        xtrain0.append(sampling(nt0))
+        ftrain0.append(trueFunc(xtrain0[co]))
+        gtrain0.append(np.zeros([nt0,dim]))
+        for i in range(dim):
+            gtrain0[co][:,i:i+1] = trueFunc(xtrain0[co],i)
+
+else:
+    co = 0
+    for n in cases[rank]:
+        xtrain0.append(model0[n].training_points[None][0][0])
+        ftrain0.append(model0[n].training_points[None][0][1])
+        gtrain0.append(np.zeros([nt0,dim]))
+        for i in range(dim):
+            gtrain0[co][:,i:i+1] = model0[n].training_points[None][i+1][1]
+        co += 1
+
+xtrain0lists = comm.allgather(xtrain0)
+ftrain0lists = comm.allgather(ftrain0)
+gtrain0lists = comm.allgather(gtrain0)
+
+#need to put them back in order
+
+xtrain0 = [None]*Nruns
+ftrain0 = [None]*Nruns
+gtrain0 = [None]*Nruns
+
+for s in range(size):
+    for n in range(len(cases[s])):
+        xtrain0[cases[s][n]] = xtrain0lists[s][n]
+        ftrain0[cases[s][n]] = ftrain0lists[s][n]
+        gtrain0[cases[s][n]] = gtrain0lists[s][n]
 
 
-        else:
-            for n in range(Nruns):
-                xtrain0.append(sampling(nt0))
-                ftrain0.append(trueFunc(xtrain0[n]))
-                gtrain0.append(np.zeros([nt0,dim]))
-                for i in range(dim):
-                    gtrain0[n][:,i:i+1] = trueFunc(xtrain0[n],i)
-    else:
-        for n in range(Nruns):
-            xtrain0.append(model0[n].training_points[None][0][0])
-            ftrain0.append(model0[n].training_points[None][0][1])
-            gtrain0.append(np.zeros([nt0,dim]))
-            for i in range(dim):
-                gtrain0[n][:,i:i+1] = model0[n].training_points[None][n+1][1]
+# xtrain0 = comm.bcast(xtrain0, root=0)
+# ftrain0 = comm.bcast(ftrain0, root=0)
+# gtrain0 = comm.bcast(gtrain0, root=0)
 
-xtrain0 = comm.bcast(xtrain0, root=0)
-ftrain0 = comm.bcast(ftrain0, root=0)
-gtrain0 = comm.bcast(gtrain0, root=0)
 
 idx = np.round(np.linspace(0, len(intervals)-1, LHS_batch+1)).astype(int)
 
@@ -272,7 +298,7 @@ if fresh:
         model0[co].train()
         co += 1
 else:
-    modelbase = copy.deepcopy(model)
+    modelbase = copy.deepcopy(model0[0])
     # modelbase.options.update({"print_training":True})
     # modelbase.options.update({"print_prediction":True})
     # modelbase.options.update({"print_problem":True})
@@ -287,7 +313,7 @@ else:
 # Initial Model Error
 err0rms = []
 err0mean = []
-if(prob is not 'shock'):
+if(prob != 'shock'):
     if rank == 0:
         print("Computing Initial Surrogate Error ...")
 
@@ -427,7 +453,7 @@ if rank == 0:
         affix = f"_{nt0}"
 
     # Adaptive Data
-    with open(f'{path}/{title}/modelf{affix}.pickle', 'wb') as f:
+    with open(f'{path}/{title}/modelf.pickle', 'wb') as f:
         pickle.dump(modelf, f)
 
     with open(f'{path}/{title}/err0rms{affix}.pickle', 'wb') as f:

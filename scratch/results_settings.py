@@ -32,7 +32,7 @@ rho = 10          #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = 10       #initial design size
-ntr = 80      #number of points to add
+ntr = 10      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000*dim       #number of test points to evaluate the error
