@@ -153,13 +153,15 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
                 errh2.append(err[1:])
                 #print("yes")
 
-            if i in intervals.tolist():
-                hist.append(copy.deepcopy(rcrit.model.training_points[None]))
+
         else:
             errh = None
             errh2 = None
-            hist = None
-        
+            #hist = None
+
+        # save training data at each interval regardless
+        if i in intervals.tolist():
+            hist.append(copy.deepcopy(rcrit.model.training_points[None]))        
 
         if(rcrit.options["print_iter"] and rank == 0):
             print("Iteration: ", i)
