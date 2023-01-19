@@ -117,6 +117,7 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
     errh2 = []
     model = copy.deepcopy(model0)
     
+    intervals = np.arange(0, count+1)
 
     for i in range(count):
         t0 = model.training_points[None][0][0]
