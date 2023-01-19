@@ -105,14 +105,13 @@ if(rtype == 'anisotransform'):
 xtest = None 
 ftest = None
 testdata = None
+if(dim > 3):
+    intervals = np.arange(0, ntr, dim)
+    intervals = np.append(intervals, ntr-1)
+else:
+    intervals = np.arange(0, ntr)
 
 if(prob != 'shock'):
-    if(dim > 3):
-        intervals = np.arange(0, ntr, dim)
-        intervals = np.append(intervals, ntr-1)
-    else:
-        intervals = np.arange(0, ntr)
-
     if rank == 0:
         xtest = sampling(Nerr)
         ftest = trueFunc(xtest)
