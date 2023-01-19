@@ -23,7 +23,7 @@ from smt.sampling_methods import LHS
 # Give directory with desired results as argument
 usetead = False
 
-title = "5000_shock_results"
+title = "10000_shock_results"
 
 if not os.path.isdir(title):
     os.mkdir(title)
