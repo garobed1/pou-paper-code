@@ -1,7 +1,7 @@
 
 header = "pou_test_fakeshock_mod"
 path = "./surrogate_results"
-skip_LHS = False
+skip_LHS = True
 LHS_batch = 10
 runs_per_proc = 1
 
