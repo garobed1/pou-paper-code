@@ -48,27 +48,28 @@ Nerr = xref.shape[0]
 
 prob = ssettings["prob"]
 dim = ssettings["dim"]
-extra = ssettings["extra"]
-corr = ssettings["corr"]
-poly = ssettings["poly"]
-t0 = ssettings["t0"]
-tb = ssettings["tb"]
-rho = ssettings["rho"]
-rscale = ssettings["rscale"]
-neval = ssettings["neval"]
-stype = ssettings["stypes"]
+#extra = ssettings["extra"]
+#corr = ssettings["corr"]
+#poly = ssettings["poly"]
+#t0 = ssettings["t0"]
+#tb = ssettings["tb"]
+#rho = ssettings["rho"]
+#rscale = ssettings["rscale"]
+#neval = ssettings["neval"]
+#stype = ssettings["stype"]
 
-trueFunc = GetProblem(prob, dim, use_design=ud)
+trueFunc = GetProblem(prob, dim)#, use_design=ud)
 xlimits = trueFunc.xlimits
 
 
 # LHS Data
-with open(f'{title}/xtrainK.pickle', 'rb') as f:
+with open(f'{title2}/xtrainK.pickle', 'rb') as f:
     xtrainK = pickle.load(f)
-with open(f'{title}/ftrainK.pickle', 'rb') as f:
+with open(f'{title2}/ftrainK.pickle', 'rb') as f:
     ftrainK = pickle.load(f)
-with open(f'{title}/gtrainK.pickle', 'rb') as f:
+with open(f'{title2}/gtrainK.pickle', 'rb') as f:
     gtrainK = pickle.load(f)
+import pdb; pdb.set_trace()
 
 Nruns = size*ssettings["runs_per_proc"]
 # Fan out parallel cases
@@ -110,8 +111,8 @@ modelbase1.options.update({"n_start":5})
 
 modelbase0 = POUHessian(bounds=xlimits)
 # modelbase.options.update({"hyper_opt":'TNC'})
-modelbase0.options.options.update({"rho":ssettings["rho"]})
-modelbase0.options.options.update({"neval":ssettings["neval"]})
+modelbase0.options.update({"rho":ssettings["rho"]})
+modelbase0.options.update({"neval":ssettings["neval"]})
 
 # else:
 #     raise ValueError("Given alternative model not valid.")

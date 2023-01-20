@@ -30,7 +30,7 @@ stop = 80
 trueFunc = GetProblem("shock", 2)
 xlimits = trueFunc.xlimits
 
-sample_list = np.arange(start, stop, 10)
+sample_list = np.arange(start, stop+1, 10)
 
 sampling = LHS(xlimits=xlimits, criterion='m')
 
@@ -52,10 +52,10 @@ xtrainK = comm.allgather(xtrainK)
 ftrainK = comm.allgather(ftrainK)
 gtrainK = comm.allgather(gtrainK)
 
-
-with open(f'./{title}/xtrainK.pickle', 'wb') as f:
-    pickle.dump(xtrainK, f)
-with open(f'./{title}/ftrainK.pickle', 'wb') as f:
-    pickle.dump(ftrainK, f)
-with open(f'./{title}/gtrainK.pickle', 'wb') as f:
-    pickle.dump(gtrainK, f)
+if rank == 0:
+    with open(f'./{title}/xtrainK.pickle', 'wb') as f:
+        pickle.dump(xtrainK, f)
+    with open(f'./{title}/ftrainK.pickle', 'wb') as f:
+        pickle.dump(ftrainK, f)
+    with open(f'./{title}/gtrainK.pickle', 'wb') as f:
+        pickle.dump(gtrainK, f)
