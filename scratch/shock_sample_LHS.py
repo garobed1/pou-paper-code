@@ -1,28 +1,14 @@
-import sys, os
-import copy
+
 import pickle
-from matplotlib.transforms import Bbox
 from mpi4py import MPI
-
 import numpy as np
-import matplotlib.pyplot as plt
-from infill.refinecriteria import looCV, HessianFit
-from infill.aniso_criteria import AnisotropicRefine
-from infill.getxnew import getxnew, adaptivesampling
-from optimization.defaults import DefaultOptOptions
-from utils.sutils import divide_cases
-from utils.error import rmse, meane
 
-from smt.problems import Branin, Sphere, LpNorm, Rosenbrock, WaterFlow, WeldedBeam, RobotArm, CantileverBeam
-from smt.surrogate_models import KPLS, GEKPLS, KRG
-#from smt.surrogate_models.rbf import RBF
-from surrogate.pougrad import POUSurrogate
-import matplotlib as mpl
+
 from smt.sampling_methods import LHS
 from functions.problem_picker import GetProblem
 
 from scipy.spatial import KDTree
-import random
+
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -59,8 +45,8 @@ for i in sample_list:
     close_dists, close_inds = tree.query(xsample, k=1)
 
     xtrainK.append(xref[close_inds])
-    ftrainK.append(xref[close_inds])
-    gtrainK.append(xref[close_inds])
+    ftrainK.append(fref[close_inds])
+    gtrainK.append(gref[close_inds])
 
 xtrainK = comm.allgather(xtrainK)
 ftrainK = comm.allgather(ftrainK)
