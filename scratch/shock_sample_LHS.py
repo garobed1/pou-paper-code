@@ -44,9 +44,9 @@ for i in sample_list:
     xsample = sampling(i)
     close_dists, close_inds = tree.query(xsample, k=1)
 
-    xtrainK.append(xref[close_inds])
-    ftrainK.append(fref[close_inds].reshape((i, 1)))
-    gtrainK.append(gref[close_inds])
+    xtrainK.append(np.array(xref[close_inds], dtype=np.float64))
+    ftrainK.append(np.array(fref[close_inds].reshape((i, 1)), dtype=np.float64))
+    gtrainK.append(np.array(gref[close_inds], dtype=np.float64))
 
 xtrainK = comm.allgather(xtrainK)
 ftrainK = comm.allgather(ftrainK)
