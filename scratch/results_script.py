@@ -41,24 +41,36 @@ fresh = True
 # If folder and integer arg are given, start from there
 if len(sys.argv) > 1:
     fresh = False
+    
     args = sys.argv[1:]
     fulltitle = args[0]
-    ntr = args[1]
-
     tsplit = fulltitle.split('/')
     if len(tsplit) == 1:
         path = "."
     else:
         path = '/'.join(tsplit[:-1])
     title = tsplit[-1]
-
+    
     if rank == 0:
         shutil.copy(f"{path}/{title}/settings.py", "./results_settings.py")
     #sys.path.append(title)
 
+    from results_settings import *
+    if(path == None):
+        path = "."
+    
+    
+    ntr = args[1]
+
+    
+
+    
+
     #need to load the current model
     with open(f'{path}/{title}/modelf.pickle', 'rb') as f:
         model0lists = pickle.load(f)
+
+    
 
 else:
     # All variables not initialized come from this import
@@ -72,7 +84,6 @@ else:
             os.mkdir(f"{path}/{title}")
         shutil.copy("./results_settings.py", f"{path}/{title}/settings.py")
 
-from results_settings import *
 Nruns = size*runs_per_proc
 # Fan out parallel cases
 cases = divide_cases(Nruns, size)
