@@ -44,6 +44,10 @@ with open(f'{title2}/xref.pickle', 'rb') as f:
     xref = pickle.load(f)
 with open(f'{title2}/fref.pickle', 'rb') as f:
     fref = pickle.load(f)
+    
+xref = np.array(xref, dtype=np.float64)
+fref = np.array(fref, dtype=np.float64)
+
 Nerr = xref.shape[0]
 
 prob = ssettings["prob"]
