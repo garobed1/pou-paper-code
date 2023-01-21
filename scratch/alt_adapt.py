@@ -24,7 +24,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 """
-LHS based surrogate error
+Adaptive sampling-based surrogate error
 """
 
 # Give directory with desired results as argument
@@ -64,18 +64,16 @@ trueFunc = GetProblem(prob, dim)#, use_design=ud)
 xlimits = trueFunc.xlimits
 
 
-# LHS Data
-with open(f'{title2}/xtrainK.pickle', 'rb') as f:
-    xtrainK = pickle.load(f)
-with open(f'{title2}/ftrainK.pickle', 'rb') as f:
-    ftrainK = pickle.load(f)
-with open(f'{title2}/gtrainK.pickle', 'rb') as f:
-    gtrainK = pickle.load(f)
+# Adaptive Data
+# need to form this
+with open(f'{title}/full_hist.pickle', 'rb') as f:
+    hist = pickle.load(f)
+
+
 #import pdb; pdb.set_trace()
 
 Nruns = size*ssettings["runs_per_proc"]
 # Fan out parallel cases
-cases = divide_cases(Nruns, size)
 
 
 # Generate Alternative Surrogate
@@ -132,20 +130,29 @@ slimh2 = slim*10
 
 
 
-samplehistK = [ftrainK[0][i].shape[0] for i in range(len(ftrainK[0]))]
-itersk = len(samplehistK)
-errk0rms = []
-errk1rms = []
-errk2rms = []
+iters = len(hist[0])
 
-errors = [errk0rms, errk1rms, errk2rms]
+samplehist = []
+for m in range(iters):
+    samplehist.append(hist[0][m][0][0].shape[0])
+erra0rms = []
+erra1rms = []
+erra2rms = []
 
-for m in range(itersk):
+errors = [erra0rms, erra1rms, erra2rms]
+
+for m in range(iters):
+    xtrain = hist[rank][m][0][0]
+    ftrain = hist[rank][m][0][0]
+    gtrain = np.zeros_like(xtrain)
+    for j in range(dim):
+        gtrain[:,j:j+1] = hist[rank][m][j+1][1]
+
     for j in range(len(models)):
-        models[j].set_training_values(xtrainK[rank][m], ftrainK[rank][m])
+        models[j].set_training_values(xtrain, ftrain)
         if(isinstance(models[j], GEKPLS) or isinstance(models[j], POUSurrogate) or isinstance(models[j], DGEK) or isinstance(models[j], POUHessian)):
             for i in range(dim):
-                models[j].set_training_derivatives(xtrainK[rank][m], gtrainK[rank][m][:,i:i+1], i)
+                models[j].set_training_derivatives(xtrain, gtrain[:,i:i+1], i)
         models[j].train()
         errors[j].append(rmse(models[j], trueFunc, N=Nerr, xdata=xref, fdata=fref))
 
@@ -161,10 +168,10 @@ if rank == 0:
     print("Saving Results")
 
     
-    with open(f'{title}/samplehistK.pickle', 'wb') as f:
-        pickle.dump(samplehistK, f)
+    with open(f'{title}/samplehist.pickle', 'wb') as f:
+        pickle.dump(samplehist, f)
 
-    with open(f'{title}/LHSerrors.pickle', 'wb') as f:
+    with open(f'{title}/Adapterrors.pickle', 'wb') as f:
         pickle.dump(errors, f)
 
 
