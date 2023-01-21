@@ -30,8 +30,8 @@ title = f'{Ncase}_shock_results'
 if rank == 0:
     if not os.path.isdir(title):
         os.mkdir(title)
-    if os.path.exists('./{title}/x.pickle'):
-        with open(f'./{title}/x.pickle', 'rb') as f:
+    if os.path.exists('./{title}/x.npy'):
+        with open(f'./{title}/x.npy', 'rb') as f:
             x = pickle.load(f)
 x = comm.bcast(x, root=0)
 
