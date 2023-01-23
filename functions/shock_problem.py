@@ -123,7 +123,7 @@ class ImpingingShock(Problem):
                     #analytic
                     work = [self.options["inputs"][k] for k in self.adind]
                     adgrads = self.prob.compute_totals(of=self.options["output"][0], wrt=work, return_format="array")
-                    self.gcur[i][self.adind] = adgrads[:,0]
+                    self.gcur[i][self.adind] = adgrads#[:,0]
                 else:
                     self.fcur[i] = np.nan
                     self.gcur[i][self.adind] = np.nan

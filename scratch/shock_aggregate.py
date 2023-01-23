@@ -34,7 +34,7 @@ plt.rcParams['font.size'] = '12'
 
 tot = 10000
 jump = 250
-nfiles = int(10000/250)
+nfiles = int(tot/jump)
 indlist = [[i*jump, (i+1)*jump] for i in range(nfiles)]
 
 
@@ -54,7 +54,7 @@ for key in indlist:
         fref = np.append(fref, pickle.load(f))
     with open(f'./{title}/g{key[0]}to{key[1]}.npy', 'rb') as f:
         gref = np.append(gref, pickle.load(f))
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
 xref = xref[1:]
 fref = fref[1:]
 gref = gref[1:]
