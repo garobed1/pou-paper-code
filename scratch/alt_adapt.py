@@ -143,7 +143,7 @@ errors = [erra0rms, erra1rms, erra2rms]
 
 for m in range(iters):
     xtrain = hist[rank][m][0][0]
-    ftrain = hist[rank][m][0][0]
+    ftrain = hist[rank][m][0][1]
     gtrain = np.zeros_like(xtrain)
     for j in range(dim):
         gtrain[:,j:j+1] = hist[rank][m][j+1][1]
