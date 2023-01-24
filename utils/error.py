@@ -55,7 +55,6 @@ def rmse(model, prob, N=5000, xdata=None, fdata=None):
     for i in range(N):
         work = tf[i] - vals[i]
         err += work*work
-        import pdb; pdb.set_trace()
     
     err = np.sqrt(err/N)
 
