@@ -109,7 +109,7 @@ modelbase1.options.update({"poly":ssettings["poly"]})
 modelbase1.options.update({"n_start":5})
 
 
-modelbase0 = POUHessian(bounds=xlimits)
+modelbase0 = POUHessian(bounds=xlimits, rscale=ssettings['rscale'])
 # modelbase.options.update({"hyper_opt":'TNC'})
 modelbase0.options.update({"rho":ssettings["rho"]})
 modelbase0.options.update({"neval":ssettings["neval"]})
@@ -148,6 +148,7 @@ for m in range(iters):
     for j in range(dim):
         gtrain[:,j:j+1] = hist[rank][m][j+1][1]
 
+    # import pdb; pdb.set_trace()
     for j in range(len(models)):
         models[j].set_training_values(xtrain, ftrain)
         if(isinstance(models[j], GEKPLS) or isinstance(models[j], POUSurrogate) or isinstance(models[j], DGEK) or isinstance(models[j], POUHessian)):

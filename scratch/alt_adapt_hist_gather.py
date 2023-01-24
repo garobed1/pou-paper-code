@@ -60,7 +60,7 @@ for i in range(nruns):
         full_hist[i].append(hist2[i][0][j])
 
 
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
 
 
 
@@ -69,7 +69,7 @@ if rank == 0:
     print("Saving Results")
 
 
-    with open(f'{title}/full_hist.pickle', 'rb') as f:
+    with open(f'{title}/full_hist.pickle', 'wb') as f:
         pickle.dump(full_hist, f)
 
 

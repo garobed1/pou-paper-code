@@ -111,7 +111,7 @@ modelbase1.options.update({"poly":ssettings["poly"]})
 modelbase1.options.update({"n_start":5})
 
 
-modelbase0 = POUHessian(bounds=xlimits)
+modelbase0 = POUHessian(bounds=xlimits, rscale=ssettings['rscale'])
 # modelbase.options.update({"hyper_opt":'TNC'})
 modelbase0.options.update({"rho":ssettings["rho"]})
 modelbase0.options.update({"neval":ssettings["neval"]})
