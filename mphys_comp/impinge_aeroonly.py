@@ -24,14 +24,24 @@ from baseclasses import AeroProblem
 # from tacs import elements, constitutive, functions
 
 # contains all options, aero, opt, struct, uq, warp
-import impinge_setup
+import mphys_comp.impinge_setup as default_impinge_setup
 
 # set these for convenience
 comm = MPI.COMM_WORLD
 rank = comm.rank
 
 class Top(Multipoint):
+
+    def _declare_options(self):
+        self.options.declare('problem_settings', default=default_impinge_setup,
+                             desc='default settings for the shock impingement problem, including solver settings.')    
+
+
     def setup(self):
+        self.impinge_setup = self.options["problem_settings"]
+
+        impinge_setup = self.impinge_setup
+
         opt_options = impinge_setup.optOptions
 
         ################################################################################
@@ -70,6 +80,8 @@ class Top(Multipoint):
         
 
     def configure(self):
+        impinge_setup = self.impinge_setup
+
         # create the aero problem 
         ap = AeroProblem(
             name=impinge_setup.probName,
@@ -105,21 +117,32 @@ class Top(Multipoint):
         self.add_objective("test.aero_post.cd_def")
 
 
-################################################################################
-# OpenMDAO setup
-################################################################################
-prob = om.Problem()
-prob.model = Top()
-prob.setup(mode='rev')
-om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
-prob.set_val("mach", impinge_setup.mach)
-prob.set_val("beta", 10.0)
-prob.run_model()
-prob.check_totals()
-#prob.check_partials()
+if __name__ == '__main__':
 
-#prob.model.list_outputs()
+    ################################################################################
+    # OpenMDAO setup
+    ################################################################################
+    problem_settings = default_impinge_setup
+    problem_settings.aeroOptions['L2Convergence'] = 1e-15
+    problem_settings.aeroOptions['printIterations'] = True
+    problem_settings.aeroOptions['printTiming'] = True
 
-if MPI.COMM_WORLD.rank == 0:
-    print("cd = %.15f" % prob["test.aero_post.cd_def"])
-#     prob.model.
+    aeroGridFile = f'../meshes/imp_mphys_73_73_25.cgns'
+    problem_settings.aeroOptions['gridFile'] = aeroGridFile
+
+
+    prob = om.Problem()
+    prob.model = Top(problem_settings=problem_settings)
+    prob.setup(mode='rev')
+    om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
+    prob.set_val("mach", default_impinge_setup.mach)
+    prob.set_val("beta", 10.0)
+    prob.run_model()
+    prob.check_totals()
+    #prob.check_partials()
+
+    #prob.model.list_outputs()
+
+    if MPI.COMM_WORLD.rank == 0:
+        print("cd = %.15f" % prob["test.aero_post.cd_def"])
+    #     prob.model.

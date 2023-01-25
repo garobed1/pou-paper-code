@@ -26,6 +26,11 @@ class ShockAngleComp(om.ExplicitComponent):
         self.declare_partials('mach1', 'shock_angle')
         self.declare_partials('P1', 'shock_angle')
         self.declare_partials('T1', 'shock_angle')
+        
+        self.declare_partials('flow_angle', 'mach0')
+        self.declare_partials('mach1', 'mach0')
+        self.declare_partials('P1', 'mach0')
+        self.declare_partials('T1', 'mach0')
 
     def compute(self, inputs, outputs):
 
@@ -72,6 +77,54 @@ class ShockAngleComp(om.ExplicitComponent):
         dm2s2_dsinsa = 2*M0*M0*sinsa
         dm2s2_ds = dm2s2_dsinsa*dsinsa_dsa*dsa_ds
 
+        dm2s2_dm0 = 2.*M0*sinsa*sinsa
+
+        ## MACH0
+        # Flow angle
+        w = (self.g + 1)*M0*M0/(2.*(m2s2 - 1.)) - 1.
+        dw_dm0 = (2.*(m2s2 - 1.))*(2*M0*(self.g + 1)) - ( (self.g + 1)*M0*M0)*2.*dm2s2_dm0
+        dw_dm0 /= (2.*(m2s2 - 1.))*(2.*(m2s2 - 1.))
+        w *= np.tan(sa)
+        dw_dm0 *= np.tan(sa)
+        a = np.arctan(1./w)
+        da_dwinv = (1./(1. + (1./w)**2))
+        dwinv_dw = -1./(w**2)
+        da_dm0 = da_dwinv*dwinv_dw*dw_dm0
+        J['flow_angle','mach0'] = da_dm0*180./np.pi
+
+        # Downstream mach number
+        wnumer = ((self.g - 1.)*m2s2 + 2.)
+        wdenom = (2.*self.g*m2s2 - (self.g -1))
+        w = wnumer/wdenom
+        dwnumer = (self.g - 1.)*dm2s2_dm0
+        dwdenom = 2.*self.g*dm2s2_dm0
+        dw_dm0 = (wdenom*dwnumer - wnumer*dwdenom)/(wdenom**2)
+        wnumer = w
+        dwnumer = dw_dm0
+        dwdenom = 2*np.sin(sa - a)*np.cos(sa - a)*(-da_dm0)
+        wdenom = (np.sin(sa - a)**2)
+        w = wnumer/wdenom
+        dw_dm0 = (wdenom*dwnumer - wnumer*dwdenom)/(wdenom**2)
+        J['mach1','mach0'] = (0.5/np.sqrt(w))*dw_dm0
+
+        # Downstream pressure
+        w = P0*(2*self.g*m2s2 - (self.g - 1))
+        dw_dm0 = P0*(2*self.g*dm2s2_dm0)
+        w /= (self.g + 1)
+        dw_dm0 /= (self.g + 1)
+        J['P1','mach0'] = dw_dm0
+
+        # Downstream temperature
+        wnumer = T0*(2.*self.g*m2s2 - (self.g - 1))*((self.g - 1)*m2s2 + 2.)
+        dwnumer = T0*(2.*self.g*dm2s2_dm0)*((self.g - 1)*m2s2 + 2.)
+        dwnumer +=  T0*(2.*self.g*m2s2 - (self.g - 1))* ((self.g - 1)*dm2s2_dm0)
+        wdenom = ((self.g+1)**2)*m2s2
+        dwdenom = ((self.g+1)**2)*dm2s2_dm0
+        dw_dm0 = (wdenom*dwnumer - wnumer*dwdenom)/(wdenom**2)
+        J['T1', 'mach0'] = dw_dm0
+
+
+        ## SHOCK ANGLE
         # Flow angle
         w = (self.g + 1)*M0*M0/(2.*(m2s2 - 1.)) - 1.
         dw = -(self.g + 1)*M0*M0/(2.*(m2s2 - 1.)**2)
@@ -117,10 +170,12 @@ class ShockAngleComp(om.ExplicitComponent):
         J['T1', 'shock_angle'] = (wdenom*dwnumer - wnumer*dwdenom)/(wdenom**2)
 
 
-# prob = om.Problem()
-# prob.model.add_subsystem('thing', ShockAngleComp())
+if __name__ == '__main__':
 
-# prob.setup()
-# prob.check_partials()
+    prob = om.Problem()
+    prob.model.add_subsystem('thing', ShockAngleComp())
+    
+    prob.setup()
+    prob.check_partials()
 
 

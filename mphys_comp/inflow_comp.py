@@ -71,11 +71,12 @@ class InflowComp(om.ExplicitComponent):
         J['Pressure', 'P0'] = 1.0
 
 
+if __name__ == '__main__':
 
-# prob = om.Problem()
-# prob.model.add_subsystem('thing', InflowComp())
-
-# prob.setup()
-# prob.check_partials()
+    prob = om.Problem()
+    prob.model.add_subsystem('thing', InflowComp())
+    
+    prob.setup()
+    prob.check_partials()
 
 

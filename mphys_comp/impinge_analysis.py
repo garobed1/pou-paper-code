@@ -146,9 +146,15 @@ class Top(Multipoint):
         ap.addDV("P",  name="pressure1")
 
         # set BC vars that are hard coded in the CGNS mesh, upstream properties
+        
+
         ap.setBCVar("Pressure", impinge_setup.P0, "inflow")
         ap.setBCVar("Density",  impinge_setup.r0, "inflow")
         ap.setBCVar("VelocityX", impinge_setup.VX, "inflow")
+
+        # ap.addDV("Pressure", name="Pressure", family="inflow")
+        # ap.addDV("Density", name="Density", family="inflow")
+        # ap.addDV("VelocityX", name="VelocityX", family="inflow")
 
         self.test.coupling.aero.mphys_set_ap(ap)
         self.test.aero_post.mphys_set_ap(ap)
@@ -207,6 +213,14 @@ if __name__ == '__main__':
     problem_settings.aeroOptions['printIterations'] = True
     problem_settings.aeroOptions['printTiming'] = True
 
+    aeroGridFile = f'../meshes/imp_mphys_73_73_25.cgns'
+    nelem = 30
+    problem_settings.nelem = nelem
+    problem_settings.aeroOptions['gridFile'] = aeroGridFile
+    problem_settings.structOptions['Nelem'] = nelem
+    problem_settings.structOptions['force'] = np.ones(nelem+1)*1.0
+    problem_settings.structOptions["th"] = np.ones(nelem+1)*0.0005
+
     prob = om.Problem()
     prob.model = Top(problem_settings=problem_settings)
     prob.setup(mode='rev')
@@ -220,19 +234,28 @@ if __name__ == '__main__':
     #for i in range(10):
     #prob.set_val("M0", x[i])
     prob.set_val("shock_angle", 25.)
+    
+    # import pdb; pdb.set_trace()
     #prob.model.approx_totals()
     prob.run_model()
-    y0 = prob.get_val("test.aero_post.cd_def")
+    import copy
+    y0 = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
     #totals1 = prob.compute_totals(wrt='rsak')
     #prob.model.approx_totals()
-    totals2 = prob.compute_totals(of='test.aero_post.cd_def', wrt='shock_angle')
+    totals2 = prob.compute_totals(of='test.aero_post.cd_def', wrt=['shock.mach1','shock_angle','rsak'])
 
     h = 1e-8
-    prob.set_val("shock_angle", 25.+h)
-    prob.run_model()
-    y1 = prob.get_val("test.aero_post.cd_def")
-    fd = (y1-y0)/h
 
+    prob.set_val("rsak", 0.41 + h)
+    prob.run_model()
+    y1k = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
+    prob.set_val("rsak", 0.41)
+    prob.set_val("shock.mach1", default_impinge_setup.mach+h)
+    prob.run_model()
+    y1s = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
+    
+    fds = (y1s-y0)/h
+    fdk = (y1k - y0)/h
 
     #prob.check_partials()
     import pdb; pdb.set_trace()

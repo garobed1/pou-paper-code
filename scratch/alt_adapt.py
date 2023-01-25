@@ -155,6 +155,36 @@ for m in range(iters):
             for i in range(dim):
                 models[j].set_training_derivatives(xtrain, gtrain[:,i:i+1], i)
         models[j].train()
+
+        ndir = 150
+        xlimits = trueFunc.xlimits
+        x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+        y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
+
+        X, Y = np.meshgrid(x, y)
+        Za = np.zeros([ndir, ndir])
+
+        for o in range(ndir):
+            for p in range(ndir):
+                xi = np.zeros([1,2])
+                xi[0,0] = x[o]
+                xi[0,1] = y[p]
+                Za[p,o] = models[j].predict_values(xi)
+
+
+        cs = plt.contourf(X, Y, Za, levels = 40)
+        plt.colorbar(cs, aspect=20)
+        plt.xlabel(r"$x_1$")
+        plt.ylabel(r"$x_2$")
+        #plt.legend(loc=1)
+        nt0 = 20
+        plt.plot(xtrain[0:nt0,0], xtrain[0:nt0,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+        plt.plot(xtrain[nt0:,0], xtrain[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
+        plt.savefig(f"{title}/2d_errcon_a.pdf", bbox_inches="tight")
+        plt.clf()
+
+        import pdb; pdb.set_trace()
+
         errors[j].append(rmse(models[j], trueFunc, N=Nerr, xdata=xref, fdata=fref))
 
 

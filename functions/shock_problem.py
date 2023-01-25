@@ -42,7 +42,7 @@ class ImpingingShock(Problem):
 
         # list of inputs we would need to finite difference
         self.fdlist = ['M0', 'P0', 'T0', 'shock_angle']
-        self.fdlist = [] # try this? and lower tolerance on solver
+        # self.fdlist = [] # try this? and lower tolerance on solver
 
         # list of inputs we can get exact derivatives for
         #self.adlist = self.options["inputs"]
@@ -131,11 +131,11 @@ class ImpingingShock(Problem):
                 
                 
                 #finite diff
-                # for key in self.fdind:
-                #     self.prob.set_val(self.options["inputs"][key], x[i, key] + h)
-                #     self.prob.run_model()
-                #     self.gcur[i][key] = (self.prob.get_val(self.options["output"][0]) - self.fcur[i])/h
-                #     self.prob.set_val(self.options["inputs"][key], x[i, key])
+                for key in self.fdind:
+                    self.prob.set_val(self.options["inputs"][key], x[i, key] + h)
+                    self.prob.run_model()
+                    self.gcur[i][key] = (self.prob.get_val(self.options["output"][0]) - self.fcur[i])/h
+                    self.prob.set_val(self.options["inputs"][key], x[i, key])
 
 
             self.fcur = self.comm.allreduce(self.fcur)

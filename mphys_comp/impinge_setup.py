@@ -96,7 +96,7 @@ aeroOptions = { #ADflow aero solver options
     'meshSurfaceFamily':'customSurface',
     'designSurfaceFamily':'wall2',
     # Adjoint options
-    'adjointL2Convergence': 1e-06,
+    'adjointL2Convergence': 1e-09,
     # Output
     'volumeVariables':['eddyratio','mach','cp','temp'],
     'surfaceVariables':['yplus','cf','cp','cfx','cfy','cfz'],
