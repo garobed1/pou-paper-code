@@ -32,10 +32,31 @@ if not os.path.isdir(title):
 plt.rcParams['font.size'] = '12'
 #indlist = [[0, 96], [96, 192], [192, 288], [288, 384], [384,388], [388,580], [868,1156], [1156,1444],[2884, 3172], [3172, 5000]]
 
-tot = 10000
-jump = 250
-nfiles = int(tot/jump)
-indlist = [[i*jump, (i+1)*jump] for i in range(nfiles)]
+tot1 = 5500
+jump1 = 250
+nfiles1 = int(tot1/jump1)
+
+tot2 = 6000
+jump2 = 100
+nfiles2 = int((tot2-tot1)/jump2)
+
+tot3 = 9000
+jump3 = 250
+nfiles3 = int((tot3-tot2)/jump3)
+
+tot4 = 9500
+jump4 = 100
+nfiles4 = int((tot4-tot3)/jump4)
+
+tot5 = 10000
+jump5 = 250
+nfiles5 = int((tot5-tot4)/jump5)
+
+indlist = [[i*jump1, (i+1)*jump1] for i in range(nfiles1)]
+indlist.append([i*jump2, (i+1)*jump2] for i in range(nfiles2))
+indlist.append([i*jump3, (i+1)*jump3] for i in range(nfiles3))
+indlist.append([i*jump4, (i+1)*jump4] for i in range(nfiles4))
+indlist.append([i*jump5, (i+1)*jump5] for i in range(nfiles5))
 
 
 ### X

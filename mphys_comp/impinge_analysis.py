@@ -185,6 +185,17 @@ class Top(Multipoint):
         self.connect("shock.T1", "test.aero_post.temp1")
         self.connect("shock.P1", "test.coupling.aero.pressure1")
         self.connect("shock.P1", "test.aero_post.pressure1")
+
+        self.add_design_var("shock_angle")
+        # self.add_design_var("M0")
+        # self.add_design_var('P0')
+        # self.add_design_var('T0')
+        # self.add_design_var('M1')
+        # self.add_design_var('P1')
+        # self.add_design_var('T1')
+
+        # self.add_objective("test.aero_post.cdv")
+        self.add_objective("test.aero_post.cd_def")
         #self.add_design_var("mach", lower=2.0, upper=2.5)
         #self.add_design_var("dv_struct")
         #self.add_design_var("shock_angle")
@@ -203,7 +214,7 @@ class Top(Multipoint):
         # self.add_design_var("rsak")
         # self.add_design_var("M0")
         # self.add_design_var("shock_angle")
-        # self.add_objective("test.aero_post.cd_def")
+        
 
 
 # use as scratch space for playing around
@@ -238,24 +249,26 @@ if __name__ == '__main__':
     # import pdb; pdb.set_trace()
     #prob.model.approx_totals()
     prob.run_model()
-    import copy
-    y0 = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
-    #totals1 = prob.compute_totals(wrt='rsak')
-    #prob.model.approx_totals()
-    totals2 = prob.compute_totals(of='test.aero_post.cd_def', wrt=['shock.mach1','shock_angle','rsak'])
+    # import copy
+    # y0 = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
+    # #totals1 = prob.compute_totals(wrt='rsak')
+    # #prob.model.approx_totals()
+    # totals2 = prob.compute_totals(of='test.aero_post.cd_def', wrt=['shock.mach1','shock_angle','rsak'])
 
-    h = 1e-8
+    # h = 1e-8
 
-    prob.set_val("rsak", 0.41 + h)
-    prob.run_model()
-    y1k = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
-    prob.set_val("rsak", 0.41)
-    prob.set_val("shock.mach1", default_impinge_setup.mach+h)
-    prob.run_model()
-    y1s = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
+    # prob.set_val("rsak", 0.41 + h)
+    # prob.run_model()
+    # y1k = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
+    # prob.set_val("rsak", 0.41)
+    # prob.set_val("shock.mach1", default_impinge_setup.mach+h)
+    # prob.run_model()
+    # y1s = copy.deepcopy(prob.get_val("test.aero_post.cd_def"))
     
-    fds = (y1s-y0)/h
-    fdk = (y1k - y0)/h
+    # fds = (y1s-y0)/h
+    # fdk = (y1k - y0)/h
+
+    prob.check_totals(step_calc='rel_avg')
 
     #prob.check_partials()
     import pdb; pdb.set_trace()
