@@ -25,43 +25,34 @@ usetead = False
 
 title = "10000_shock_results"
 
-if not os.path.isdir(title):
-    os.mkdir(title)
+
+
+title_aux = "AUX_10000_shock_results"
 
 
 plt.rcParams['font.size'] = '12'
 #indlist = [[0, 96], [96, 192], [192, 288], [288, 384], [384,388], [388,580], [868,1156], [1156,1444],[2884, 3172], [3172, 5000]]
 
-tot1 = 5500
-jump1 = 250
-nfiles1 = int(tot1/jump1)
+totlist = [5500, 5600, 5650, 5700, 6000, 9000, 9050, 9100, 9500, 10000]
+jumplist = [250, 100, 50, 50, 100, 250, 50, 50, 100, 250]
+nX = len(totlist)
+nfileslist = [int(totlist[0]/jumplist[0])]
+for i in range(nX-1):
+    nfileslist.append(int((totlist[i+1]-totlist[i])/jumplist[i+1]))
 
-tot2 = 6000
-jump2 = 100
-nfiles2 = int((tot2-tot1)/jump2)
-
-tot3 = 9000
-jump3 = 250
-nfiles3 = int((tot3-tot2)/jump3)
-
-tot4 = 9500
-jump4 = 100
-nfiles4 = int((tot4-tot3)/jump4)
-
-tot5 = 10000
-jump5 = 250
-nfiles5 = int((tot5-tot4)/jump5)
-
-indlist = [[i*jump1, (i+1)*jump1] for i in range(nfiles1)]
-indlist.append([i*jump2, (i+1)*jump2] for i in range(nfiles2))
-indlist.append([i*jump3, (i+1)*jump3] for i in range(nfiles3))
-indlist.append([i*jump4, (i+1)*jump4] for i in range(nfiles4))
-indlist.append([i*jump5, (i+1)*jump5] for i in range(nfiles5))
+indlist = []
+totlist.insert(0, 0)
+for i in range(nX):
+    for j in range(nfileslist[i]):
+        indlist.append([totlist[i]+j*jumplist[i], totlist[i]+(j+1)*jumplist[i]])
 
 
 ### X
 with open(f'./{title}/x.npy', 'rb') as f:
     xreffull = pickle.load(f)
+
+with open(f'./{title_aux}/AUX_x.npy', 'rb') as f:
+    xrefaux = pickle.load(f)
 
 ### F, G
 fref = None
@@ -70,11 +61,18 @@ xref = None
 total = 0
 for key in indlist:
     total += key[1] - key[0]
-    xref = np.append(xref, xreffull[key[0]:key[1]])
-    with open(f'./{title}/y{key[0]}to{key[1]}.npy', 'rb') as f:
-        fref = np.append(fref, pickle.load(f))
-    with open(f'./{title}/g{key[0]}to{key[1]}.npy', 'rb') as f:
-        gref = np.append(gref, pickle.load(f))
+    if(key[0] == 5650 or key[0] == 9000):
+        xref = np.append(xref, xrefaux[key[0]:key[1]])
+        with open(f'./{title_aux}/y{key[0]}to{key[1]}.npy', 'rb') as f:
+            fref = np.append(fref, pickle.load(f))
+        with open(f'./{title_aux}/g{key[0]}to{key[1]}.npy', 'rb') as f:
+            gref = np.append(gref, pickle.load(f))
+    else:
+        xref = np.append(xref, xreffull[key[0]:key[1]])
+        with open(f'./{title}/y{key[0]}to{key[1]}.npy', 'rb') as f:
+            fref = np.append(fref, pickle.load(f))
+        with open(f'./{title}/g{key[0]}to{key[1]}.npy', 'rb') as f:
+            gref = np.append(gref, pickle.load(f))
 # import pdb; pdb.set_trace()
 xref = xref[1:]
 fref = fref[1:]

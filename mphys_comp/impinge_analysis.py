@@ -186,7 +186,7 @@ class Top(Multipoint):
         self.connect("shock.P1", "test.coupling.aero.pressure1")
         self.connect("shock.P1", "test.aero_post.pressure1")
 
-        self.add_design_var("shock_angle")
+        # self.add_design_var("shock_angle")
         # self.add_design_var("M0")
         # self.add_design_var('P0')
         # self.add_design_var('T0')
@@ -195,7 +195,7 @@ class Top(Multipoint):
         # self.add_design_var('T1')
 
         # self.add_objective("test.aero_post.cdv")
-        self.add_objective("test.aero_post.cd_def")
+        # self.add_objective("test.aero_post.cd_def")
         #self.add_design_var("mach", lower=2.0, upper=2.5)
         #self.add_design_var("dv_struct")
         #self.add_design_var("shock_angle")
