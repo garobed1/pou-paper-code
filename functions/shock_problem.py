@@ -105,7 +105,7 @@ class ImpingingShock(Problem):
         """
         ne, nx = x.shape
         y = np.zeros((ne, 1), complex)
-        h = 1e-6
+        h = 1e-8
         #import pdb; pdb.set_trace()
         if(not np.array_equal(x, self.xcur)): # Don't recompute if we already have the answer for the given inputs
             self.xcur = x
