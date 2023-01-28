@@ -19,6 +19,9 @@ import matplotlib as mpl
 import matplotlib.ticker as mticker
 from smt.sampling_methods import LHS
 
+from scipy.spatial import KDTree
+
+
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
@@ -42,6 +45,8 @@ with open(f'{title2}/xref.pickle', 'rb') as f:
     xref = pickle.load(f)
 with open(f'{title2}/fref.pickle', 'rb') as f:
     fref = pickle.load(f)
+with open(f'{title2}/gref.pickle', 'rb') as f:
+    gref = pickle.load(f)
     
 xref = np.array(xref, dtype=np.float64)
 fref = np.array(fref, dtype=np.float64)
@@ -148,7 +153,7 @@ for m in range(iters):
     for j in range(dim):
         gtrain[:,j:j+1] = hist[rank][m][j+1][1]
 
-    # import pdb; pdb.set_trace()
+
     for j in range(len(models)):
         models[j].set_training_values(xtrain, ftrain)
         if(isinstance(models[j], GEKPLS) or isinstance(models[j], POUSurrogate) or isinstance(models[j], DGEK) or isinstance(models[j], POUHessian)):
@@ -156,36 +161,37 @@ for m in range(iters):
                 models[j].set_training_derivatives(xtrain, gtrain[:,i:i+1], i)
         models[j].train()
 
-        ndir = 150
-        xlimits = trueFunc.xlimits
-        x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
-        y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
+        if(ftrain.shape[0] > 1000):
+            ndir = 150
+            xlimits = trueFunc.xlimits
+            x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+            y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
 
-        X, Y = np.meshgrid(x, y)
-        Za = np.zeros([ndir, ndir])
+            X, Y = np.meshgrid(x, y)
+            Za = np.zeros([ndir, ndir])
 
-        for o in range(ndir):
-            for p in range(ndir):
-                xi = np.zeros([1,2])
-                xi[0,0] = x[o]
-                xi[0,1] = y[p]
-                Za[p,o] = models[j].predict_values(xi)
+            for o in range(ndir):
+                for p in range(ndir):
+                    xi = np.zeros([1,2])
+                    xi[0,0] = x[o]
+                    xi[0,1] = y[p]
+                    Za[p,o] = models[j].predict_values(xi)
 
 
-        cs = plt.contourf(X, Y, Za, levels = 40)
-        plt.colorbar(cs, aspect=20)
-        plt.xlabel(r"$x_1$")
-        plt.ylabel(r"$x_2$")
-        #plt.legend(loc=1)
-        nt0 = 20
-        plt.plot(xtrain[0:nt0,0], xtrain[0:nt0,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
-        plt.plot(xtrain[nt0:,0], xtrain[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
-        plt.savefig(f"{title}/2d_errcon_a.pdf", bbox_inches="tight")
-        plt.clf()
+            cs = plt.contourf(X, Y, Za, levels = 40)
+            plt.colorbar(cs, aspect=20)
+            plt.xlabel(r"$x_1$")
+            plt.ylabel(r"$x_2$")
+            #plt.legend(loc=1)
+            nt0 = 20
+            plt.plot(xtrain[0:nt0,0], xtrain[0:nt0,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+            plt.plot(xtrain[nt0:,0], xtrain[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
+            plt.savefig(f"{title}/2d_errcon_a.pdf", bbox_inches="tight")
+            plt.clf()
 
-        import pdb; pdb.set_trace()
 
         errors[j].append(rmse(models[j], trueFunc, N=Nerr, xdata=xref, fdata=fref))
+    
 
 
 errors = comm.allgather(errors)

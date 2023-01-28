@@ -215,7 +215,6 @@ for s in range(size):
         ftrain0[cases[s][n]] = ftrain0lists[s][n]
         gtrain0[cases[s][n]] = gtrain0lists[s][n]
 
-
 # xtrain0 = comm.bcast(xtrain0, root=0)
 # ftrain0 = comm.bcast(ftrain0, root=0)
 # gtrain0 = comm.bcast(gtrain0, root=0)
@@ -296,19 +295,20 @@ if fresh:
         modelbase.options.update({"n_start":5})
     modelbase.options.update({"print_global":False})
 
-    model0 = []
-    co = 0
 
-    for n in cases[rank]: #range(Nruns):
-        model0.append(copy.deepcopy(modelbase))
-        model0[co].set_training_values(xtrain0[n], ftrain0[n])
-        if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK) or isinstance(model0[co], POUHessian)):
-            for i in range(dim):
-                model0[co].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
-        model0[co].train()
-        co += 1
 else:
     modelbase = copy.deepcopy(model0[0])
+
+model0 = []
+co = 0
+for n in cases[rank]: #range(Nruns):
+    model0.append(copy.deepcopy(modelbase))
+    model0[co].set_training_values(xtrain0[n], ftrain0[n])
+    if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK) or isinstance(model0[co], POUHessian)):
+        for i in range(dim):
+            model0[co].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
+    model0[co].train()
+    co += 1
     # modelbase.options.update({"print_training":True})
     # modelbase.options.update({"print_prediction":True})
     # modelbase.options.update({"print_problem":True})

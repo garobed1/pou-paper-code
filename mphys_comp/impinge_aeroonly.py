@@ -76,7 +76,7 @@ class Top(Multipoint):
         # self.add_subsystem("shock", ShockAngleComp())
 
         # # component to determine pre-shock flow properties for ADFlow
-        self.add_subsystem("upstream", InflowComp())
+        # self.add_subsystem("upstream", InflowComp())
 
         nonlinear_solver = om.NonlinearBlockGS(maxiter=25, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
         linear_solver = om.LinearBlockGS(maxiter=25, iprint=2, use_aitken=True, rtol=1e-14, atol=1e-14)
@@ -156,7 +156,7 @@ class Top(Multipoint):
         # self.connect("shock.flow_angle", "test.aero_post.beta")
         # self.connect("shock.T1", "test.aero_post.temperature1")
         # self.connect("shock.P1", "test.aero_post.pressure1")
-        self.connect("P0", "test.coupling.aero.Pressure")
+        # self.connect("P0", "test.coupling.aero.Pressure")
         self.connect("P0", "test.aero_post.Pressure")
 
 
@@ -164,7 +164,7 @@ class Top(Multipoint):
         self.add_design_var("beta")
         self.add_design_var("P")
         self.add_design_var("T")
-        self.add_design_var("Pressure")
+        self.add_design_var("P0")
         # self.add_design_var("M0")
         # self.add_objective("test.aero_post.cdv")
         # self.add_design_var("shock_angle")
