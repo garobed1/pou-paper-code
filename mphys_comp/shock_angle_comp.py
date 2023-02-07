@@ -169,7 +169,6 @@ class ShockAngleComp(om.ExplicitComponent):
         dwdenom = ((self.g+1)**2)*dm2s2_ds
         J['T1', 'shock_angle'] = (wdenom*dwnumer - wnumer*dwdenom)/(wdenom**2)
 
-
 if __name__ == '__main__':
 
     prob = om.Problem()

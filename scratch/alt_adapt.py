@@ -89,7 +89,7 @@ if(dim > 1):
     modelbase2.options.update({"theta_bounds":ssettings["tb"]})
     modelbase2.options.update({"n_comp":dim})
     modelbase2.options.update({"extra_points":ssettings["extra"]})
-    modelbase2.options.update({"corr":ssettings["corr"]})#ssettings["corr"]})
+    modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
     modelbase2.options.update({"poly":ssettings["poly"]})
     modelbase2.options.update({"n_start":5})
     if(dim > 2):
@@ -99,7 +99,7 @@ else:
     #modelgek.options.update({"hyper_opt":"TNC"})
     modelbase2.options.update({"theta0":ssettings["t0"]})
     modelbase2.options.update({"theta_bounds":ssettings["tb"]})
-    modelbase2.options.update({"corr":ssettings["corr"]})#})
+    modelbase2.options.update({"corr":"squar_exp"})#})
     modelbase2.options.update({"poly":ssettings["poly"]})
     modelbase2.options.update({"n_start":5})
     modelbase2.options.update({"print_prediction":False})
@@ -109,7 +109,7 @@ modelbase1 = KRG()
 # modelbase.options.update({"hyper_opt":'TNC'})
 modelbase1.options.update({"theta0":ssettings["t0"]})
 modelbase1.options.update({"theta_bounds":ssettings["tb"]})
-modelbase1.options.update({"corr":ssettings["corr"]})#ssettings["corr"]})
+modelbase1.options.update({"corr":"squar_exp"})#ssettings["corr"]})
 modelbase1.options.update({"poly":ssettings["poly"]})
 modelbase1.options.update({"n_start":5})
 
@@ -161,7 +161,7 @@ for m in range(iters):
                 models[j].set_training_derivatives(xtrain, gtrain[:,i:i+1], i)
         models[j].train()
 
-        if(ftrain.shape[0] > 1000):
+        if(ftrain.shape[0] > 0):
             ndir = 150
             xlimits = trueFunc.xlimits
             x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
@@ -188,6 +188,7 @@ for m in range(iters):
             plt.plot(xtrain[nt0:,0], xtrain[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
             plt.savefig(f"{title}/2d_errcon_a.pdf", bbox_inches="tight")
             plt.clf()
+            import pdb; pdb.set_trace()
 
 
         errors[j].append(rmse(models[j], trueFunc, N=Nerr, xdata=xref, fdata=fref))

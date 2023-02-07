@@ -1,12 +1,12 @@
 
-header = "pou_paper_hess"
+header = "pou_TESTFAKE2_hess"
 path = None
 skip_LHS = True 
 LHS_batch = 7
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "shock"    #problem
+prob  = "fakeshock"    #problem
 dim = 2     #problem dimension
 
 
@@ -31,7 +31,7 @@ rho = 10           #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = 10       #number of points to add
+ntr = 200      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000*dim       #number of test points to evaluate the error
