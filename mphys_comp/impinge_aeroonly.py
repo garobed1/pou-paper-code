@@ -65,10 +65,14 @@ class Top(Multipoint):
 
         aero_builder = ADflowBuilder(options=aero_options,  scenario="aerodynamic", def_surf=def_surf, struct_surf=struct_surf) #mesh_options=warp_options,
         aero_builder.initialize(self.comm)
-        aero_builder.solver.addFunction('cd','wall2','cd_def')
-        aero_builder.solver.addFunction('cdv','wall2','cdv_def')
-        aero_builder.solver.addFunction('cdp','wall2','cdp_def')
-        aero_builder.solver.addFunction('cdm','wall2','cdm_def')
+        # aero_builder.solver.addFunction('cd','wall2','cd_def')
+        # aero_builder.solver.addFunction('cdv','wall2','cdv_def')
+        # aero_builder.solver.addFunction('cdp','wall2','cdp_def')
+        # aero_builder.solver.addFunction('cdm','wall2','cdm_def')
+        aero_builder.solver.addFunction('drag','allWalls','d_def')
+        aero_builder.solver.addFunction('dragviscous','allWalls', 'dv_def')
+        aero_builder.solver.addFunction('dragpressure','allWalls','dp_def')
+        aero_builder.solver.addFunction('dragmomentum','allWalls','dm_def')
         # aero_builder.solver.addFunction('cd',aero_builder.solver.allWallsGroup,'cd_def')
         # aero_builder.solver.addFunction('cdv',aero_builder.solver.allWallsGroup,'cdv_def')
         # aero_builder.solver.addFunction('cdp',aero_builder.solver.allWallsGroup,'cdp_def')
@@ -129,7 +133,9 @@ class Top(Multipoint):
             chordRef = 1.0,
             P = impinge_setup.P, 
             T = impinge_setup.T, 
-            evalFuncs=["cd_def", "cdv_def","cdm_def","cdp_def"]
+            # evalFuncs=["cd_def", "cdv_def","cdm_def","cdp_def"]
+            evalFuncs=["d_def", "dv_def","dm_def","dp_def"]
+            # evalFuncs=["drag", "dragviscous","dragpressure","dragmomentum"]
         )    
 
 
@@ -198,16 +204,21 @@ if __name__ == '__main__':
     ################################################################################
 
     use_shock = False
-    use_inflow = True
+    use_inflow = False
     full_far = False
 
     problem_settings = default_impinge_setup
-    problem_settings.aeroOptions['equationType'] = 'laminar NS'
+    # problem_settings.aeroOptions['equationType'] = 'laminar NS'
+    problem_settings.aeroOptions['equationType'] = 'Euler'
+    # problem_settings.aeroOptions['NKSwitchTol'] = 1e-6 #1e-6
     problem_settings.aeroOptions['NKSwitchTol'] = 1e-3 #1e-6
     problem_settings.aeroOptions['nCycles'] = 5000000
+
     problem_settings.aeroOptions['L2Convergence'] = 1e-15
-    problem_settings.aeroOptions['printIterations'] = True
+    problem_settings.aeroOptions['printIterations'] = False
     problem_settings.aeroOptions['printTiming'] = True
+
+    # problem_settings.mach = 4.
 
     if full_far:
         aeroGridFile = f'../meshes/imp_TEST_73_73_25.cgns'
@@ -224,13 +235,22 @@ if __name__ == '__main__':
     prob.model.add_design_var("P1")
     prob.model.add_design_var("T1")
     # prob.model.add_design_var("P0")
-    prob.model.add_design_var("M0")
+    # prob.model.add_design_var("M0")
+    prob.model.add_design_var("vx0")
     # prob.model.add_design_var("T0")
     # prob.model.add_design_var("shock_angle")
-    prob.model.add_objective("test.aero_post.cd_def")
-    prob.model.add_objective("test.aero_post.cdv_def")
-    prob.model.add_objective("test.aero_post.cdp_def")
-    prob.model.add_objective("test.aero_post.cdm_def")
+    # prob.model.add_objective("test.aero_post.cd_def")
+    # prob.model.add_objective("test.aero_post.cdv_def")
+    # prob.model.add_objective("test.aero_post.cdp_def")
+    # prob.model.add_objective("test.aero_post.cdm_def")
+    prob.model.add_objective("test.aero_post.d_def")
+    prob.model.add_objective("test.aero_post.dv_def")
+    prob.model.add_objective("test.aero_post.dp_def")
+    prob.model.add_objective("test.aero_post.dm_def")
+    # prob.model.add_objective("test.aero_post.drag")
+    # prob.model.add_objective("test.aero_post.dragviscous")
+    # prob.model.add_objective("test.aero_post.dragpressure")
+    # prob.model.add_objective("test.aero_post.dragmomentum")
 
     prob.setup(mode='rev')
     om.n2(prob, show_browser=False, outfile="mphys_as_adflow_eb_%s_2pt.html")
@@ -255,7 +275,7 @@ if __name__ == '__main__':
     # prob.model.test.coupling.solver.solver.evalFunctionsSens(prob.model.test.coupling.solver.ap, funcDerivs)
 
     prob.check_totals(step_calc='rel_avg')
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 
     #prob.model.list_outputs()
 

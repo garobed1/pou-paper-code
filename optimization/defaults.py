@@ -29,7 +29,7 @@ DefaultOptOptions = {
     "gpop":15, 
     "gtol":0.01,
     "liter":100,
-    "ltol":None,
+    "ltol":1e-6,
     "errorcheck":None,
     "multistart":2
 }

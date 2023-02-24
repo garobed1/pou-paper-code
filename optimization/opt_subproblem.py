@@ -3,6 +3,16 @@ import numpy as np
 from optimization.optimizers import optimize
 from optimization.robust_objective import RobustQuantity
 
+from smt.utils.options_dictionary import OptionsDictionary
+
+
+try:
+    import pyoptsparse
+    Optimization = pyoptsparse.Optimization
+except ImportError:
+    Optimization = None
+    pyoptsparse = None
+
 class OptSubproblem():
     """
     Base class that defines a generic optimization subproblem, i.e. 
@@ -41,12 +51,15 @@ class OptSubproblem():
         self.cons = [] #empty list
         self.dcons = []
 
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
+
+
     def _declare_options(self):
         self.options.declare('optimizer', default=optimize,
                              desc='function handle ')    
 
 
-    def set_objective(self, func, grad=None, min=):
+    def set_objective(self, func, grad=None):
         """
         Set objective function/function handle
 
@@ -91,14 +104,27 @@ class OptSubproblem():
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
             raise ValueError(msg.format(self.msginfo, name))
     
-    def set_optimizer(self, opt):
+    def set_optimizer(self, opt=optimize):
         """
         Set the optimization object that solves the subproblem.
         """
+
         self.optimizer = opt
-        self.options["optimizer"] = self.optimizer
+        
+        # scipy optimizer
+        if callable(opt):
+            self.options["optimizer"] = 'scipy'
+        # pyOptSparse optimizer
+        elif isinstance(opt, Optimization):
+            self.options["optimizer"] = 'pyoptsparse'
+            if opt is None:
+                raise RuntimeError("pyOptSparse not installed!")
 
+        else:
+            raise RuntimeError("Invalid optimizer")
 
+        # actual call that prepares things
+        self._setup_optimization()
     
     def solve_subproblem(self):
         """
@@ -108,4 +134,27 @@ class OptSubproblem():
         """
         pass
 
+    def eval_truth(self, zk)
+        """
+        At the end of optimization, evaluate the "truth" model for comparison
+        or approval, and use the result to take action
+        """
 
+        pass
+
+
+    def _setup_optimization(self):
+        """
+        Set up arguments, settings, objectives, constraints, etc. for either 
+        the scipy optimization call or the pyOptSparse object, similar to how 
+        the OpenMDAO drivers do it
+        
+        """
+
+        # for scipy, set up a dictionary of arguments
+        if self.options["optimizer"] == 'scipy':
+            pass
+
+        # for pyoptsparse, call setup functions
+        if self.options["optimizer"] == 'pyoptsparse':
+            pass

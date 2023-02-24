@@ -1,5 +1,5 @@
 
-header = "pou_TESTFAKE2_hess"
+header = "pou_TESTFAKE3_hess"
 path = None
 skip_LHS = True 
 LHS_batch = 7
@@ -31,7 +31,7 @@ rho = 10           #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = 200      #number of points to add
+ntr = 5      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000*dim       #number of test points to evaluate the error

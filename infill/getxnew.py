@@ -8,6 +8,7 @@ from surrogate.direct_gek import DGEK
 from scipy.stats import qmc
 from surrogate.pougrad import POUSurrogate
 from utils.error import rmse, meane, full_error
+from utils.sutils import convert_to_smt_grads
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -132,15 +133,16 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
         # add the new points to the model
         t0 = np.append(t0, xnew, axis=0)
         f0 = np.append(f0, func(xnew), axis=0)
-        g0 = np.append(g0, np.zeros([xnew.shape[0], xnew.shape[1]]), axis=0)
-        for j in range(dim):
-            g0[nt:,j] = func(xnew, j)[:,0]
-
+        g0 = np.append(g0, convert_to_smt_grads(func, xnew), axis=0)
+        # g0 = np.append(g0, np.zeros([xnew.shape[0], xnew.shape[1]]), axis=0)
+        # for j in range(dim):
+        #     g0[nt:,j] = func(xnew, j)[:,0]
 
         model.set_training_values(t0, f0)
-        if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate) or isinstance(model0, DGEK)):
-            for j in range(dim):
-                model.set_training_derivatives(t0, g0[:,j], j)
+        convert_to_smt_grads(model, t0, g0)
+        # if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate) or isinstance(model0, DGEK)):
+        #     for j in range(dim):
+        #         model.set_training_derivatives(t0, g0[:,j], j)
         model.train()
 
         # evaluate errors

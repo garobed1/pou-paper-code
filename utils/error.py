@@ -2,12 +2,28 @@ import numpy as np
 from smt.sampling_methods import LHS
 from scipy.stats import uniform, norm, beta, truncnorm
 
+from smt.utils.options_dictionary import OptionsDictionary
+from utils.stat_comps import _mu_sigma_comp, _mu_sigma_grad
 
+#TODO: Need a way to overload this for stochastic collocation weights, e.g.
 _pdf_handle = {
     "uniform":uniform,
     "norm":norm,
     "beta":beta
 }
+
+_stat_handle = {
+    "mu_sigma":_mu_sigma_comp,
+}
+
+_stat_handle_grad = {
+    "mu_sigma":_mu_sigma_grad,
+}
+
+
+
+
+
 
 def rmse(model, prob, N=5000, xdata=None, fdata=None):
     """
@@ -66,10 +82,12 @@ def rmse(model, prob, N=5000, xdata=None, fdata=None):
 # keeping func name to retain compatibility
 def meane(model, prob, N=5000, xdata=None, fdata=None, return_values=False):
 
-    rval1, rval2, rval3, rval4, rval5, rval6 = stat_comp(model, prob, N=N, xdata=xdata, fdata=fdata, pdfs=["uniform"], compute_error = not return_values)
+    err_tup, t_tup, m_tup = stat_comp(model, prob, stat_type="mu_sigma", N=N, xdata=xdata, fdata=fdata, pdfs=["uniform"], compute_error = not return_values)
+    rval1 = err_tup[0]
+    rval2 = err_tup[1]
     return rval1, rval2
 
-def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], compute_error=False):
+def stat_comp(model, prob, stat_type="mu_sigma", N=5000, xdata=None, fdata=None, pdfs=["uniform"], compute_error=False, get_grad=False):
     """
     Compute the mean and standard deviation of a function using either the function itself or a surrogate, along with its error
     if reference values or data are available.
@@ -82,8 +100,9 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
 
         prob : smt problem object
         N : number of points to evaluate the error
-        xdata : predefined set of points to compute statistics
-            NOTE: If xdata is provided, static input dimensions should not vary and should match the corresponding value in pdfs
+        xdata : ndarray or RobustSampler
+            predefined set of points to compute statistics
+            NOTE: If xdata is provided as an array, static input dimensions should not vary and should match the corresponding value in pdfs
         fdata : predefined true function data for the given xdata
 
         TODO: separate set of args for error comparison?
@@ -93,13 +112,22 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
             if str, consider all variables in that way
         compute_error : return error in addition to statistics
 
+        get_grad : return gradient of outputs of interest
+
     Outputs:
-        
+        tuple of outputs or output gradients
     """
     
     xlimits = prob.xlimits
 
     dim = len(xlimits)#tx.shape[1]
+
+    using_sampler= False
+
+    from optimization.robust_objective import RobustSampler
+    if isinstance(xdata, RobustSampler):
+        using_sampler = True
+
 
     # if pdfs is of length 1, treat each variable the same
     if isinstance(pdfs, str):
@@ -112,6 +140,7 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
     # get scales for uncertain variables, and preset pdf funcs for each
     #TODO: find a way to deal with normal dist/truncated normal at least
     pdf_list, uncert_list, static_list, scales = _gen_var_lists(pdfs, xlimits)
+    u_scales = scales[uncert_list]
 
     u_dim = len(uncert_list)
     d_dim = len(static_list)
@@ -121,8 +150,15 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
     # generate sample points, with fixed static values
     # TODO: need some kind of all-encompassing sampling function
     if(xdata is not None):
-        tx = xdata
-        N = xdata.shape[0]
+        if using_sampler:
+            tx = xdata.current_samples['x']
+            tf = xdata.current_samples['f'] #probably None but this should work
+            tg = xdata.current_samples['g']
+            N = tx.shape[0]
+        else:
+            tx = xdata
+            tf = None
+            N = xdata.shape[0]
     else:
         # generate points
         u_xlimits = xlimits[uncert_list] 
@@ -132,18 +168,37 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
         tx[:, uncert_list] = u_tx
         tx[:, static_list] = [pdf_list[i] for i in static_list]
 
-
     # compute statistics
     if(model):
         func_handle = model.predict_values
+        if(get_grad):
+            grad_handle = model.predict_derivatives
     else:
         func_handle = prob
+        grad_handle = prob
+
+    if get_grad:
+        if tf is None:
+            out_tup, vals = _stat_handle[stat_type](func_handle, N, tx, xlimits, u_scales, pdf_list, tf=tf)
+            if using_sampler:
+                xdata.set_evaluated_func(vals)
+
+            tf = vals
+
+        grad_tup, grads = _stat_handle_grad[stat_type](grad_handle, N, tx, xlimits, u_scales, static_list, pdf_list, tf=tf, tg=tg)
+
+        if using_sampler:
+            xdata.set_evaluated_grad(grads)
+
+        return grad_tup
+
+    out_tup, vals = _stat_handle[stat_type](func_handle, N, tx, xlimits, u_scales, pdf_list, tf=tf)
+    
+    if using_sampler:
+        xdata.set_evaluated_func(vals)
 
     
-    mmean, mstdev = _actual_stat_comp(func_handle, N, tx, xlimits, scales, pdf_list)
-    
-    
-    # Error comp if requested
+    # TODO: this needs all sorts of separate options to handle validation
     if(compute_error):
         #TODO: refactor this
         # if("mean" in prob.__dict__ and all(isinstance(pdfs == 'uniform'))):
@@ -156,51 +211,20 @@ def stat_comp(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], com
         else:
             tf = None # prob(tx) # the expensive option
             Nt = N
-        tmean, tstdev = _actual_stat_comp(prob, Nt, tx, xlimits, scales, pdf_list, tf)
+        t_tup, t_vals = _stat_handle[stat_type](prob, Nt, tx, xlimits, u_scales, pdf_list, tf)
 
+        err_tup = []
+        for i in range(len(t_tup)):
+            err_tup.append(abs(t_tup[i] - out_tup[i]))
 
-        serr = abs(tstdev - mstdev)
-        merr = abs(tmean - mmean)
-    
         # return errors first if requested
-        return merr, serr, mmean, mstdev, tmean, tstdev # to scale error if you want 
+        return err_tup, out_tup, t_tup # to scale error if you want 
     
-    return mmean, mstdev
+    return out_tup
 
 
 
-def _actual_stat_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None):
 
-    dim = tx.shape[1]
-    
-    vals = np.zeros([N,1])
-    dens = np.ones([N,1])
-    summand = np.zeros([N,1])
-    
-
-
-    arrs = np.array_split(tx, dim)
-    l1 = 0
-    l2 = 0
-    for k in range(dim):
-        l2 += arrs[k].shape[0]
-        if(tf is not None): #data
-            vals[l1:l2,:] = tf[l1:l2,:]
-        else:   #function
-            vals[l1:l2,:] = func_handle(arrs[k])
-        for j in range(dim):
-            #import pdb; pdb.set_trace()
-            # do i need to divide by N?
-            if not isinstance(pdf_list[j], float):
-                dens[l1:l2,:] = np.multiply(dens[l1:l2,:], pdf_list[j].pdf(arrs[k][:,j]).reshape((l2-l1, 1))) #TODO: loc must be different for certain dists
-        summand[l1:l2,:] = dens[l1:l2,:]*vals[l1:l2,:]
-        l1 += arrs[k].shape[0]
-
-    area = np.prod(scales) #just a hypercube
-    mean = area*sum(summand)/N
-    stdev = np.sqrt(((area*sum(summand*vals))/N - (mean)**2))#/N
-
-    return mean, stdev
 
 
 
@@ -261,11 +285,15 @@ def full_error(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], re
     
     # compute mean error
     # get benchmark values for mean and stdev
-    merr, serr, mmean, mstdev, tmean, tstdev = stat_comp(model, prob, N=N, xdata=xdata, fdata=fdata, pdfs=pdfs, compute_error=True)
 
+    # merr, serr = def meane(model, prob, N=5000, xdata=None, fdata=None, return_values=False):
+    # merr, serr, mmean, mstdev, tmean, tstdev = stat_comp(model, prob, N=N, xdata=xdata, fdata=fdata, pdfs=pdfs, compute_error=True)
+    err_tup, t_tup, m_tup = stat_comp(model, prob, N=N, xdata=xdata, fdata=fdata, pdfs=pdfs, compute_error=True)
+    merr = err_tup[0]
+    serr = err_tup[1]
 
     if(return_values):
-        return mmean, mstdev, tmean, tstdev
+        return m_tup[0], m_tup[1], t_tup[0], t_tup[1]
 
     return nrmse, merr, serr
 
@@ -279,6 +307,7 @@ def _gen_var_lists(pdfs, xlimits):
     scales = np.zeros(dim)
     for j in range(dim):
         scales[j] = (xlimits[j][1] - xlimits[j][0]) # not necessarily the case
+
         # if dist needs more args, (e.g. beta shape params) pass the dist as a
         # list with the name as the first argument and remaining args as the next ones
         if isinstance(pdfs[j], list):   
@@ -287,20 +316,29 @@ def _gen_var_lists(pdfs, xlimits):
             args.append(scales[j])#scale=
             pdf_list.append(_pdf_handle[pdfs[j][0]](*args))
             uncert_list.append(j)
+
+        # pdf with no arguments e.g. uniform
+        elif isinstance(pdfs[j], str):   
+            args = []
+            args.append(xlimits[j][0])#loc=
+            args.append(scales[j])#scale=
+            pdf_list.append(_pdf_handle[pdfs[j]](*args))
+            uncert_list.append(j)
+        
+        # no pdf, fixed at the float given
         elif isinstance(pdfs[j], float): # consider these variables to be fixed (e.g. design vars)
             pdf_list.append(pdfs[j])
             static_list.append(j)
-        elif pdfs[j] == None: # treat as if uniform
+
+        # treat as if uniform
+        elif pdfs[j] == None: 
             args = []
             args.append(xlimits[j][0])#loc=
             args.append(scales[j])#scale=
             pdf_list.append(_pdf_handle['uniform'])
             uncert_list.append(j)
-        else:
-            args = []
-            args.append(xlimits[j][0])#loc=
-            args.append(scales[j])#scale=
-            pdf_list.append(_pdf_handle[pdfs[j]])
-            uncert_list.append(j)
+        else: # ndarray, should only have one element
+            pdf_list.append(pdfs[j][0])
+            static_list.append(j)
 
     return pdf_list, uncert_list, static_list, scales

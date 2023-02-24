@@ -5,6 +5,8 @@ from scipy.spatial.distance import cdist
 from functions.example_problems import Heaviside, MultiDimJump, Quad2D
 from smt.problems import RobotArm
 from smt.sampling_methods import LHS
+from smt.surrogate_models.surrogate_model import SurrogateModel as SMT_SM
+from smt.problems.problem import Problem as SMT_PB
 
 def standardization2(X, y, bounds):
 
@@ -540,6 +542,77 @@ def estimate_pou_volume(trx, bounds):
     dV /= ms
 
     return dV
+
+
+#TODO: Probably need a test for this function, but it seems to work well
+# haven't tested predict derivatives or get training derivatives though
+def convert_to_smt_grads(smt_func, x_array=None, g_array=None, deriv_predict=False, name=None):
+    """
+    Either convert the gradients from smt_model.training_points OR an smt_problem
+    into an appropriate ndarray or insert external gradients into an smt form. 
+    automating something implemented a million times
+
+    Parameters
+    ----------
+    smt_func: smt.problem or smt.surrogate_model
+        list of training point locations
+
+    x_array, g_array: None or ndarray
+        if ndarray, insert gradients from g_array, corresponding to x_array,
+        into training data of surrogate
+
+    deriv_predict: bool
+        if True, predict derivatives from SM
+
+    name: None or str
+        name of training set if used, ususally None
+
+    Returns
+    -------
+    g_array: None or np.ndarray
+    """
+    # get all problem derivatives
+    if isinstance(smt_func, SMT_PB) and (x_array is not None):
+        handle = lambda ij: smt_func(x_array, ij)
+        ndim = smt_func.options["ndim"]
+        nt = x_array.shape[0]
+    # predict derivatives from surrogate
+    elif isinstance(smt_func, SMT_SM) and (x_array is not None) and deriv_predict:
+        handle = lambda ij: smt_func.predict_derivatives(x_array, ij)
+        ndim = smt_func.training_points[name][0][0].shape[1]
+        nt = x_array.shape[0]
+    # get training derivatives from surrogate
+    elif isinstance(smt_func, SMT_SM):
+        handle = lambda ij: smt_func.training_points[name][1+ij][1]
+        ndim = smt_func.training_points[name][0][0].shape[1]
+        nt = smt_func.training_points[name][0][0].shape[0]
+    else:
+        print("SMT objects or data not valid, no operation performed.")
+        return g_array
+
+    # if given, set training data
+    if (g_array is not None):
+        if (x_array is not None) and isinstance(smt_func, SMT_SM):
+            dim = x_array.shape[1] # just in case
+
+            # exit if the model doesn't even support training derivs
+            if smt_func.supports["training_derivatives"]:
+                for i in range(dim):
+                    smt_func.set_training_derivatives(x_array, g_array[:,i:i+1], i)
+            else:
+                print("SMT Model does not support training derivatives, no operation performed.")
+        else:
+            print("x locations not given/surrogate not given, no operation performed.")
+
+        return g_array
+
+    # otherwise, extract gradients from whatever we have
+    g_array = np.zeros([nt, ndim])
+    for i in range(ndim):
+        g_array[:,i:i+1] = handle(i)
+
+    return g_array
+
 
 # dim = 2
 # trueFunc = MultiDimJump(ndim=dim)

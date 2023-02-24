@@ -15,7 +15,7 @@ from infill.loocv_criteria import POUSFCVT
 from infill.aniso_transform import AnisotropicTransform
 from infill.getxnew import getxnew, adaptivesampling
 from optimization.defaults import DefaultOptOptions
-from utils.sutils import divide_cases
+from utils.sutils import divide_cases, convert_to_smt_grads
 from utils.error import rmse, meane
 from functions.problem_picker import GetProblem
 
@@ -185,18 +185,20 @@ if fresh:
     for n in cases[rank]:
         xtrain0.append(sampling(nt0))
         ftrain0.append(trueFunc(xtrain0[co]))
-        gtrain0.append(np.zeros([nt0,dim]))
-        for i in range(dim):
-            gtrain0[co][:,i:i+1] = trueFunc(xtrain0[co],i)
+        gtrain0.append(convert_to_smt_grads(trueFunc, xtrain0[co]))
+        # gtrain0.append(np.zeros([nt0,dim]))
+        # for i in range(dim):
+        #     gtrain0[co][:,i:i+1] = trueFunc(xtrain0[co],i)
 
 else:
     co = 0
     for n in cases[rank]:
         xtrain0.append(model0[n].training_points[None][0][0])
         ftrain0.append(model0[n].training_points[None][0][1])
-        gtrain0.append(np.zeros([nt0,dim]))
-        for i in range(dim):
-            gtrain0[co][:,i:i+1] = model0[n].training_points[None][i+1][1]
+        gtrain0.append(convert_to_smt_grads(trueFunc, xtrain0[co]))
+        # gtrain0.append(np.zeros([nt0,dim]))
+        # for i in range(dim):
+        #     gtrain0[co][:,i:i+1] = model0[n].training_points[None][i+1][1]
         co += 1
 
 xtrain0lists = comm.allgather(xtrain0)
@@ -242,9 +244,10 @@ if(not skip_LHS):
             for m in range(len(samplehistK)):
                 xtrainK[n].append(sampling(samplehistK[m]))
                 ftrainK[n].append(trueFunc(xtrainK[n][m]))
-                gtrainK[n].append(np.zeros([samplehistK[m],dim]))
-                for i in range(dim):
-                    gtrainK[n][m][:,i:i+1] = trueFunc(xtrainK[n][m],i)
+                gtrainK[n].append(convert_to_smt_grads(trueFunc, xtrainK[co]))
+                # gtrainK[n].append(np.zeros([samplehistK[m],dim]))
+                # for i in range(dim):
+                #     gtrainK[n][m][:,i:i+1] = trueFunc(xtrainK[n][m],i)
 
     xtrainK = comm.bcast(xtrainK, root=0)
     ftrainK = comm.bcast(ftrainK, root=0)
@@ -304,9 +307,10 @@ co = 0
 for n in cases[rank]: #range(Nruns):
     model0.append(copy.deepcopy(modelbase))
     model0[co].set_training_values(xtrain0[n], ftrain0[n])
-    if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK) or isinstance(model0[co], POUHessian)):
-        for i in range(dim):
-            model0[co].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
+    convert_to_smt_grads(model0[co], xtrain0[n], gtrain0[n])
+    # if(isinstance(model0[co], GEKPLS) or isinstance(model0[co], POUSurrogate) or isinstance(model0[co], DGEK) or isinstance(model0[co], POUHessian)):
+    #     for i in range(dim):
+    #         model0[co].set_training_derivatives(xtrain0[n], gtrain0[n][:,i:i+1], i)
     model0[co].train()
     co += 1
     # modelbase.options.update({"print_training":True})
@@ -352,9 +356,10 @@ if(not skip_LHS):
 
         for m in range(len(samplehistK)):
             modelK.set_training_values(xtrainK[n][m], ftrainK[n][m])
-            if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate) or isinstance(model0[co], DGEK)):
-                for i in range(dim):
-                    modelK.set_training_derivatives(xtrainK[n][m], gtrainK[n][m][:,i:i+1], i)
+            convert_to_smt_grads(modelK, xtrainK[n][m], gtrainK[n][m])
+            # if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate) or isinstance(model0[co], DGEK)):
+            #     for i in range(dim):
+            #         modelK.set_training_derivatives(xtrainK[n][m], gtrainK[n][m][:,i:i+1], i)
             modelK.train()
             errkrms[co].append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
             errkmean[co].append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))

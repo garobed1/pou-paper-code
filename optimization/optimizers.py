@@ -33,7 +33,7 @@ def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, co
 
     # if local, use minimize
     else:
-        results = minimize(func, x0, args, method=lmethod, jac=jac, hess=hess, bounds=bounds, constraints=constraints, tol=ltol, callback=callback, options={"maxiter":liter,"disp":False, "iprint":1})
+        results = minimize(func, x0, args, method=lmethod, jac=jac, hess=hess, bounds=bounds, constraints=constraints, tol=ltol, callback=callback, options={"maxiter":liter,"disp":True, "iprint":2})
         # print(results.x)
         #import pdb; pdb.set_trace()
 

@@ -1024,20 +1024,22 @@ class BetaRobustEx1D(Problem):
         y = np.zeros((ne, 1), complex)
         D0 = 0
         D1 = -x[:,1]*np.sin(x[:,1])
-        D2 = x[:,1]*x[:,1] - 10.
+        D2 = 0.1*x[:,1]*x[:,1] - 5.
         if kx is None:
             y[:,0] = self.a*D0 
             y[:,0] += self.b*D1*x[:,0]
             y[:,0] += self.c*D2*(1.-x[:,0])
         elif kx == 0:
-            y[:,0] = 3*self.b*x[:,0]*x[:,0]
-            y[:,0] += 5*self.c*D*x[:,0]*x[:,0]*x[:,0]*x[:,0]
-            y[:,0] *= self.sh
+            y[:,0] = 0.
+            y[:,0] += self.b*D1
+            y[:,0] += -self.c*D2
         elif kx == 1:
-            dD = np.sin(x[:,1]) + x[:,1]*np.cos(x[:,1])
-            y[:,0] = self.a*dD
-            y[:,0] += self.c*dD*x[:,0]*x[:,0]*x[:,0]*x[:,0]*x[:,0]
-            y[:,0] *= self.sh
+            dD0 = 0.
+            dD1 = -np.sin(x[:,1]) - x[:,1]*np.cos(x[:,1])
+            dD2 = 0.2*x[:,1]
+            y[:,0] = self.a*dD0
+            y[:,0] += self.b*dD1*x[:,0]
+            y[:,0] += self.c*dD2*(1.-x[:,0])
 
         return y
 
