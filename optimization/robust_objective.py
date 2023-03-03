@@ -12,7 +12,6 @@ design inputs and uncertain inputs,
 """
 class RobustSampler():
     def __init__(self, x_d_init, N, **kwargs):
-        
         self.has_points = False #are uncertain samples generated at the current design?
 
         self.x_d_cur = x_d_init # current design point, same length as x_d_ind
@@ -33,13 +32,15 @@ class RobustSampler():
         self.func_computed = False #do we have function data at the samples?
         self.grad_computed = False #do we have gradient data at the samples?
 
+        self._attribute_reset()
+
         self.sampling = None #SMT sampler object
 
         """
         Max index to keep track of previous iterations. Increments either when 
         design is changed, or UQ is refined/changed
         """
-        self.iter_max = 0
+        self.iter_max = -1
 
         self.comp_track = 0 #track total number of evaluations since instantiation
         self.grad_track = 0
@@ -121,8 +122,14 @@ class RobustSampler():
     def _refine_sample(self, N):
         tx = self.current_samples['x']
 
+        # just produce new LHS
+        newsize = N + tx.shape[0]
+        u_tx = self.sampling(newsize)
+        tx = np.zeros([newsize, self.dim])
+        tx[:, self.x_u_ind] = u_tx
+        tx[:, self.x_d_ind] = self.x_d_cur
         # track matching points #TODO: standardize this
-        self.nested_ref_ind = range(tx.shape[0]).tolist()
+        # self.nested_ref_ind = range(tx.shape[0]).tolist()
         return tx
 
     """
@@ -133,20 +140,19 @@ class RobustSampler():
         
         x_d_buf = x_d_new
         if np.allclose(x_d_buf, self.x_d_cur, rtol = 1e-15, atol = 1e-15):
-            print("No change in design, returning")
+            print(f"Iter {self.iter_max}: No change in design, returning")
             return
         else: 
+            self.has_points = False
             if self.options["retain_uncertain_points"]:
+                tx = copy.deepcopy(self.current_samples['x'])
                 self._internal_save_state()
-
-            self.x_d_cur = x_d_new
-            self._attribute_reset()
-
-            # no need to generate uncertain points if this is the case
-            if self.options["retain_uncertain_points"]:
-                self.current_samples['x'][:, self.x_d_ind] = self.x_d_cur
+                self.current_samples['x'] = tx
+                self.current_samples['x'][:, self.x_d_ind] = x_d_buf
                 # self.x_samples[:, self.x_d_ind] = self.x_d_cur#[self.x_d_cur[i] for i in self.x_d_ind]
                 self.has_points = True
+            
+            self.x_d_cur = x_d_buf
 
     def generate_uncertain_points(self, N):
         """
@@ -160,9 +166,9 @@ class RobustSampler():
             generic reference to sampling level, by default just number of points to sample
 
         """
-        # check if we already have them NOTE: EVEN IF A DIFFERENT NUMBER IS REQUESTED FOR NOW
+        # check if we already have them
         if self.has_points:
-            print(f"Iter {self.iter_max}: No design change requested, no points generated")
+            print(f"Iter {self.iter_max}: Already have points, no points generated")
             return
 
         tx = self._new_sample(N)
@@ -229,15 +235,17 @@ class RobustSampler():
             True if refining in place, false if traversing
         
         """
+        if self.iter_max < 0:
+            self.iter_max += 1
+            return
 
-        #TODO: name should depend on what kind of increment 
         affix = '_trav'
         if refine:
             affix = '_ref'
 
         name = self.options['name'] + '_' + str(self.iter_max) + affix
         self.save_state(name)
-        
+
         # update design history, simple list
         self.design_history.append(self.x_d_cur)
 

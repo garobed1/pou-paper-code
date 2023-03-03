@@ -1,4 +1,5 @@
 from scipy.optimize import minimize, differential_evolution, NonlinearConstraint
+from pyoptsparse import Optimization
 from optimization.defaults import DefaultOptOptions
 import numpy as np
 
@@ -38,3 +39,7 @@ def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, co
         #import pdb; pdb.set_trace()
 
     return results
+
+"""
+Wrapper for pyOptSparse
+"""
