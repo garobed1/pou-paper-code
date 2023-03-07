@@ -23,8 +23,8 @@ plt.rcParams['font.size'] = '22'
 u_dim = 1
 eta_use = 1.0
 N_t = 5000*u_dim
-N_m = 50
-jump = 50
+N_m = 100
+jump = 100
 
 # set up beta test problem parameters
 dim = 2
@@ -45,14 +45,14 @@ xlimits_d[:,1] = 10.
 
 pdfs = [['beta', 3., 1.], 0.] # replace 2nd arg with the current design var
 
-max_outer = 10
+max_outer = 20
 opt_settings = {}
-opt_settings['ACC'] = 1e-8
+opt_settings['ACC'] = 1e-6
 
 # start distinguishing between model and truth here
 
 ### TRUTH ###
-sampler_t = RobustSampler(np.array([x_init]), N=N_t, xlimits=xlimits, probability_functions=pdfs, retain_uncertain_points=True)
+sampler_t = RobustSampler(np.array([x_init]), N=N_t, name='truth', xlimits=xlimits, probability_functions=pdfs, retain_uncertain_points=True)
 probt = om.Problem()
 probt.model.add_subsystem("stat", StatCompComponent(sampler=sampler_t,
                                  stat_type="mu_sigma", 
@@ -61,8 +61,9 @@ probt.model.add_subsystem("stat", StatCompComponent(sampler=sampler_t,
                                  func=func))
 # doesn't need a driver
 
-probt.driver = om.pyOptSparseDriver() #Default: SLSQP
-probt.driver.opt_settings = opt_settings
+# probt.driver = om.pyOptSparseDriver() #Default: SLSQP
+# probt.driver.opt_settings = opt_settings
+probt.driver = om.ScipyOptimizeDriver(optimizer='CG') 
 probt.model.add_design_var("stat.x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
 probt.model.add_objective("stat.musigma")
 probt.setup()
@@ -70,15 +71,16 @@ probt.set_val("stat.x_d", x_init)
 probt.run_model()
 
 ### MODEL ###
-sampler_m = RobustSampler(np.array([x_init]), N=N_m, xlimits=xlimits, probability_functions=pdfs, retain_uncertain_points=True)
+sampler_m = RobustSampler(np.array([x_init]), N=N_m, name='model', xlimits=xlimits, probability_functions=pdfs, retain_uncertain_points=True)
 probm = om.Problem()
 probm.model.add_subsystem("stat", StatCompComponent(sampler=sampler_m,
                                  stat_type="mu_sigma", 
                                  pdfs=pdfs, 
                                  eta=eta_use, 
                                  func=func))
-probm.driver = om.pyOptSparseDriver() #Default: SLSQP
-probt.driver.opt_settings = opt_settings
+# probm.driver = om.pyOptSparseDriver() #Default: SLSQP
+# probm.driver.opt_settings = opt_settings
+probm.driver = om.ScipyOptimizeDriver(optimizer='CG') 
 probm.model.add_design_var("stat.x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
 probm.model.add_objective("stat.musigma")
 probm.setup()
@@ -89,8 +91,14 @@ sub_optimizer = SequentialFullSolve(prob_model=probm, prob_truth=probt, flat_ref
 sub_optimizer.setup_optimization()
 sub_optimizer.solve_full()
 
-x_opt_1 = sub_optimizer.zk #prob.get_val("stat.x_d")[0]
+# x_opt_1 = sub_optimizer.result_cur['stat.xd'][0] #prob.get_val("stat.x_d")[0]
+x_opt_1 = probm.get_val("stat.x_d")[0] #prob.get_val("stat.x_d")[0]
 
+probt.set_val("stat.x_d", x_init)
+probt.run_driver()
+
+x_opt_true = probt.get_val("stat.x_d")[0]
+import pdb; pdb.set_trace()
 # plot robust func
 ndir = 150
 x = np.linspace(xlimits[1][0], xlimits[1][1], ndir)

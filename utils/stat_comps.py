@@ -16,7 +16,7 @@ def _mu_sigma_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None):
     summand = np.zeros([N,1])
     
 
-
+    # uniform importance sampled monte carlo integration
     arrs = np.array_split(tx, dim)
     l1 = 0
     l2 = 0
@@ -34,7 +34,9 @@ def _mu_sigma_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None):
 
     area = np.prod(scales) #just a hypercube
     mean = area*sum(summand)/N
-    stdev = np.sqrt(((area*sum(summand*vals))/N - (mean)**2))#/N
+    #stdev = np.sqrt(((area*sum(summand*vals))/N - (mean)**2))#/N
+    A = sum(dens)/N
+    stdev = np.sqrt(((area*sum(summand*vals))/N - (2-A)*(mean)**2 ))#/N
 
     return (mean, stdev), vals
 
@@ -82,9 +84,11 @@ def _mu_sigma_grad(func_handle, N, tx, xlimits, scales, static_list, pdf_list, t
     mean = area*sum(summand)/N
     gmean = (area/N)*np.sum(gsummand, axis=0 )
 
-    stdev = np.sqrt((area*sum(summand*vals))/N - (mean)**2)#/N
+    #stdev = np.sqrt(((area*sum(summand*vals))/N - (mean)**2))#/N
+    A = sum(dens)/N
+    stdev = np.sqrt(((area*sum(summand*vals))/N - (2-A)*(mean)**2 ))#/N
     work = 0.5*(1./stdev)
-    work2 = 2*mean*gmean
+    work2 = 2.*(2.-A)*mean*gmean
     work3 = np.multiply(2*summand, grads[:,static_list])
     work3 = (area/N)*np.sum(work3, axis=0)
     gstdev = work*(work3 - work2)

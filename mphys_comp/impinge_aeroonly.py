@@ -136,7 +136,12 @@ class Top(Multipoint):
             # evalFuncs=["cd_def", "cdv_def","cdm_def","cdp_def"]
             evalFuncs=["d_def", "dv_def","dm_def","dp_def"]
             # evalFuncs=["drag", "dragviscous","dragpressure","dragmomentum"]
-        )    
+        )
+
+        # modify to allow for additional BCDVS
+        # should be safe
+        BCVarFuncs = ["Pressure", "PressureStagnation", "Temperature", "Density", "VelocityX", "TemperatureStagnation", "Thrust", "Heat"]
+        ap.possibleBCDVs = set(BCVarFuncs)
 
 
         ap.addDV("mach", value=impinge_setup.mach, name="mach1")
@@ -148,6 +153,10 @@ class Top(Multipoint):
             ap.setBCVar("Pressure", impinge_setup.P0, "inflow")
             ap.setBCVar("Density",  impinge_setup.r0, "inflow")
             ap.setBCVar("VelocityX", impinge_setup.VX, "inflow")
+
+            ap.addDV("Pressure", family="inflow", name="pressure0")
+            ap.addDV("Density",  family="inflow", name="density0")
+            ap.addDV("VelocityX", family="inflow", name="velocityx0")
 
         self.test.coupling.mphys_set_ap(ap)
         self.test.aero_post.mphys_set_ap(ap)
@@ -182,19 +191,19 @@ class Top(Multipoint):
                 self.connect("P0", "upstream.P0")
                 self.connect("T0", "upstream.T0")
 
-                self.connect("upstream.VelocityX", "test.coupling.VelocityX")
-                self.connect("upstream.Density", "test.coupling.Density")
-                self.connect("upstream.Pressure", "test.coupling.Pressure")
-                self.connect("upstream.VelocityX", "test.aero_post.VelocityX")
-                self.connect("upstream.Density", "test.aero_post.Density")
-                self.connect("upstream.Pressure", "test.aero_post.Pressure")
+                self.connect("upstream.VelocityX", "test.coupling.velocityx0")
+                self.connect("upstream.Density", "test.coupling.density0")
+                self.connect("upstream.Pressure", "test.coupling.pressure0")
+                self.connect("upstream.VelocityX", "test.aero_post.velocityx0")
+                self.connect("upstream.Density", "test.aero_post.density0")
+                self.connect("upstream.Pressure", "test.aero_post.pressure0")
             else:
-                self.connect("vx0", "test.coupling.VelocityX")
-                self.connect("r0", "test.coupling.Density")
-                self.connect("P0", "test.coupling.Pressure")
-                self.connect("vx0", "test.aero_post.VelocityX")
-                self.connect("r0", "test.aero_post.Density")
-                self.connect("P0", "test.aero_post.Pressure")
+                self.connect("vx0", "test.coupling.velocityx0")
+                self.connect("r0", "test.coupling.density0")
+                self.connect("P0", "test.coupling.pressure0")
+                self.connect("vx0", "test.aero_post.velocityx0")
+                self.connect("r0", "test.aero_post.density0")
+                self.connect("P0", "test.aero_post.pressure0")
 
 
 if __name__ == '__main__':
@@ -231,22 +240,24 @@ if __name__ == '__main__':
     prob.model = Top(problem_settings=problem_settings, use_shock_comp=use_shock, use_inflow_comp=use_inflow, full_free=full_far)
 
     prob.model.add_design_var("M1")
-    prob.model.add_design_var("beta")
-    prob.model.add_design_var("P1")
-    prob.model.add_design_var("T1")
+    # prob.model.add_design_var("beta")
+    # prob.model.add_design_var("P1")
+    # prob.model.add_design_var("T1")
     # prob.model.add_design_var("P0")
     # prob.model.add_design_var("M0")
     prob.model.add_design_var("vx0")
+    prob.model.add_design_var("r0")
+    prob.model.add_design_var("P0")
     # prob.model.add_design_var("T0")
     # prob.model.add_design_var("shock_angle")
     # prob.model.add_objective("test.aero_post.cd_def")
     # prob.model.add_objective("test.aero_post.cdv_def")
     # prob.model.add_objective("test.aero_post.cdp_def")
     # prob.model.add_objective("test.aero_post.cdm_def")
-    prob.model.add_objective("test.aero_post.d_def")
-    prob.model.add_objective("test.aero_post.dv_def")
+    # prob.model.add_objective("test.aero_post.d_def")
+    # prob.model.add_objective("test.aero_post.dv_def")
     prob.model.add_objective("test.aero_post.dp_def")
-    prob.model.add_objective("test.aero_post.dm_def")
+    # prob.model.add_objective("test.aero_post.dm_def")
     # prob.model.add_objective("test.aero_post.drag")
     # prob.model.add_objective("test.aero_post.dragviscous")
     # prob.model.add_objective("test.aero_post.dragpressure")
@@ -271,11 +282,11 @@ if __name__ == '__main__':
         "shock.T0",
     ]
     # prob.check_partials(includes=shock_comp_ins + shock_comp_outs)
-    # funcDerivs = {}
-    # prob.model.test.coupling.solver.solver.evalFunctionsSens(prob.model.test.coupling.solver.ap, funcDerivs)
+    funcDerivs = {}
+    prob.model.test.coupling.solver.solver.evalFunctionsSens(prob.model.test.coupling.solver.ap, funcDerivs)
 
     prob.check_totals(step_calc='rel_avg')
-    # import pdb; pdb.set_trace()
+    import pdb; pdb.set_trace()
 
     #prob.model.list_outputs()
 

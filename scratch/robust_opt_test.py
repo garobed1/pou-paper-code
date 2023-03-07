@@ -62,7 +62,7 @@ def objRobustGrad(x, func, eta = 0.5):
 
 # test deriv
 h = 1e-8
-eta_use = 0.
+eta_use = 0.5
 fd0 = objRobust(x_init, func, eta_use)
 ad = objRobustGrad(x_init, func, eta_use)
 fd1 = objRobust(x_init+h, func, eta_use)

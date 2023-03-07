@@ -51,6 +51,13 @@ class RobustSampler():
             types=np.ndarray,
             desc="The interval of the domain in each dimension with shape dim x 2 (required)",
         )
+
+        self.options.declare(
+            "name",
+            default='',
+            types=str,
+            desc="The interval of the domain in each dimension with shape dim x 2 (required)",
+        )
         
         self.options.declare(
             "probability_functions",
@@ -140,7 +147,7 @@ class RobustSampler():
         
         x_d_buf = x_d_new
         if np.allclose(x_d_buf, self.x_d_cur, rtol = 1e-15, atol = 1e-15):
-            print(f"Iter {self.iter_max}: No change in design, returning")
+            print(f"{self.options['name']} Iter {self.iter_max}: No change in design, returning")
             return
         else: 
             self.has_points = False
@@ -168,7 +175,7 @@ class RobustSampler():
         """
         # check if we already have them
         if self.has_points:
-            print(f"Iter {self.iter_max}: Already have points, no points generated")
+            print(f"{self.options['name']} Iter {self.iter_max}: Already have points, no points generated")
             return
 
         tx = self._new_sample(N)
@@ -189,7 +196,7 @@ class RobustSampler():
         """
         # check if we already have them NOTE: EVEN IF A DIFFERENT NUMBER IS REQUESTED FOR NOW
         if self.has_points and N is None:
-            print(f"Iter {self.iter_max}: No refinement requested, no points generated")
+            print(f"{self.options['name']} Iter {self.iter_max}: No refinement requested, no points generated")
             return
 
         tx = self._refine_sample(N)

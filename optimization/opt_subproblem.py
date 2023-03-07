@@ -62,6 +62,8 @@ class OptSubproblem():
 
         self.setup_completed = False
 
+        self.result_cur = None
+
         self._declare_options()
         self.options.update(kwargs)
 
@@ -287,9 +289,15 @@ class SequentialFullSolve(OptSubproblem):
             ftru = copy.deepcopy(self.prob_truth.get_val(self.prob_outs[0]))
 
             # this needs to be the lagrangian gradient with constraints
+            # gmod = self.prob_model.compute_totals(return_format='array')
             gtru = self.prob_truth.compute_totals(return_format='array')
 
             ferr = abs(fmod-ftru)
+
+            # perhaps instead we try the condition from Kouri (2013)?
+            # not really, it uses the model gradient, which is known to be
+            # close to the true gradient as a result of the algorithm assumptions
+
             gerr = np.linalg.norm(gtru)
 
             fetext = str(ferr)
@@ -314,6 +322,9 @@ class SequentialFullSolve(OptSubproblem):
             succ = f'unsuccessfully, true gradient norm: {getext}'
         else:
             succ = 'successfully!'
+
+        zk = self.prob_model.driver.get_design_var_values()
+        self.result_cur = zk
 
         print("\n")
         print(f"Optimization terminated {succ}")
