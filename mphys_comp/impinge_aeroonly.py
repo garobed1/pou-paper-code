@@ -43,6 +43,8 @@ class Top(Multipoint):
                              desc='determine downstream settings ')    
         self.options.declare('use_shock_comp', default=False,
                              desc='determine upstream settings using the oblique shock component')    
+        self.options.declare('subsonic', default=False,
+                             desc='use subsonic mesh specification instead')    
 
 
     def setup(self):
@@ -70,9 +72,13 @@ class Top(Multipoint):
         # aero_builder.solver.addFunction('cdp','wall2','cdp_def')
         # aero_builder.solver.addFunction('cdm','wall2','cdm_def')
         aero_builder.solver.addFunction('drag','allWalls','d_def')
+        # aero_builder.solver.addFunction('drag',None,'d_def')
         aero_builder.solver.addFunction('dragviscous','allWalls', 'dv_def')
+        # aero_builder.solver.addFunction('dragviscous',None, 'dv_def')
         aero_builder.solver.addFunction('dragpressure','allWalls','dp_def')
+        # aero_builder.solver.addFunction('dragpressure',None,'dp_def')
         aero_builder.solver.addFunction('dragmomentum','allWalls','dm_def')
+        # aero_builder.solver.addFunction('dragmomentum',None,'dm_def')
         # aero_builder.solver.addFunction('cd',aero_builder.solver.allWallsGroup,'cd_def')
         # aero_builder.solver.addFunction('cdv',aero_builder.solver.allWallsGroup,'cdv_def')
         # aero_builder.solver.addFunction('cdp',aero_builder.solver.allWallsGroup,'cdp_def')
@@ -140,7 +146,7 @@ class Top(Multipoint):
 
         # modify to allow for additional BCDVS
         # should be safe
-        BCVarFuncs = ["Pressure", "PressureStagnation", "Temperature", "Density", "VelocityX", "TemperatureStagnation", "Thrust", "Heat"]
+        BCVarFuncs = ["Pressure", "PressureStagnation", "Temperature", "Density", "DensityStagnation", "VelocityX", "TemperatureStagnation", "Thrust", "Heat"]
         ap.possibleBCDVs = set(BCVarFuncs)
 
 
@@ -150,13 +156,20 @@ class Top(Multipoint):
         ap.addDV("T", value=impinge_setup.T, name="temperature1")
 
         if(not self.options["full_free"]):
-            ap.setBCVar("Pressure", impinge_setup.P0, "inflow")
-            ap.setBCVar("Density",  impinge_setup.r0, "inflow")
-            ap.setBCVar("VelocityX", impinge_setup.VX, "inflow")
+            if self.options["subsonic"]:
+                ap.setBCVar("PressureStagnation", impinge_setup.P0, "inflow")
+                ap.setBCVar("DensityStagnation",  impinge_setup.r0, "inflow")
 
-            ap.addDV("Pressure", family="inflow", name="pressure0")
-            ap.addDV("Density",  family="inflow", name="density0")
-            ap.addDV("VelocityX", family="inflow", name="velocityx0")
+                ap.addDV("PressureStagnation", family="inflow", name="pressure0")
+                ap.addDV("DensityStagnation",  family="inflow", name="density0")
+            else:
+                ap.setBCVar("Pressure", impinge_setup.P0, "inflow")
+                ap.setBCVar("Density",  impinge_setup.r0, "inflow")
+                ap.setBCVar("VelocityX", impinge_setup.VX, "inflow")
+
+                ap.addDV("Pressure", family="inflow", name="pressure0")
+                ap.addDV("Density",  family="inflow", name="density0")
+                ap.addDV("VelocityX", family="inflow", name="velocityx0")
 
         self.test.coupling.mphys_set_ap(ap)
         self.test.aero_post.mphys_set_ap(ap)
@@ -191,17 +204,21 @@ class Top(Multipoint):
                 self.connect("P0", "upstream.P0")
                 self.connect("T0", "upstream.T0")
 
-                self.connect("upstream.VelocityX", "test.coupling.velocityx0")
+                if not self.options["subsonic"]:
+                    self.connect("upstream.VelocityX", "test.coupling.velocityx0")
                 self.connect("upstream.Density", "test.coupling.density0")
                 self.connect("upstream.Pressure", "test.coupling.pressure0")
-                self.connect("upstream.VelocityX", "test.aero_post.velocityx0")
+                if not self.options["subsonic"]:
+                    self.connect("upstream.VelocityX", "test.aero_post.velocityx0")
                 self.connect("upstream.Density", "test.aero_post.density0")
                 self.connect("upstream.Pressure", "test.aero_post.pressure0")
             else:
-                self.connect("vx0", "test.coupling.velocityx0")
+                if not self.options["subsonic"]:
+                    self.connect("vx0", "test.coupling.velocityx0")
                 self.connect("r0", "test.coupling.density0")
                 self.connect("P0", "test.coupling.pressure0")
-                self.connect("vx0", "test.aero_post.velocityx0")
+                if not self.options["subsonic"]:
+                    self.connect("vx0", "test.aero_post.velocityx0")
                 self.connect("r0", "test.aero_post.density0")
                 self.connect("P0", "test.aero_post.pressure0")
 
@@ -215,6 +232,7 @@ if __name__ == '__main__':
     use_shock = False
     use_inflow = False
     full_far = False
+    subsonic = False
 
     problem_settings = default_impinge_setup
     # problem_settings.aeroOptions['equationType'] = 'laminar NS'
@@ -224,31 +242,38 @@ if __name__ == '__main__':
     problem_settings.aeroOptions['nCycles'] = 5000000
 
     problem_settings.aeroOptions['L2Convergence'] = 1e-15
-    problem_settings.aeroOptions['printIterations'] = False
+    problem_settings.aeroOptions['printIterations'] = True
     problem_settings.aeroOptions['printTiming'] = True
 
-    # problem_settings.mach = 4.
+    problem_settings.mach = 4.0
+    # problem_settings.beta = 0.8
+    # problem_settings.mach = 0.8
 
     if full_far:
         aeroGridFile = f'../meshes/imp_TEST_73_73_25.cgns'
+    elif subsonic:
+        aeroGridFile = f'../meshes/imp_subs_73_73_25.cgns'
     else:
         aeroGridFile = f'../meshes/imp_mphys_73_73_25.cgns'
     problem_settings.aeroOptions['gridFile'] = aeroGridFile
 
 
     prob = om.Problem()
-    prob.model = Top(problem_settings=problem_settings, use_shock_comp=use_shock, use_inflow_comp=use_inflow, full_free=full_far)
+    prob.model = Top(problem_settings=problem_settings, subsonic=subsonic,
+                                                         use_shock_comp=use_shock, 
+                                                         use_inflow_comp=use_inflow, 
+                                                         full_free=full_far)
 
-    prob.model.add_design_var("M1")
+    # prob.model.add_design_var("M1")
     # prob.model.add_design_var("beta")
-    # prob.model.add_design_var("P1")
+    prob.model.add_design_var("P1")
     # prob.model.add_design_var("T1")
     # prob.model.add_design_var("P0")
     # prob.model.add_design_var("M0")
-    prob.model.add_design_var("vx0")
-    prob.model.add_design_var("r0")
-    prob.model.add_design_var("P0")
     # prob.model.add_design_var("T0")
+    # prob.model.add_design_var("vx0")
+    # prob.model.add_design_var("r0")
+    # prob.model.add_design_var("P0")
     # prob.model.add_design_var("shock_angle")
     # prob.model.add_objective("test.aero_post.cd_def")
     # prob.model.add_objective("test.aero_post.cdv_def")
@@ -293,3 +318,88 @@ if __name__ == '__main__':
     if MPI.COMM_WORLD.rank == 0:
         print("cd = %.15f" % prob["test.aero_post.cd_def"])
     #     prob.model.
+
+
+"""
+
+i'm thinking rgas might be the culprit
+nah
+
+
+pref
+timeref (prob not)
+href
+uref
+winf
+rgas
+
+muref (maybe in viscous case?)
+
+
+IT HAS TO DO WITH THE INTEGRATION SURFACES FOR SURE, PREFD GETS THE RIGHT VALUE
+AT SOME POINT IF FAMILY GROUP IS SET TO NONE (ALL SURFACES)
+
+-----------------------
+Group: Top 'Full Model'
+-----------------------
+  Full Model: 'test.aero_post.dp_def' wrt 'dvs.P1'
+    Analytic Magnitude: 4.548233e-01
+          Fd Magnitude: 7.712190e-01 (fd:None)
+    Absolute Error (Jan - Jfd) : 3.163957e-01 *
+
+    Relative Error (Jan - Jfd) / Jfd : 4.102541e-01 *
+
+    Raw Analytic Derivative (Jfor)
+[[0.45482328]]
+
+    Raw FD Derivative (Jfd)
+[[0.77121903]]
+
+
+ARE WE IN MASTER_B
+ MASTER_B 1
+ MASTER_B 2
+ MASTER_B 3
+ MASTER_B 4
+ MADE IT TO APPLYALLBC_BLOCK_B
+ MADE OUT OF APPLYALLBC_BLOCK_B
+ MASTER_B 5
+ DID WE MAKE IT?
+ prefd before:   0.48397762634064073     
+ prefd after :   0.77186737058245858     
+ tempd1   (muref):    0.0000000000000000     
+           murefd:    0.0000000000000000     
+ tempd2    (rgas):    0.0000000000000000     
+            rgasd:    0.0000000000000000     
+ tempd3 (timeref):    0.0000000000000000     
+         timerefd:    0.0000000000000000     
+            prefd:   0.77186737058245858     
+Solving linear in mphys_adflow
+Solving ADjoint Transpose with PETSc...
+Solving ADjoint Transpose with PETSc time (s) =     0.00
+ Norm of error = 0.2228E-05    Iterations =  106
+ ------------------------------------------------
+ PETSc solver converged after   106 iterations.
+ ------------------------------------------------
+ ARE WE IN MASTER_B
+ MASTER_B 1
+ MASTER_B 2
+ MASTER_B 3
+ MASTER_B 4
+ MADE IT TO APPLYALLBC_BLOCK_B
+ MADE OUT OF APPLYALLBC_BLOCK_B
+ MASTER_B 5
+ DID WE MAKE IT?
+ prefd before:    0.0000000000000000     
+ prefd after :  -0.31704409046229221     
+ tempd1   (muref):    0.0000000000000000     
+           murefd:    0.0000000000000000     
+ tempd2    (rgas):    0.0000000000000000     
+            rgasd:    0.0000000000000000     
+ tempd3 (timeref):    0.0000000000000000     
+         timerefd:    0.0000000000000000     
+            prefd:  -0.31704409046229221     
+
+
+EDIT: Think it's just a coincidence :(
+"""

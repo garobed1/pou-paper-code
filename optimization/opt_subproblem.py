@@ -281,7 +281,7 @@ class SequentialFullSolve(OptSubproblem):
 
             #Eval Truth
             if self.options["print"]:
-                print(f"    Validating with truth model...")
+                print(f"    Computing truth model...")
 
             zk = self.prob_model.driver.get_design_var_values()
             self._eval_truth(zk)

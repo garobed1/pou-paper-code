@@ -146,9 +146,10 @@ class RobustSampler():
     def set_design(self, x_d_new):
         
         x_d_buf = x_d_new
+        print(f"{self.options['name']} Iter {self.iter_max}: Design {x_d_buf}")
         if np.allclose(x_d_buf, self.x_d_cur, rtol = 1e-15, atol = 1e-15):
             print(f"{self.options['name']} Iter {self.iter_max}: No change in design, returning")
-            return
+            return 0 # indicates that we have not moved, useful for gradient evals, avoiding retraining
         else: 
             self.has_points = False
             if self.options["retain_uncertain_points"]:
@@ -160,6 +161,8 @@ class RobustSampler():
                 self.has_points = True
             
             self.x_d_cur = x_d_buf
+
+        return 1 # indicates that we have not moved, useful for gradient evals, avoiding retraining
 
     def generate_uncertain_points(self, N):
         """

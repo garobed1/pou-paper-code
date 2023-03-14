@@ -99,7 +99,7 @@ def stat_comp(model, prob, stat_type="mu_sigma", N=5000, xdata=None, fdata=None,
             smt surrogate modeling object. If None, stats are computed from the prob, and xdata and fdata must be provided to compute error
 
         prob : smt problem object
-        N : number of points to evaluate the error
+        N : if sampler is not present, use this number of (LHS) points to evaluate the func or surrogate
         xdata : ndarray or RobustSampler
             predefined set of points to compute statistics
             NOTE: If xdata is provided as an array, static input dimensions should not vary and should match the corresponding value in pdfs
@@ -158,6 +158,7 @@ def stat_comp(model, prob, stat_type="mu_sigma", N=5000, xdata=None, fdata=None,
         else:
             tx = xdata
             tf = None
+            tg = None
             N = xdata.shape[0]
     else:
         # generate points
@@ -167,6 +168,8 @@ def stat_comp(model, prob, stat_type="mu_sigma", N=5000, xdata=None, fdata=None,
         tx = np.zeros([N, dim])
         tx[:, uncert_list] = u_tx
         tx[:, static_list] = [pdf_list[i] for i in static_list]
+        tf = None
+        tg = None
 
     # compute statistics
     if(model):

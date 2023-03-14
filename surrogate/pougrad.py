@@ -93,6 +93,7 @@ class POUSurrogate(SurrogateModel):
         g = self.g_norma
         h = self.h
         numsample = xc.shape[0]
+        numeval = X_cont.shape[0]
         delta = self.options["delta"]
         rho = self.options["rho"]
 
@@ -101,14 +102,15 @@ class POUSurrogate(SurrogateModel):
 
         # y_ = POUEval(X_cont, xc, f, g, h, delta, rho)
 
-        # loop over rows in xt
-        y_ = np.zeros(xt.shape[0])
-        for k in range(xt.shape[0]):
-            x = X_cont[k,:]
+        # exhaustive search for closest sample point, for regularization
+        # pulling out of loop
+        D = cdist(X_cont ,xc) #numeval x numsample
+        mindist = np.min(D, axis=1)
 
-            # exhaustive search for closest sample point, for regularization
-            D = cdist(np.array([x]),xc)
-            mindist = min(D[0])
+        # loop over rows in xt
+        y_ = np.zeros(numeval)
+        for k in range(numeval):
+            x = X_cont[k,:]
 
             numer = 0
             denom = 0
@@ -116,33 +118,124 @@ class POUSurrogate(SurrogateModel):
             # evaluate the surrogate, requiring the distance from every point
             # for i in range(numsample):
             work = x - xc
-            dist = D[0][:] + delta#np.sqrt(D[0][i] + delta)
-            expfac = np.exp(-rho*(dist-mindist))
-            local = np.zeros(numsample)
-            # if(self.counter < 6):
-            #     i = self.counter
+            dist = D[k,:] + delta#np.sqrt(D[0][i] + delta)
+            expfac = np.exp(-rho*(dist-mindist[k]))
+            # local = np.zeros(numsample)
+
+            # for i in range(numsample):
             #     local[i] = f[i] + self.higher_terms(work[i], g[i], h[i])
-            # else:
-            for i in range(numsample):
-                local[i] = f[i] + self.higher_terms(work[i], g[i], h[i])
+            local = f[:,0] + self.higher_terms(work, g, h)
+
             numer = np.dot(local, expfac)
             denom = np.sum(expfac)
             # t2 = time.time()
 
             # exec1 += t1-t0
             # exec2 += t2-t1
-            
 
             y_[k] = numer/denom
+
         y = (self.y_mean + self.y_std * y_).ravel()
         # print("mindist  = ", exec1)
         # print("evaluate = ", exec2)
 
         return y
+    
+
+    """
+    Evaluate the surrogate derivative as-is at the point x wrt x
+
+    Parameters
+    ----------
+
+    Parameters
+        ----------
+        x : np.ndarray[nt, nx]
+            Input values for the prediction points.
+
+        kx : int
+            The 0-based index of the input variable with respect to which derivatives are desired.
+
+        Returns
+        -------
+        dy_dx : np.ndarray[nt, ny]
+            Derivatives at the prediction points.
+        
+    """
+    #TODO: Cache points to skip min dist calcs?
+    def _predict_derivatives(self, xt, kx):
+
+        X_cont = (xt - self.X_offset) / self.X_scale
+        xc = self.X_norma
+        f = self.y_norma
+        g = self.g_norma
+        h = self.h
+        numsample = xc.shape[0]
+        numeval = X_cont.shape[0]
+        delta = self.options["delta"]
+        rho = self.options["rho"]
+
+        if(self.options["rscale"]):
+            rho = self.options["rscale"]*pow(numsample, 1./xc.shape[1])
+
+        D = cdist(X_cont ,xc) #numeval x numsample
+        mindist = np.min(D, axis=1)
+
+        # loop over rows in xt
+        y_ = np.zeros(numeval)
+        dy_dx_ = np.zeros(numeval)
+        for k in range(numeval):
+            x = X_cont[k,:]
+
+            numer = 0
+            denom = 0
+            dnumer = 0#np.zeros(self.dim)
+            ddenom = 0#np.zeros(self.dim)
+
+            # evaluate the surrogate, requiring the distance from every point
+            # for i in range(numsample):
+            work = x - xc
+            dist = D[k,:] + delta#np.sqrt(D[0][i] + delta)
+            ddist = work[:,kx]/D[k,:]
+
+            expfac = np.exp(-rho*(dist-mindist[k]))
+            dexpfac = -rho*expfac*ddist
+
+            # local = np.zeros(numsample)
+            dlocal = np.zeros(numsample)
+            # for i in range(numsample):
+            local = f[:,0] + self.higher_terms(work, g, h)
+            dlocal = self.higher_terms_deriv(work, g, h, kx)
+
+            numer = np.dot(local, expfac)
+            dnumer = np.dot(local, dexpfac) + np.dot(dlocal, expfac)
+            denom = np.sum(expfac)
+            ddenom = np.sum(dexpfac)
+            # t2 = time.time()
+
+            # exec1 += t1-t0
+            # exec2 += t2-t1
+            
+            y_[k] = numer/denom
+            dy_dx_[k] = (denom*dnumer - numer*ddenom)/(denom**2)
+
+        y = (self.y_mean + self.y_std * y_).ravel()
+        dy_dx = (self.y_std * dy_dx_).ravel()/4 # need to find why this is needed
+        # print("mindist  = ", exec1)
+        # print("evaluate = ", exec2)
+        # import pdb; pdb.set_trace()
+
+        return dy_dx
 
 
     def higher_terms(self, dx, g, h):
-        return np.dot(g, dx)
+        return (g*dx).sum(axis = 1)
+    
+    # wrt dx[kx]
+    def higher_terms_deriv(self, dx, g, h, kx):
+        dterms = np.zeros(dx.shape[0])
+        dterms += g[:,kx]
+        return dterms
 
 
     def _train(self):
@@ -212,11 +305,23 @@ class POUHessian(POUSurrogate):
             desc="number of closest points to evaluate hessian estimate")
 
         self.supports["training_derivatives"] = True
+        self.supports["derivatives"] = True
 
     def higher_terms(self, dx, g, h):
-        terms = np.dot(g, dx)
-        terms += 0.5*innerMatrixProduct(h, dx)
+        # terms = np.dot(g, dx)
+        # terms += 0.5*innerMatrixProduct(h, dx)
+        terms = (g*dx).sum(axis = 1)
+        for j in range(dx.shape[0]):
+            terms[j] += 0.5*innerMatrixProduct(h[j], dx[j])
         return terms
+
+    def higher_terms_deriv(self, dx, g, h, kx):
+        # terms = (g*dx).sum(axis = 1)
+        dterms = np.zeros(dx.shape[0])
+        dterms += g[:,kx]
+        for j in range(dx.shape[0]):
+            dterms[j] += np.dot(h[j][kx,:], dx[j])#0.5*innerMatrixProduct(h, dx)
+        return dterms
 
 
     def _train(self):

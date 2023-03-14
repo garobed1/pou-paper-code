@@ -65,9 +65,9 @@ def _mu_sigma_grad(func_handle, N, tx, xlimits, scales, static_list, pdf_list, t
         if tg is not None:
             grads[l1:l2,:] = tg[l1:l2,:]
         else:
-            grads[l1:l2,:] = convert_to_smt_grads(func_handle, arrs[k])
-            # for ki in range(dim):
-            #     grads[l1:l2,ki] = func_handle(arrs[k], kx=ki)[:,0]
+            # grads[l1:l2,:] = convert_to_smt_grads(func_handle, arrs[k])
+            for ki in range(dim):
+                grads[l1:l2,ki] = func_handle(arrs[k], kx=ki)[:,0]
         
         for j in range(dim):
             #import pdb; pdb.set_trace()

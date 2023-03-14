@@ -4,6 +4,7 @@ from scipy.stats import beta
 import openmdao.api as om
 from scratch.stat_comp_comp import StatCompComponent
 from optimization.opt_subproblem import SequentialFullSolve
+from surrogate.pougrad import POUSurrogate, POUHessian
 
 """
 run a mean plus variance optimization over the 1D-1D test function, pure LHS
@@ -19,12 +20,18 @@ from optimization.defaults import DefaultOptOptions
 
 plt.rcParams['font.size'] = '22'
 
+# surrogate
+use_surrogate = True
+full_surrogate = True
+print_plots = True
+
 # set up robust objective UQ comp parameters
 u_dim = 1
 eta_use = 1.0
 N_t = 5000*u_dim
-N_m = 100
-jump = 100
+N_m = 10
+jump = 10
+retain_uncertain_points = False
 
 # set up beta test problem parameters
 dim = 2
@@ -37,11 +44,33 @@ xlimits = func.xlimits
 x_init = 5.
 
 
-# run optimizations
+# optimization
 x_init = 5.
 # args = (func, eta_use)
 xlimits_d = np.zeros([1,2])
-xlimits_d[:,1] = 10.
+xlimits_d[:,0] = xlimits[1,0]
+xlimits_d[:,1] = xlimits[1,1]
+xlimits_u = np.zeros([u_dim,2])
+xlimits_u[:,1] = xlimits[0,0]
+xlimits_u[:,1] = xlimits[0,1]
+
+# set up surrogates #NOTE: not doing it for truth for now
+msur = None
+if use_surrogate:
+    rscale = 5.5
+    rho = 10 
+
+    if(full_surrogate):
+        neval = 1+(dim+2)
+        msur = POUHessian(bounds=xlimits)
+    else:
+        neval = 1+(u_dim+2)
+        msur = POUHessian(bounds=xlimits_u)
+
+    msur.options.update({"rscale":rscale})
+    msur.options.update({"rho":rho})
+    msur.options.update({"neval":neval})
+    msur.options.update({"print_prediction":False})
 
 pdfs = [['beta', 3., 1.], 0.] # replace 2nd arg with the current design var
 
@@ -52,7 +81,11 @@ opt_settings['ACC'] = 1e-6
 # start distinguishing between model and truth here
 
 ### TRUTH ###
-sampler_t = RobustSampler(np.array([x_init]), N=N_t, name='truth', xlimits=xlimits, probability_functions=pdfs, retain_uncertain_points=True)
+sampler_t = RobustSampler(np.array([x_init]), N=N_t, 
+                          name='truth', 
+                          xlimits=xlimits, 
+                          probability_functions=pdfs, 
+                          retain_uncertain_points=retain_uncertain_points)
 probt = om.Problem()
 probt.model.add_subsystem("stat", StatCompComponent(sampler=sampler_t,
                                  stat_type="mu_sigma", 
@@ -61,9 +94,9 @@ probt.model.add_subsystem("stat", StatCompComponent(sampler=sampler_t,
                                  func=func))
 # doesn't need a driver
 
-# probt.driver = om.pyOptSparseDriver() #Default: SLSQP
+# probt.driver = om.pyOptSparseDriver(optimizer= 'SNOPT') #Default: SLSQP
 # probt.driver.opt_settings = opt_settings
-probt.driver = om.ScipyOptimizeDriver(optimizer='CG') 
+probt.driver = om.ScipyOptimizeDriver(optimizer='L-BFGS-B') 
 probt.model.add_design_var("stat.x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
 probt.model.add_objective("stat.musigma")
 probt.setup()
@@ -71,16 +104,23 @@ probt.set_val("stat.x_d", x_init)
 probt.run_model()
 
 ### MODEL ###
-sampler_m = RobustSampler(np.array([x_init]), N=N_m, name='model', xlimits=xlimits, probability_functions=pdfs, retain_uncertain_points=True)
+sampler_m = RobustSampler(np.array([x_init]), N=N_m, 
+                          name='model', 
+                          xlimits=xlimits, 
+                          probability_functions=pdfs, 
+                          retain_uncertain_points=retain_uncertain_points)
 probm = om.Problem()
 probm.model.add_subsystem("stat", StatCompComponent(sampler=sampler_m,
                                  stat_type="mu_sigma", 
                                  pdfs=pdfs, 
                                  eta=eta_use, 
-                                 func=func))
-# probm.driver = om.pyOptSparseDriver() #Default: SLSQP
+                                 func=func,
+                                 surrogate=msur,
+                                 full_space=full_surrogate,
+                                 print_surr_plots=print_plots))
+# probm.driver = om.pyOptSparseDriver(optimizer='SNOPT') #Default: SLSQP
 # probm.driver.opt_settings = opt_settings
-probm.driver = om.ScipyOptimizeDriver(optimizer='CG') 
+probm.driver = om.ScipyOptimizeDriver(optimizer='L-BFGS-B') 
 probm.model.add_design_var("stat.x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
 probm.model.add_objective("stat.musigma")
 probm.setup()
