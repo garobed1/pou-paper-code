@@ -66,6 +66,13 @@ class POUSurrogate(SurrogateModel):
             desc="Regularization parameter"
         )
 
+        declare(
+            "min_contribution",
+            None,
+            types=(float),
+            desc="If not None, use to determine a ball-point radius for which POU numerator contributes greater than it. Then, use a KDTree to query points in that ball during evaluation"
+        )
+
         self.supports["training_derivatives"] = True
 
     """
@@ -96,15 +103,23 @@ class POUSurrogate(SurrogateModel):
         numeval = X_cont.shape[0]
         delta = self.options["delta"]
         rho = self.options["rho"]
+        cap = self.options["min_contribution"]
+        ball_rad = None
+        neighbors = None
 
         if(self.options["rscale"]):
             rho = self.options["rscale"]*pow(numsample, 1./xc.shape[1])
 
         # y_ = POUEval(X_cont, xc, f, g, h, delta, rho)
 
+        D = cdist(X_cont , xc) #numeval x numsample
+        
+        neighbors_all = list(range(numsample))
+        if(cap):
+            ball_rad = -np.log(cap)/rho
+            neighbors_all = self.tree.query_ball_point(X_cont, ball_rad)
+
         # exhaustive search for closest sample point, for regularization
-        # pulling out of loop
-        D = cdist(X_cont ,xc) #numeval x numsample
         mindist = np.min(D, axis=1)
 
         # loop over rows in xt
@@ -115,16 +130,22 @@ class POUSurrogate(SurrogateModel):
             numer = 0
             denom = 0
 
+            neighbors = neighbors_all
+            if ball_rad:
+                neighbors = neighbors_all[k]
+                xc = self.X_norma[neighbors]
+
             # evaluate the surrogate, requiring the distance from every point
             # for i in range(numsample):
+
             work = x - xc
-            dist = D[k,:] + delta#np.sqrt(D[0][i] + delta)
+            dist = D[k,neighbors] + delta#np.sqrt(D[0][i] + delta)
             expfac = np.exp(-rho*(dist-mindist[k]))
             # local = np.zeros(numsample)
 
             # for i in range(numsample):
             #     local[i] = f[i] + self.higher_terms(work[i], g[i], h[i])
-            local = f[:,0] + self.higher_terms(work, g, h)
+            local = f[neighbors,0] + self.higher_terms(work, g[neighbors], h[neighbors])
 
             numer = np.dot(local, expfac)
             denom = np.sum(expfac)
@@ -136,6 +157,7 @@ class POUSurrogate(SurrogateModel):
             y_[k] = numer/denom
 
         y = (self.y_mean + self.y_std * y_).ravel()
+
         # print("mindist  = ", exec1)
         # print("evaluate = ", exec2)
 
@@ -175,10 +197,20 @@ class POUSurrogate(SurrogateModel):
         delta = self.options["delta"]
         rho = self.options["rho"]
 
+        cap = self.options["min_contribution"]
+        ball_rad = None
+        neighbors = None
+
         if(self.options["rscale"]):
             rho = self.options["rscale"]*pow(numsample, 1./xc.shape[1])
 
         D = cdist(X_cont ,xc) #numeval x numsample
+
+        neighbors_all = list(range(numsample))
+        if(cap):
+            ball_rad = -np.log(cap)/rho
+            neighbors_all = self.tree.query_ball_point(X_cont, ball_rad)
+
         mindist = np.min(D, axis=1)
 
         # loop over rows in xt
@@ -257,11 +289,15 @@ class POUSurrogate(SurrogateModel):
 
         self.g_norma = np.zeros([xc.shape[0], xc.shape[1]])
         
-        self.g_norma = np.zeros([xc.shape[0], xc.shape[1]])
-        
         for i in range(self.dim):
             self.g_norma[:,[i]] = self.training_points[None][i+1][1]*(self.X_scale[i]/self.y_std)
+        
+        self.tree = KDTree(self.X_norma)
 
+        self._train_further()
+
+    def _train_further(self):
+        xc = self.training_points[None][0][0]
         self.h = np.zeros([xc.shape[0], self.dim, self.dim])
         
         # self.dV = estimate_pou_volume(self.training_points[None][0][0], self.options["bounds"])
@@ -324,48 +360,31 @@ class POUHessian(POUSurrogate):
         return dterms
 
 
-    def _train(self):
-        xc = self.training_points[None][0][0]
-        f = self.training_points[None][0][1]
 
-        self.dim = xc.shape[1]
-        self.ntr = xc.shape[0]
-
-        # Center and scale X and y
-        (
-            self.X_norma,
-            self.y_norma,
-            self.X_offset,
-            self.y_mean,
-            self.X_scale,
-            self.y_std,
-        ) = standardization2(xc, f, self.options["bounds"])
-
-        self.g_norma = np.zeros([xc.shape[0], xc.shape[1]])
         
-        for i in range(self.dim):
-            self.g_norma[:,[i]] = self.training_points[None][i+1][1]*(self.X_scale[i]/self.y_std)
+    def _train_further(self):
+        
         # hessian estimate
         indn = []
         nstencil = self.options["neval"]
-        tree = KDTree(self.X_norma)
         # dists = pdist(self.xc)
         # dists = squareform(dists)
         # mins = np.zeros(self.ntr)
         for i in range(self.ntr):
-            dists, ind = tree.query(self.X_norma[i], nstencil)
+            dists, ind = self.tree.query(self.X_norma[i], nstencil)
             indn.append(ind)
-        hess = []
+        hess = np.zeros([self.ntr, self.dim, self.dim])
 
         for i in range(self.ntr):
             Hh = quadraticSolveHOnly(self.X_norma[i,:], self.X_norma[indn[i][1:nstencil],:], \
                                      self.y_norma[i], self.y_norma[indn[i][1:nstencil]], \
                                      self.g_norma[i,:], self.g_norma[indn[i][1:nstencil],:])
 
-            hess.append(np.zeros([self.dim, self.dim]))
+            # hess.append(np.zeros([self.dim, self.dim]))
+            # hess[i] = np.zeros([self.dim, self.dim])
             for j in range(self.dim):
                 for k in range(self.dim):
-                    hess[i][j,k] = Hh[symMatfromVec(j,k,self.dim)]
+                    hess[i,j,k] = Hh[symMatfromVec(j,k,self.dim)]
 
         self.h = hess
 

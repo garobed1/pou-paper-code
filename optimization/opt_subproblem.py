@@ -232,6 +232,13 @@ class SequentialFullSolve(OptSubproblem):
             desc="Flat refinement amount to apply at each outer iter"
         )
 
+        declare(
+            "use_truth_to_train", 
+            default=False, 
+            types=bool,
+            desc="If the model uses a surrogate, add the truth evaluations to its training data"
+        )
+
     def solve_full(self):
 
         ftol = self.options['ftol']
@@ -286,6 +293,8 @@ class SequentialFullSolve(OptSubproblem):
             zk = self.prob_model.driver.get_design_var_values()
             self._eval_truth(zk)
 
+
+
             ftru = copy.deepcopy(self.prob_truth.get_val(self.prob_outs[0]))
 
             # this needs to be the lagrangian gradient with constraints
@@ -310,10 +319,18 @@ class SequentialFullSolve(OptSubproblem):
                 fail = 0
                 break
 
-            if self.options["print"]:
-                print(f"    Refining model by: {refjump}")
-            self.prob_model.model.stat.refine_model(refjump)
-            reflevel += refjump
+            # grab sample data from the truth model if we are using a surrogate
+            if self.prob_model.model.stat.surrogate and self.options["use_truth_to_train"]:
+                truth_eval = self.prob_truth.model.stat.sampler.current_samples
+                if self.options["print"]:
+                    print(f"    Refining model with {truth_eval['x'].shape[0]} validation points")
+                self.prob_model.model.stat.refine_model(truth_eval)
+                reflevel = self.prob_model.model.stat.xtrain_act.shape[0]
+            else:
+                if self.options["print"]:
+                    print(f"    Refining model by adding {refjump} points to evaluation")
+                self.prob_model.model.stat.refine_model(refjump)
+                reflevel += refjump
 
             k += 1            
             self.outer_iter = k

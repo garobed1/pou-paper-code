@@ -3,12 +3,14 @@ import openmdao.api as om
 from utils.error import stat_comp
 from utils.sutils import convert_to_smt_grads
 from optimization.robust_objective import RobustSampler
+import copy
 """
 Compute some statistical measure of a model at a given design
 """
 class StatCompComponent(om.ExplicitComponent):
 
     def initialize(self):
+        self.options.declare('name', default='name', desc="name, used for plot saving path")
         self.options.declare('surrogate', default=None, desc="surrogate model of the func. If not None, sampler is used for training data")
 
 
@@ -35,6 +37,9 @@ class StatCompComponent(om.ExplicitComponent):
         self.ftrain_act = None
 
         self.first_train = False
+
+        self.objs = []
+        self.func_calls = []
 
     def setup(self):
         
@@ -78,7 +83,7 @@ class StatCompComponent(om.ExplicitComponent):
         moved = self.sampler.set_design(np.array([x]))
         self.sampler.generate_uncertain_points(self.sampler.N)
 
-        # train the surrogate if available AND we have moved
+        # train the surrogate if available AND we have moved AND we even bothered to generate points
         if self.surrogate and (moved or not self.first_train):
             # TODO: find a way to add samples
             # Choose between surrogate over just x_u,
@@ -86,12 +91,18 @@ class StatCompComponent(om.ExplicitComponent):
 
             # actual computation of training data
             xtrain = self.sampler.current_samples['x']
-            ftrain = self.func(xtrain)
-            gtrain = convert_to_smt_grads(self.func, xtrain)
+            if self.sampler.func_computed:
+                ftrain = self.sampler.current_samples['f']
+            else:
+                ftrain = self.func(xtrain)
+                self.sampler.set_evaluated_func(ftrain)
 
-            # give computed data to sampler
-            self.sampler.set_evaluated_func(ftrain)
-            self.sampler.set_evaluated_grad(gtrain)
+            if self.sampler.grad_computed:
+                gtrain = self.sampler.current_samples['g']
+            else:
+                gtrain = convert_to_smt_grads(self.func, xtrain)
+                self.sampler.set_evaluated_grad(gtrain)
+
 
             # train model
             # slice dimensions here
@@ -172,14 +183,14 @@ class StatCompComponent(om.ExplicitComponent):
                 if(n == 2):
                     ndir = 100
                     xlimits = self.surrogate.options["bounds"]
-                    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+                    xp = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
                     y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)  
-                    X, Y = np.meshgrid(x, y)
+                    X, Y = np.meshgrid(xp, y)
                     F  = np.zeros([ndir, ndir]) 
                     for i in range(ndir):
                         for j in range(ndir):
                             xi = np.zeros([2])
-                            xi[0] = x[i]
+                            xi[0] = xp[i]
                             xi[1] = y[j]
                             F[i,j]  = self.surrogate.predict_values(np.array([xi]))
                     cs = plt.contourf(Y, X, F, levels = 25) #, levels = np.linspace(np.min(F), 0., 25)
@@ -187,8 +198,29 @@ class StatCompComponent(om.ExplicitComponent):
                     trxs = self.surrogate.training_points[None][0][0] #qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
                     plt.plot(trxs[0:-self.jump,1], trxs[0:-self.jump,0], 'bo')
                     plt.plot(trxs[-self.jump:,1], trxs[-self.jump:,0], 'ro')
-                    plt.savefig(f"./robust_opt_subopt_plots/subprob_surr_2d_iter_{self.sampler.iter_max}.pdf")    
+                    path = self.options["name"]
+                    plt.savefig(f"./{path}/subprob_surr_2d_iter_{self.sampler.iter_max}.pdf")    
                     plt.clf()
+
+                    # plot robust func
+                    ndir = 150
+                    yobj = np.zeros([ndir])
+                    for j in range(ndir):
+                        pdfs_plot = copy.deepcopy(self.pdfs)
+                        pdfs_plot[1] = xp[j]
+                        yobj[j] = stat_comp(self.surrogate, self.func, 
+                                stat_type=self.stat_type, 
+                                pdfs=pdfs_plot, 
+                                N=eval_N)[0]
+
+                    # Plot original function
+                    cs = plt.plot(xp, y)
+                    plt.xlabel(r"$x_d$")
+                    plt.ylabel(r"$\mu_f(x_d)$")
+                    # plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
+                    # plt.axvline(x_opt_1, color='r', linestyle='--', linewidth=1.2)
+                    #plt.legend(loc=1)
+                    plt.savefig(f"./{path}/subprob_surr_2d_obj_{self.sampler.iter_max}.pdf", bbox_inches="tight")
                     # import pdb; pdb.set_trace()
 
         res = stat_comp(self.surrogate, self.func, 
@@ -198,6 +230,20 @@ class StatCompComponent(om.ExplicitComponent):
                                 xdata=eval_sampler)
         fm = res[0]
         fs = res[1]
+
+        # if(self.options["print_surr_plots"]):
+        #     import matplotlib.pyplot as plt
+        #     n += self.sampler.x_d_dim
+            
+        #     if(n == 1):
+        #         plt.plot(x, fm)
+        #         plt.savefig(f"./{path}/subprob_surr_2d_obj_{self.sampler.iter_max}.pdf", bbox_inches="tight")
+        #         plt.clf()
+        self.objs.append(fm)
+        if len(self.func_calls):
+            self.func_calls.append(self.func_calls[-1] + eval_sampler.current_samples['x'].shape[0])
+        else:
+            self.func_calls.append(eval_sampler.current_samples['x'].shape[0])
 
         outputs['musigma'] = eta*fm + (1-eta)*fs
 
@@ -270,9 +316,13 @@ class StatCompComponent(om.ExplicitComponent):
     
     def refine_model(self, N):
 
-        self.sampler.N += N
-        self.jump = N
-        self.sampler.refine_uncertain_points(N)
+        if isinstance(N, dict):
+            self.sampler.add_data(N, replace_current=True)
+
+        else:
+            self.sampler.N += N
+            self.jump = N
+            self.sampler.refine_uncertain_points(N)
 
         # reset training since the design is the same and we haven't moved
         self.first_train = False

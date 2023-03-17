@@ -31,6 +31,7 @@ class RobustSampler():
         self.nested_ref_ind = None #list of indices of current iteration that existed in previous
         self.func_computed = False #do we have function data at the samples?
         self.grad_computed = False #do we have gradient data at the samples?
+        self.stop_generating = True
 
         self._attribute_reset()
 
@@ -71,6 +72,13 @@ class RobustSampler():
             default=True,
             desc="keep the same points in the uncertain space as we traverse the design space",
         )
+
+        self.options.declare(
+            "external_only",
+            types=bool,
+            default=False,
+            desc="only use with surrogate. when design is updated, don't add new points at all",
+        )   #TODO: This will likely need tweaking, and allow for both kinds of training data updates
 
         self.options.declare(
             "name",
@@ -146,11 +154,13 @@ class RobustSampler():
     def set_design(self, x_d_new):
         
         x_d_buf = x_d_new
+        ret = 0
         print(f"{self.options['name']} Iter {self.iter_max}: Design {x_d_buf}")
         if np.allclose(x_d_buf, self.x_d_cur, rtol = 1e-15, atol = 1e-15):
             print(f"{self.options['name']} Iter {self.iter_max}: No change in design, returning")
-            return 0 # indicates that we have not moved, useful for gradient evals, avoiding retraining
-        else: 
+            return ret # indicates that we have not moved, useful for gradient evals, avoiding retraining
+
+        if not self.options["external_only"]:
             self.has_points = False
             if self.options["retain_uncertain_points"]:
                 tx = copy.deepcopy(self.current_samples['x'])
@@ -159,10 +169,13 @@ class RobustSampler():
                 self.current_samples['x'][:, self.x_d_ind] = x_d_buf
                 # self.x_samples[:, self.x_d_ind] = self.x_d_cur#[self.x_d_cur[i] for i in self.x_d_ind]
                 self.has_points = True
-            
-            self.x_d_cur = x_d_buf
+            ret = 1
+        else:
+            print(f"{self.options['name']} Iter {self.iter_max}: Only design is changed, no data added")
+            ret = 0
+        self.x_d_cur = x_d_buf
 
-        return 1 # indicates that we have not moved, useful for gradient evals, avoiding retraining
+        return ret # indicates that we have not moved, useful for gradient evals, avoiding retraining
 
     def generate_uncertain_points(self, N):
         """
@@ -179,7 +192,7 @@ class RobustSampler():
         # check if we already have them
         if self.has_points:
             print(f"{self.options['name']} Iter {self.iter_max}: Already have points, no points generated")
-            return
+            return 0
 
         tx = self._new_sample(N)
 
@@ -188,6 +201,8 @@ class RobustSampler():
 
         self.current_samples['x'] = tx
         self.has_points = True
+
+        return 1
 
     def refine_uncertain_points(self, N):
         """
@@ -234,7 +249,7 @@ class RobustSampler():
 
 
     # saving to a dict of dicts
-    def _internal_save_state(self, refine=False):
+    def _internal_save_state(self, refine=False, insert=False):
         """
         Internal version, increments sample counter since it's called just
         before updating the state
@@ -243,15 +258,19 @@ class RobustSampler():
         -----------
         refine: bool
             True if refining in place, false if traversing
-        
+
+        insert: bool
+            True if points are added external to sampler generation
         """
         if self.iter_max < 0:
             self.iter_max += 1
             return
 
-        affix = '_trav'
+        affix = '_mov'
         if refine:
             affix = '_ref'
+        if insert:
+            affix = '_ins'
 
         name = self.options['name'] + '_' + str(self.iter_max) + affix
         self.save_state(name)
@@ -262,6 +281,30 @@ class RobustSampler():
         # increment iteration counter
         self._attribute_reset()
         self.iter_max += 1
+
+    # add samples to this object from outside, in the format of current_samples
+    #
+    def add_data(self, new_samples, replace_current=False):
+
+        # check that new_samples is good
+        assert 'x' in new_samples
+
+        if replace_current:
+
+            # archive previous dataset
+            self._internal_save_state(insert=True)
+
+            self.current_samples['x'] = copy.deepcopy(new_samples['x'])
+            self.has_points = True
+            if 'f' in new_samples:
+                self.set_evaluated_func(new_samples['f'])
+            if 'g' in new_samples:
+                self.set_evaluated_grad(new_samples['g'])
+
+            self.stop_generating = False
+        else:
+            print(f"{self.options['name']} Iter {self.iter_max}: Adding points without replacing not implemented!")
+
 
 
     def save_state(self, name):
