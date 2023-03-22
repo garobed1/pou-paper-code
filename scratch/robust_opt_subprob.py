@@ -26,20 +26,26 @@ if not os.path.isdir(f"{name}"):
     os.mkdir(f"{name}")
 
 # surrogate
-use_surrogate = False
+use_surrogate = True
 full_surrogate = True
-use_truth_to_train = False #NEW
-print_plots = True
+use_truth_to_train = True #NEW, ONLY IF USING SURR
+use_design_noise = True #NEW, ONLY IF USING SURR
+design_noise = 0.0
+print_plots = False
 
 # set up robust objective UQ comp parameters
 u_dim = 1
 eta_use = 1.0
-N_t = 5000*u_dim
-# N_t = 100*u_dim
+# N_t = 5000*u_dim
+N_t = 500*u_dim
 N_m = 10
 jump = 10
-retain_uncertain_points = False
-external_only = use_truth_to_train #NEW
+retain_uncertain_points = True
+external_only = (use_truth_to_train and use_surrogate) #NEW
+
+design_noise_act = 0.0
+if(use_design_noise and use_surrogate): #NEW
+    design_noise_act = design_noise
 
 # set up beta test problem parameters
 dim = 2
@@ -66,6 +72,7 @@ msur = None
 if use_surrogate:
     rscale = 5.5
     rho = 10 
+    min_contributions = 1e-12
 
     if(full_surrogate):
         neval = 1+(dim+2)
@@ -77,6 +84,7 @@ if use_surrogate:
     msur.options.update({"rscale":rscale})
     msur.options.update({"rho":rho})
     msur.options.update({"neval":neval})
+    msur.options.update({"min_contribution":min_contributions})
     msur.options.update({"print_prediction":False})
 
 pdfs = [['beta', 3., 1.], 0.] # replace 2nd arg with the current design var
@@ -102,30 +110,39 @@ probt.model.add_subsystem("stat", StatCompComponent(sampler=sampler_t,
                                  name=name))
 # doesn't need a driver
 
-# probt.driver = om.pyOptSparseDriver(optimizer= 'SNOPT') #Default: SLSQP
-# probt.driver.opt_settings = opt_settings
+
+
+probt.driver = om.pyOptSparseDriver(optimizer= 'SNOPT') #Default: SLSQP
+probt.driver.opt_settings = opt_settings
 probt.driver = om.ScipyOptimizeDriver(optimizer='L-BFGS-B') 
+# probt.driver = om.ScipyOptimizeDriver(optimizer='CG') 
 probt.model.add_design_var("stat.x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
 probt.model.add_objective("stat.musigma")
 probt.setup()
 probt.set_val("stat.x_d", x_init)
-# probt.run_model()
-probt.run_driver()
+probt.run_model()
 
-x_opt_true = copy.deepcopy(probt.get_val("stat.x_d")[0])
+""" 
+raw optimization section
+"""
+# probt.run_driver()
+
+# x_opt_true = copy.deepcopy(probt.get_val("stat.x_d")[0])
 
 # plot conv
-cs = plt.plot(probt.model.stat.func_calls, probt.model.stat.objs)
-plt.xlabel(r"Number of function calls")
-plt.ylabel(r"$\mu_f(x_d)$")
-#plt.legend(loc=1)
-plt.savefig(f"./{name}/convergence_truth.pdf", bbox_inches="tight")
-plt.clf()
+# cs = plt.plot(probt.model.stat.func_calls, probt.model.stat.objs)
+# plt.xlabel(r"Number of function calls")
+# plt.ylabel(r"$\mu_f(x_d)$")
+# #plt.legend(loc=1)
+# plt.savefig(f"./{name}/convergence_truth.pdf", bbox_inches="tight")
+# plt.clf()
 
-true_fm = copy.deepcopy(probt.model.stat.objs[-1])
+# true_fm = copy.deepcopy(probt.model.stat.objs[-1])
 
-probt.set_val("stat.x_d", x_init)
-
+# probt.set_val("stat.x_d", x_init)
+""" 
+raw optimization section
+"""
 ### MODEL ###
 sampler_m = RobustSampler(np.array([x_init]), N=N_m, 
                           name='model', 
@@ -133,6 +150,7 @@ sampler_m = RobustSampler(np.array([x_init]), N=N_m,
                           probability_functions=pdfs, 
                           retain_uncertain_points=retain_uncertain_points,
                           external_only=external_only)
+# import pdb; pdb.set_trace()
 probm = om.Problem()
 probm.model.add_subsystem("stat", StatCompComponent(sampler=sampler_m,
                                  stat_type="mu_sigma", 
@@ -146,6 +164,7 @@ probm.model.add_subsystem("stat", StatCompComponent(sampler=sampler_m,
 # probm.driver = om.pyOptSparseDriver(optimizer='SNOPT') #Default: SLSQP
 # probm.driver.opt_settings = opt_settings
 probm.driver = om.ScipyOptimizeDriver(optimizer='L-BFGS-B') 
+# probm.driver = om.ScipyOptimizeDriver(optimizer='CG') 
 probm.model.add_design_var("stat.x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
 probm.model.add_objective("stat.musigma")
 probm.setup()
@@ -155,7 +174,8 @@ probm.run_model()
 sub_optimizer = SequentialFullSolve(prob_model=probm, prob_truth=probt, 
                                     flat_refinement=jump, 
                                     max_iter=max_outer,
-                                    use_truth_to_train=use_truth_to_train,)
+                                    use_truth_to_train=use_truth_to_train,
+                                    gradient_proximity_ref=True)
 sub_optimizer.setup_optimization()
 sub_optimizer.solve_full()
 

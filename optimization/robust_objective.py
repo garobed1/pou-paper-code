@@ -81,11 +81,19 @@ class RobustSampler():
         )   #TODO: This will likely need tweaking, and allow for both kinds of training data updates
 
         self.options.declare(
+            "design_noise",
+            types=float,
+            default=0.0,
+            desc="only use with surrogate. when sampling the uncertain space, add random noise to the dvs, scaled by this option",
+        )
+
+        self.options.declare(
             "name",
             types=str,
             default='sampler',
             desc="keep the same points in the uncertain space as we traverse the design space",
         )
+
 
         self.options.update(kwargs)
 
@@ -132,10 +140,13 @@ class RobustSampler():
         tx = np.zeros([N, self.dim])
         tx[:, self.x_u_ind] = u_tx
         tx[:, self.x_d_ind] = self.x_d_cur#[self.x_d_cur[i] for i in self.x_d_ind]
+
+
         return tx
 
     def _refine_sample(self, N):
         tx = self.current_samples['x']
+        noise = self.options["design_noise"]
 
         # just produce new LHS
         newsize = N + tx.shape[0]
@@ -145,6 +156,34 @@ class RobustSampler():
         tx[:, self.x_d_ind] = self.x_d_cur
         # track matching points #TODO: standardize this
         # self.nested_ref_ind = range(tx.shape[0]).tolist()
+        
+        """
+        function this out
+        
+        if noise > 1e-12:
+            perturb = np.random.rand(self.x_d_dim)
+            xlimits = self.options["xlimits"]
+            d_xlimits = xlimits[self.x_d_ind]
+            bound = np.zeros([self.x_d_dim, 2])
+            # for i in range(self.x_d_dim):
+            
+            
+            
+
+            scale = d_xlimits[:,1] - d_xlimits[:,0]
+            nlower = self.x_d_cur[:] - noise*scale
+            bound[:,0] = np.maximum(d_xlimits[:][0], nlower)
+            nupper = self.x_d_cur[:] + noise*scale
+            bound[:,1] = np.minimum(d_xlimits[:][1], nupper)
+            bscale = bound[:,1] - bound[:,0]
+            bperturb = perturb*bscale - bound[:,0]
+
+            tx[:, self.x_d_ind] += bperturb 
+        """
+            
+
+
+
         return tx
 
     """
@@ -177,6 +216,8 @@ class RobustSampler():
 
         return ret # indicates that we have not moved, useful for gradient evals, avoiding retraining
 
+
+    #NOTE: both generate_ and refine_ need an option to introduce noise to the sample
     def generate_uncertain_points(self, N):
         """
         First of two functions that will increment the sampling iteration

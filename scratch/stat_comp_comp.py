@@ -82,6 +82,8 @@ class StatCompComponent(om.ExplicitComponent):
         self.pdfs[1] = x
         moved = self.sampler.set_design(np.array([x]))
         self.sampler.generate_uncertain_points(self.sampler.N)
+        
+        call_track = copy.deepcopy(self.first_train)
 
         # train the surrogate if available AND we have moved AND we even bothered to generate points
         if self.surrogate and (moved or not self.first_train):
@@ -122,7 +124,9 @@ class StatCompComponent(om.ExplicitComponent):
             self.surrogate.set_training_values(self.xtrain_act, self.ftrain_act)
             convert_to_smt_grads(self.surrogate, self.xtrain_act, self.gtrain_act)
             self.surrogate.train()
+            
             self.first_train = True
+
 
             if(self.options["print_surr_plots"]):
                 import matplotlib.pyplot as plt
@@ -241,10 +245,15 @@ class StatCompComponent(om.ExplicitComponent):
         #         plt.clf()
         self.objs.append(fm)
         if len(self.func_calls):
-            self.func_calls.append(self.func_calls[-1] + eval_sampler.current_samples['x'].shape[0])
+            if self.surrogate and not (moved or not call_track):
+                self.func_calls.append(self.func_calls[-1])
+            else:
+                self.func_calls.append(self.func_calls[-1] + self.sampler.current_samples['x'].shape[0])
         else:
-            self.func_calls.append(eval_sampler.current_samples['x'].shape[0])
+            self.func_calls.append(self.sampler.current_samples['x'].shape[0])
 
+
+        import pdb; pdb.set_trace()
         outputs['musigma'] = eta*fm + (1-eta)*fs
 
     def compute_partials(self, inputs, partials):

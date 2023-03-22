@@ -68,7 +68,7 @@ ad = objRobustGrad(x_init, func, eta_use)
 fd1 = objRobust(x_init+h, func, eta_use)
 
 fd = (fd1-fd0)/h
-import pdb; pdb.set_trace()
+# import pdb; pdb.set_trace()
 
 
 # run optimizations
@@ -97,7 +97,7 @@ plt.axvline(results1.x, color='r', linestyle='--', linewidth=1.2)
 #plt.legend(loc=1)
 plt.savefig(f"./robust_opt_plots/objrobust1_true.pdf", bbox_inches="tight")
 plt.clf()
-
+import pdb; pdb.set_trace()
 # plot beta dist
 x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
 y = np.zeros([ndir])
