@@ -38,8 +38,12 @@ class StatCompComponent(om.ExplicitComponent):
 
         self.first_train = False
 
+        self.xps = []
         self.objs = []
         self.func_calls = []
+
+        self.surr_x = []
+        self.surr_f = []
 
     def setup(self):
         
@@ -206,26 +210,33 @@ class StatCompComponent(om.ExplicitComponent):
                     plt.savefig(f"./{path}/subprob_surr_2d_iter_{self.sampler.iter_max}.pdf")    
                     plt.clf()
 
+
+                    # import pdb; pdb.set_trace()
                     # plot robust func
-                    ndir = 150
-                    yobj = np.zeros([ndir])
-                    for j in range(ndir):
-                        pdfs_plot = copy.deepcopy(self.pdfs)
-                        pdfs_plot[1] = xp[j]
-                        yobj[j] = stat_comp(self.surrogate, self.func, 
-                                stat_type=self.stat_type, 
-                                pdfs=pdfs_plot, 
-                                N=eval_N)[0]
+                    # ndir = 150
+                    # yobj = np.zeros([ndir])
+                    # for j in range(ndir):
+                    #     pdfs_plot = copy.deepcopy(self.pdfs)
+                    #     pdfs_plot[1] = xp[j]
+                    #     yobj[j] = stat_comp(self.surrogate, self.func, 
+                    #             stat_type=self.stat_type, 
+                    #             pdfs=pdfs_plot, 
+                    #             N=eval_N)[0]
 
                     # Plot original function
-                    cs = plt.plot(xp, y)
-                    plt.xlabel(r"$x_d$")
-                    plt.ylabel(r"$\mu_f(x_d)$")
-                    # plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
-                    # plt.axvline(x_opt_1, color='r', linestyle='--', linewidth=1.2)
-                    #plt.legend(loc=1)
-                    plt.savefig(f"./{path}/subprob_surr_2d_obj_{self.sampler.iter_max}.pdf", bbox_inches="tight")
-                    # import pdb; pdb.set_trace()
+                    # cs = plt.plot(xp, y)
+                    # plt.xlabel(r"$x_d$")
+                    # plt.ylabel(r"$\mu_f(x_d)$")
+                    # # plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
+                    # # plt.axvline(x_opt_1, color='r', linestyle='--', linewidth=1.2)
+                    # #plt.legend(loc=1)
+                    # plt.savefig(f"./{path}/subprob_surr_2d_obj_{self.sampler.iter_max}.pdf", bbox_inches="tight")
+                    """
+                    append data to a self. list so we can plot obj surrogate converging
+                    """
+                    # self.surr_x.append(xp)
+                    # self.surr_f.append(yobj)
+
 
         res = stat_comp(self.surrogate, self.func, 
                                 stat_type=self.stat_type, 
@@ -243,6 +254,7 @@ class StatCompComponent(om.ExplicitComponent):
         #         plt.plot(x, fm)
         #         plt.savefig(f"./{path}/subprob_surr_2d_obj_{self.sampler.iter_max}.pdf", bbox_inches="tight")
         #         plt.clf()
+        self.xps.append(copy.deepcopy(x[0]))
         self.objs.append(fm)
         if len(self.func_calls):
             if self.surrogate and not (moved or not call_track):
@@ -253,7 +265,6 @@ class StatCompComponent(om.ExplicitComponent):
             self.func_calls.append(self.sampler.current_samples['x'].shape[0])
 
 
-        import pdb; pdb.set_trace()
         outputs['musigma'] = eta*fm + (1-eta)*fs
 
     def compute_partials(self, inputs, partials):

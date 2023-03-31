@@ -99,6 +99,7 @@ class Top(Multipoint):
             dvs.add_output("beta", val=impinge_setup.beta)
             dvs.add_output("P1", val=impinge_setup.P)
             dvs.add_output("T1", val=impinge_setup.T)
+            # dvs.add_output("r1", val=impinge_setup.rho)
 
         if(self.options["use_inflow_comp"]):
             dvs.add_output("M0", 3.0)
@@ -139,6 +140,7 @@ class Top(Multipoint):
             chordRef = 1.0,
             P = impinge_setup.P, 
             T = impinge_setup.T, 
+            # rho = impinge_setup.rho, 
             # evalFuncs=["cd_def", "cdv_def","cdm_def","cdp_def"]
             evalFuncs=["d_def", "dv_def","dm_def","dp_def"]
             # evalFuncs=["drag", "dragviscous","dragpressure","dragmomentum"]
@@ -154,6 +156,7 @@ class Top(Multipoint):
         ap.addDV("beta", value=impinge_setup.beta, name="beta")
         ap.addDV("P", value=impinge_setup.P, name="pressure1")
         ap.addDV("T", value=impinge_setup.T, name="temperature1")
+        # ap.addDV("rho", value=impinge_setup.rho, name="density1")
 
         if(not self.options["full_free"]):
             if self.options["subsonic"]:
@@ -197,6 +200,8 @@ class Top(Multipoint):
             self.connect("P1", "test.aero_post.pressure1")
             self.connect("T1", "test.coupling.temperature1")
             self.connect("T1", "test.aero_post.temperature1")
+            # self.connect("r1", "test.coupling.density1")
+            # self.connect("r1", "test.aero_post.density1")
         
         if(not self.options["full_free"]):
             if(self.options["use_inflow_comp"]):
@@ -242,10 +247,10 @@ if __name__ == '__main__':
     problem_settings.aeroOptions['nCycles'] = 5000000
 
     problem_settings.aeroOptions['L2Convergence'] = 1e-15
-    problem_settings.aeroOptions['printIterations'] = True
+    problem_settings.aeroOptions['printIterations'] = False
     problem_settings.aeroOptions['printTiming'] = True
 
-    problem_settings.mach = 4.0
+    problem_settings.mach = 1.7
     # problem_settings.beta = 0.8
     # problem_settings.mach = 0.8
 
@@ -267,14 +272,18 @@ if __name__ == '__main__':
     # prob.model.add_design_var("M1")
     # prob.model.add_design_var("beta")
     prob.model.add_design_var("P1")
-    # prob.model.add_design_var("T1")
+    prob.model.add_design_var("T1")
+    # prob.model.add_design_var("r1")
+
     # prob.model.add_design_var("P0")
     # prob.model.add_design_var("M0")
     # prob.model.add_design_var("T0")
     # prob.model.add_design_var("vx0")
     # prob.model.add_design_var("r0")
     # prob.model.add_design_var("P0")
+
     # prob.model.add_design_var("shock_angle")
+
     # prob.model.add_objective("test.aero_post.cd_def")
     # prob.model.add_objective("test.aero_post.cdv_def")
     # prob.model.add_objective("test.aero_post.cdp_def")
@@ -401,5 +410,52 @@ Solving ADjoint Transpose with PETSc time (s) =     0.00
             prefd:  -0.31704409046229221     
 
 
-EDIT: Think it's just a coincidence :(
+    print *, "tempd1   (muref): ", tempd1
+    print *, "          murefd: ", murefd
+    print *, "tempd2    (rgas): ", tempd2
+    print *, "           rgasd: ", rgasd
+    print *, "tempd3 (timeref): ", tempd3
+    print *, "        timerefd: ", timerefd
+    print *, "           prefd: ", prefd
+    print *, "           pinfd: ", pinfd
+
+CLOSER WITH UREF ACCOUNTED
+STILL NOT QUITE THERE
+
+
+
+WHAT'S MISSING?
+
+
+pinfd is cancelling itself out at some point, don't think it's relevant
+
+are we not taking rhoref into account (P T mach definition)
+
+Divide rhoinfdimd by 72,917.89627702
+
+DRHO/DT = -P/RT^2 = -2.6927513082979661213487587983942e-4
+
+default mach
+AD = -0.15494944
+rhoinfdimd = 651.30941027172992 
+DRHO/DP*DDRAG/DRHO = 0.008932092716
+adding this makes AD -0.14601734728304, FD = -0.1454
+T FD = -0.12589514
+DRHO/DT*DDRAG/DRHO = -0.17538142666159775162793
+
+mach 4.0
+DRHO/DP*DDRAG/DRHO = 0.008932092716
+adding this makes AD -0.169298663387, FD = -0.1685429
+
+mach 1.7
+AD = -0.08414637
+rhoinfdimd = -1758.4695206470465
+DRHO/DP*DDRAG/DRHO = 0.008932092716
+adding this makes AD -0.1082621167566878552, FD = -0.10748369
+T FD = 0.53660872
+DRHO/DT*DDRAG/DRHO = 0.473512110232443181178
+
+IT SEEMS CONSISTENT, BUT IT LOOKS LIKE THERE'S A TINY ERROR LEFT
+
+
 """

@@ -12,6 +12,18 @@ areaRef = 1.0
 chordRef = 1.0
 T = 254.02071103827234 #217.
 P = 4987.6905797938707 #2919.
+
+R_universal = 8.3144598  # J / mol / K
+# Molecular mass of air
+# (https://www.engineeringtoolbox.com/molecular-mass-air-d_679.html)
+M_air = 28.9647  # g / mol
+# Specific gas constant of air in S.I. units
+R_air = R_universal / M_air * 1000.0 
+R = R_air #287.05492547
+#R*T = 72,917.89627702
+#R*rho = 19.6349760586880680
+rho = P/(R * T) #0.0684014601963
+
 probName = 'impinge_mphys'
 
 #downstream defaults

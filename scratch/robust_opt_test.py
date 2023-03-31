@@ -12,11 +12,11 @@ from utils.error import stat_comp
 from optimization.robust_objective import RobustSampler
 from optimization.defaults import DefaultOptOptions
 
-plt.rcParams['font.size'] = '22'
+plt.rcParams['font.size'] = '16'
 
 # set up robust objective UQ comp parameters
 u_dim = 1
-eta_use = 0.3
+eta_use = 1.0
 N = 5000*u_dim
 
 
@@ -33,6 +33,11 @@ x_init = 5.
 
 sampler = RobustSampler(np.array([x_init]), N, xlimits=xlimits, probability_functions=pdfs, retain_uncertain_points=True)
 
+xds = []
+func_calls = []
+objs = []
+
+
 # eta*mean + (1-eta)stdev
 def objRobust(x, func, eta = 0.5):
 
@@ -42,6 +47,13 @@ def objRobust(x, func, eta = 0.5):
     res = stat_comp(None, func, stat_type="mu_sigma", pdfs=pdfs, xdata=sampler)
     fm = res[0]
     fs = res[1]
+
+    xds.append(x)
+    objs.append(fm)
+    if len(func_calls):
+        func_calls.append(N + func_calls[-1])
+    else:
+        func_calls.append(N)
 
     return eta*fm + (1-eta)*fs
 # eta*mean + (1-eta)stdev
@@ -61,13 +73,13 @@ def objRobustGrad(x, func, eta = 0.5):
 
 
 # test deriv
-h = 1e-8
-eta_use = 0.5
-fd0 = objRobust(x_init, func, eta_use)
-ad = objRobustGrad(x_init, func, eta_use)
-fd1 = objRobust(x_init+h, func, eta_use)
+# h = 1e-8
+# eta_use = 0.5
+# fd0 = objRobust(x_init, func, eta_use)
+# ad = objRobustGrad(x_init, func, eta_use)
+# fd1 = objRobust(x_init+h, func, eta_use)
 
-fd = (fd1-fd0)/h
+# fd = (fd1-fd0)/h
 # import pdb; pdb.set_trace()
 
 
@@ -83,20 +95,42 @@ xlimits_d[:,1] = 10.
 results1 = optimize(objRobust, args=args, bounds=xlimits_d, type="local", jac=objRobustGrad, x0=x_init, options=options)
 
 # plot robust func
+
+
+plt.plot(func_calls, objs, linestyle='-', marker='s', label='convergence')
+plt.xlabel(r"Function Calls")
+plt.ylabel(r"$\mu_f(x_d)$")
+
+plt.savefig(f"./robust_opt_plots/convrobust1_true.pdf", bbox_inches="tight")
+plt.clf()
+
+cs = plt.plot(xds, objs, linestyle='-', marker='s', label='convergence')
+
+plt.xlabel(r"$x_d$")
+plt.ylabel(r"$\mu_f(x_d)$")
+
+plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
+plt.axvline(results1.x, color='r', linestyle='--', linewidth=1.2)
+
 ndir = 150
 x = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
 y = np.zeros([ndir])
 for j in range(ndir):
     y[j] = objRobust(x[j], func, eta_use)
 # Plot original function
-cs = plt.plot(x, y)
-plt.xlabel(r"$x_d$")
-plt.ylabel(r"$\mu_f(x_d)$")
-plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
-plt.axvline(results1.x, color='r', linestyle='--', linewidth=1.2)
-#plt.legend(loc=1)
+plt.plot(x, y, label='objective')
+
+plt.legend()
 plt.savefig(f"./robust_opt_plots/objrobust1_true.pdf", bbox_inches="tight")
+
+
+
 plt.clf()
+
+
+
+
+
 import pdb; pdb.set_trace()
 # plot beta dist
 x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)

@@ -88,6 +88,23 @@ def map_om_to_smt(self, dvs):
     return smt_map, xlimits
 
 
+def get_om_design_size(dv_settings):
+    ndesvar = 0
+    for name, meta in dv_settings.items():
+        size = meta['global_size'] if meta['distributed'] else meta['size']
+        ndesvar += size
+    return ndesvar
+
+# Assume items in OM DV dict originate from OrderedDict
+def om_dict_to_flat_array(dct, dv_settings, ndesvar):
+    desvar_array = np.empty(ndesvar)
+    i = 0
+    for name, meta in dv_settings.items():
+        size = meta['global_size'] if meta['distributed'] else meta['size']
+        desvar_array[i:i + size] = dct[name]
+        i += size
+    return desvar_array
+
 def _get_size(dct):
     # Returns global size of the variable if it is distributed, size otherwise.
     return dct['global_size'] if dct['distributed'] else dct['size']

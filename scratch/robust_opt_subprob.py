@@ -4,8 +4,12 @@ from scipy.stats import beta
 import openmdao.api as om
 from scratch.stat_comp_comp import StatCompComponent
 from optimization.opt_subproblem import SequentialFullSolve
+from optimization.opt_trust_uncertain import UncertainTrust
+from optimization.trust_bound_comp import TrustBound
 from surrogate.pougrad import POUSurrogate, POUHessian
+from collections import OrderedDict
 import os, copy
+
 """
 run a mean plus variance optimization over the 1D-1D test function, pure LHS
 for now using the subproblem idea
@@ -18,26 +22,33 @@ from utils.error import stat_comp
 from optimization.robust_objective import RobustSampler
 from optimization.defaults import DefaultOptOptions
 
-plt.rcParams['font.size'] = '22'
+plt.rcParams['font.size'] = '16'
 
-name = 'betaex_no_surrogate'
+name = 'betaex_trust_demo'
 
 if not os.path.isdir(f"{name}"):
     os.mkdir(f"{name}")
 
 # surrogate
+grad_prox_ref = False
+use_truth_to_train = True #NEW, ONLY IF USING SURR
+
 use_surrogate = True
 full_surrogate = True
-use_truth_to_train = True #NEW, ONLY IF USING SURR
-use_design_noise = True #NEW, ONLY IF USING SURR
+
+use_design_noise = False #NEW, ONLY IF USING SURR
 design_noise = 0.0
-print_plots = False
+
+trust_region_bound = True #NEW
+initial_trust_radius = 1.0
+
+print_plots = True
 
 # set up robust objective UQ comp parameters
 u_dim = 1
 eta_use = 1.0
-# N_t = 5000*u_dim
-N_t = 500*u_dim
+N_t = 5000*u_dim
+# N_t = 500*u_dim
 N_m = 10
 jump = 10
 retain_uncertain_points = True
@@ -89,7 +100,7 @@ if use_surrogate:
 
 pdfs = [['beta', 3., 1.], 0.] # replace 2nd arg with the current design var
 
-max_outer = 20
+max_outer = 3
 opt_settings = {}
 opt_settings['ACC'] = 1e-6
 
@@ -102,6 +113,9 @@ sampler_t = RobustSampler(np.array([x_init]), N=N_t,
                           probability_functions=pdfs, 
                           retain_uncertain_points=retain_uncertain_points)
 probt = om.Problem()
+probt.model.add_subsystem("dvs", om.IndepVarComp(), promotes=["*"])
+probt.model.dvs.add_output("x_d", val=x_init)
+
 probt.model.add_subsystem("stat", StatCompComponent(sampler=sampler_t,
                                  stat_type="mu_sigma", 
                                  pdfs=pdfs, 
@@ -114,9 +128,11 @@ probt.model.add_subsystem("stat", StatCompComponent(sampler=sampler_t,
 
 probt.driver = om.pyOptSparseDriver(optimizer= 'SNOPT') #Default: SLSQP
 probt.driver.opt_settings = opt_settings
-probt.driver = om.ScipyOptimizeDriver(optimizer='L-BFGS-B') 
+probt.driver = om.ScipyOptimizeDriver(optimizer='SLSQP') 
+
+probt.model.connect("x_d", "stat.x_d")
+probt.model.add_design_var("x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
 # probt.driver = om.ScipyOptimizeDriver(optimizer='CG') 
-probt.model.add_design_var("stat.x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
 probt.model.add_objective("stat.musigma")
 probt.setup()
 probt.set_val("stat.x_d", x_init)
@@ -144,6 +160,7 @@ raw optimization section
 raw optimization section
 """
 ### MODEL ###
+dvdict = OrderedDict()
 sampler_m = RobustSampler(np.array([x_init]), N=N_m, 
                           name='model', 
                           xlimits=xlimits, 
@@ -152,6 +169,9 @@ sampler_m = RobustSampler(np.array([x_init]), N=N_m,
                           external_only=external_only)
 # import pdb; pdb.set_trace()
 probm = om.Problem()
+probm.model.add_subsystem("dvs", om.IndepVarComp(), promotes=["*"])
+probm.model.dvs.add_output("x_d", val=x_init)
+
 probm.model.add_subsystem("stat", StatCompComponent(sampler=sampler_m,
                                  stat_type="mu_sigma", 
                                  pdfs=pdfs, 
@@ -163,65 +183,154 @@ probm.model.add_subsystem("stat", StatCompComponent(sampler=sampler_m,
                                  print_surr_plots=print_plots))
 # probm.driver = om.pyOptSparseDriver(optimizer='SNOPT') #Default: SLSQP
 # probm.driver.opt_settings = opt_settings
-probm.driver = om.ScipyOptimizeDriver(optimizer='L-BFGS-B') 
+probm.driver = om.ScipyOptimizeDriver(optimizer='SLSQP') 
 # probm.driver = om.ScipyOptimizeDriver(optimizer='CG') 
-probm.model.add_design_var("stat.x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
+probm.model.connect("x_d", "stat.x_d")
+probm.model.add_design_var("x_d", lower=xlimits_d[0,0], upper=xlimits_d[0,1])
+dvdict["x_d"] = OrderedDict({'name':'x_d', 'size':1})
+# probm.setup()
+
+if trust_region_bound:
+    # connect all dvs 
+    dv_settings = dvdict
+    probm.model.add_subsystem('trust', TrustBound(dv_dict=dv_settings))#, promotes_inputs=list(dv_settings.keys()))
+    probm.model.trust.add_input("x_d", val=x_init)
+    probm.model.add_constraint('trust.c_trust', lower=0.0)
+    probm.model.connect("x_d", "trust.x_d")
+
+
 probm.model.add_objective("stat.musigma")
 probm.setup()
-probm.set_val("stat.x_d", x_init)
+# om.n2(probm)
+probm.set_val("x_d", x_init)
 probm.run_model()
 
-sub_optimizer = SequentialFullSolve(prob_model=probm, prob_truth=probt, 
+
+if trust_region_bound:
+    sub_optimizer = UncertainTrust(prob_model=probm, prob_truth=probt, 
+                                    initial_trust_radius=initial_trust_radius,
                                     flat_refinement=jump, 
                                     max_iter=max_outer,
                                     use_truth_to_train=use_truth_to_train,
-                                    gradient_proximity_ref=True)
+                                    gradient_proximity_ref=grad_prox_ref)
+else:
+    sub_optimizer = SequentialFullSolve(prob_model=probm, prob_truth=probt, 
+                                    flat_refinement=jump, 
+                                    max_iter=max_outer,
+                                    use_truth_to_train=use_truth_to_train,
+                                    gradient_proximity_ref=grad_prox_ref)
 sub_optimizer.setup_optimization()
 sub_optimizer.solve_full()
 
-# x_opt_1 = sub_optimizer.result_cur['stat.xd'][0] #prob.get_val("stat.x_d")[0]
+x_opt_1 = copy.deepcopy(probm.model.get_val("x_d")[0])
 
-# plot conv
-cs = plt.plot(probm.model.stat.func_calls, probm.model.stat.objs)
-plt.xlabel(r"Number of function calls")
+func_calls_t = probt.model.stat.func_calls
+func_calls = probm.model.stat.func_calls
+objs_t = probt.model.stat.objs
+objs = probm.model.stat.objs
+xds_t = probt.model.stat.xps
+xds = probm.model.stat.xps
+
+outer = sub_optimizer.outer_iter
+jumps = sub_optimizer.break_iters
+
+bigsum = 0
+for i in range(outer+1):
+    if i == 0:
+        ind0 = 0
+    else:
+        ind0 = sum(jumps[:i])
+    ind1 = sum(jumps[:i+1])
+
+    plt.plot(list(np.asarray(func_calls[ind0:ind1])+bigsum), objs[ind0:ind1], linestyle='-', marker='s', color='b', label='convergence')
+    plt.plot([func_calls[ind1]+bigsum,func_calls_t[i]+func_calls[ind1]], 
+             [objs[ind1], objs_t[i]], linestyle='-', marker='s', color='orange')
+    bigsum = func_calls_t[i]
+
+# plt.xscale("log")
+plt.xlabel(r"Function Calls")
 plt.ylabel(r"$\mu_f(x_d)$")
-#plt.legend(loc=1)
-plt.savefig(f"./{name}/convergence_model_nosurr.pdf", bbox_inches="tight")
+
+plt.savefig(f"./{name}/convrobust1_true.pdf", bbox_inches="tight")
+
+
+
 plt.clf()
 
-import pdb; pdb.set_trace()
-# plot robust func
+for i in range(outer+1):
+    if i == 0:
+        ind0 = 0
+    else:
+        ind0 = sum(jumps[:i])
+    ind1 = sum(jumps[:i+1])
+
+    plt.plot(xds[ind0:ind1], objs[ind0:ind1], linestyle='-', marker='s',color='b')
+    plt.plot(xds_t[i], objs_t[i], linestyle='-', marker='s', color='orange')
+
+
+plt.xlabel(r"$x_d$")
+plt.ylabel(r"$\mu_f(x_d)$")
+
+plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
+plt.axvline(x_opt_1, color='r', linestyle='--', linewidth=1.2)
+
 ndir = 150
 x = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
 y = np.zeros([ndir])
 for j in range(ndir):
-    prob.set_val("stat.x_d", x[j])
-    prob.run_model()
-    y[j] = prob.get_val("stat.musigma")
-
+    probt.set_val("stat.x_d", x[j])
+    probt.run_model()
+    y[j] = probt.get_val("stat.musigma")
 # Plot original function
-cs = plt.plot(x, y)
-plt.xlabel(r"$x_d$")
-plt.ylabel(r"$\mu_f(x_d)$")
-plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
-plt.axvline(x_opt_1, color='r', linestyle='--', linewidth=1.2)
-#plt.legend(loc=1)
-plt.savefig(f"./robust_opt_subopt_plots/objrobust1_true.pdf", bbox_inches="tight")
+plt.plot(x, y, label='objective')
+
+plt.savefig(f"./{name}/objrobust1_true.pdf", bbox_inches="tight")
+
+
+
 plt.clf()
 
-# plot beta dist
-x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
-y = np.zeros([ndir])
-beta_handle = beta(pdfs[0][1],pdfs[0][2])
-for j in range(ndir):
-    y[j] = beta_handle.pdf(x[j])
-cs = plt.plot(x, y)
-plt.xlabel(r"$x_d$")
-plt.ylabel(r"$\mu_f(x_d)$")
-plt.axvline(0.75, color='r', linestyle='--', linewidth=1.2)
-#plt.legend(loc=1)
-plt.savefig(f"./robust_opt_subopt_plots/betadist1_true.pdf", bbox_inches="tight")
-plt.clf()
+
+import pdb; pdb.set_trace()
+
+
+
+# # plot conv
+# cs = plt.plot(probm.model.stat.func_calls, probm.model.stat.objs)
+# plt.xlabel(r"Number of function calls")
+# plt.ylabel(r"$\mu_f(x_d)$")
+# #plt.legend(loc=1)
+# plt.savefig(f"./{name}/convergence_model_nosurr.pdf", bbox_inches="tight")
+# plt.clf()
+
+# import pdb; pdb.set_trace()
+# # plot robust func
+# ndir = 150
+
+
+# # Plot original function
+# cs = plt.plot(x, y)
+# plt.xlabel(r"$x_d$")
+# plt.ylabel(r"$\mu_f(x_d)$")
+# plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
+# plt.axvline(x_opt_1, color='r', linestyle='--', linewidth=1.2)
+# #plt.legend(loc=1)
+# plt.savefig(f"./robust_opt_subopt_plots/objrobust1_true.pdf", bbox_inches="tight")
+# plt.clf()
+
+# # plot beta dist
+# x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+# y = np.zeros([ndir])
+# beta_handle = beta(pdfs[0][1],pdfs[0][2])
+# for j in range(ndir):
+#     y[j] = beta_handle.pdf(x[j])
+# cs = plt.plot(x, y)
+# plt.xlabel(r"$x_d$")
+# plt.ylabel(r"$\mu_f(x_d)$")
+# plt.axvline(0.75, color='r', linestyle='--', linewidth=1.2)
+# #plt.legend(loc=1)
+# plt.savefig(f"./robust_opt_subopt_plots/betadist1_true.pdf", bbox_inches="tight")
+# plt.clf()
 
 
 
