@@ -244,7 +244,7 @@ if(not skip_LHS):
             for m in range(len(samplehistK)):
                 xtrainK[n].append(sampling(samplehistK[m]))
                 ftrainK[n].append(trueFunc(xtrainK[n][m]))
-                gtrainK[n].append(convert_to_smt_grads(trueFunc, xtrainK[co]))
+                gtrainK[n].append(convert_to_smt_grads(trueFunc, xtrainK[n][m]))
                 # gtrainK[n].append(np.zeros([samplehistK[m],dim]))
                 # for i in range(dim):
                 #     gtrainK[n][m][:,i:i+1] = trueFunc(xtrainK[n][m],i)
@@ -267,6 +267,7 @@ if fresh:
         modelbase.options.update({"extra_points":extra})
         modelbase.options.update({"corr":corr})
         modelbase.options.update({"poly":poly})
+        modelbase.options.update({"delta_x":delta_x})
         modelbase.options.update({"n_start":5})
     elif(stype == "dgek"):
         modelbase = DGEK(xlimits=xlimits)
@@ -430,6 +431,7 @@ for n in cases[rank]:
     hist.append(hf)
     errhrms.append(ef)
     errhmean.append(ef2)
+    import pdb; pdb.set_trace()
     co += 1
 
 

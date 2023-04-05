@@ -139,7 +139,7 @@ def stat_comp(model, prob, stat_type="mu_sigma", N=5000, xdata=None, fdata=None,
 
     # get scales for uncertain variables, and preset pdf funcs for each
     #TODO: find a way to deal with normal dist/truncated normal at least
-    pdf_list, uncert_list, static_list, scales = _gen_var_lists(pdfs, xlimits)
+    pdf_list, uncert_list, static_list, scales, pdf_name_list = _gen_var_lists(pdfs, xlimits)
     u_scales = scales[uncert_list]
 
     u_dim = len(uncert_list)
@@ -302,10 +302,37 @@ def full_error(model, prob, N=5000, xdata=None, fdata=None, pdfs=["uniform"], re
 
 
 def _gen_var_lists(pdfs, xlimits):
+    """
+    Based on variable designation in pdfs, return useful lists
+
+    N total variables, N = n_u + n_d
+
+    Parameters:
+        pdfs : list
+            list of pdf and deterministic information
+
+        xlimits : list
+            parameter bounds for each variable
+
+    Returns:
+        pdf_list : list
+            list of pdf function handles and deterministic values, length N
+        uncert_list : list
+            list of indices in pdf_list corresponding to uncertain vars, length n_u
+        static_list : list
+            list of indices in pdf_list corresponding to deterministic vars, length n_d
+        scales : list
+            list of indices in pdf_list corresponding to deterministic vars, length N
+        pdf_name_list : list
+            list of pdf name strings, length n_u
+
+
+    """
 
     dim = len(pdfs)
     pdf_list = []
-    uncert_list = []
+    pdf_name_list = [] # same length 
+    uncert_list = []   # same length
     static_list = []
     scales = np.zeros(dim)
     for j in range(dim):
@@ -318,6 +345,7 @@ def _gen_var_lists(pdfs, xlimits):
             args.append(xlimits[j][0])#loc=
             args.append(scales[j])#scale=
             pdf_list.append(_pdf_handle[pdfs[j][0]](*args))
+            pdf_name_list.append(pdfs[j][0])
             uncert_list.append(j)
 
         # pdf with no arguments e.g. uniform
@@ -326,6 +354,7 @@ def _gen_var_lists(pdfs, xlimits):
             args.append(xlimits[j][0])#loc=
             args.append(scales[j])#scale=
             pdf_list.append(_pdf_handle[pdfs[j]](*args))
+            pdf_name_list.append(pdfs[j])
             uncert_list.append(j)
         
         # no pdf, fixed at the float given
@@ -339,9 +368,10 @@ def _gen_var_lists(pdfs, xlimits):
             args.append(xlimits[j][0])#loc=
             args.append(scales[j])#scale=
             pdf_list.append(_pdf_handle['uniform'])
+            pdf_name_list.append('uniform')
             uncert_list.append(j)
         else: # ndarray, should only have one element
             pdf_list.append(pdfs[j][0])
             static_list.append(j)
 
-    return pdf_list, uncert_list, static_list, scales
+    return pdf_list, uncert_list, static_list, scales, pdf_name_list

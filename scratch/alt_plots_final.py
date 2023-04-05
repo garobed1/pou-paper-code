@@ -32,10 +32,17 @@ size = comm.Get_size()
 In this plotting script, generate desired alternative surrogate models from
 those used in adaptive sampling, using the data obtained from adaptive
 sampling, and compare performance.
+
+Adding the option to "double count" the number of samples for gradient models
 """
 
 # Give directory with desired results as argument
 title = sys.argv[1]
+
+fac = 1
+if len(sys.argv) > 2:
+    fac = sys.argv[2]
+
 alt_model = ['KRG','GEK']#sys.argv[2]
 #impath = title.rsplit('.')
 sys.path.append(title)
@@ -95,20 +102,23 @@ for i in range(1, ehrm.shape[0]):
 if rank == 0:
     #NRMSE
     ax = plt.gca()
-    #plt.loglog(samplehist, ehrm, "b-", label=f'Adapt (POU)')
+    plt.loglog(fac*samplehist, ehrm, "b-", label=f'Adapt (POU)')
     # #plt.fill_between(samplehist, ehrm - ehrs, ehrm + ehrs, color='b', alpha=0.2)
-    plt.loglog(samplehistk, ekrm, 'b--', label='LHS (POU)')
+    plt.loglog(fac*samplehistk, ekrm, 'b--', label='LHS (POU)')
     #plt.fill_between(samplehistk, ekrm - ekrs, ekrm + ekrs, color='b', alpha=0.1)
-    # plt.loglog(samplehistk, earm1, 'g-', label=f'Adapt ({alt_model[0]})')
+    plt.loglog(samplehistk, earm1, 'g-', label=f'Adapt ({alt_model[0]})')
     #plt.fill_between(samplehistk, earm1 - ears1, earm1 + ears1, color='g', alpha=0.2)
-    # plt.loglog(samplehistk, ehrm1, 'g--',  label=f'LHS ({alt_model[0]})')
+    plt.loglog(samplehistk, ehrm1, 'g--',  label=f'LHS ({alt_model[0]})')
     #plt.fill_between(samplehistk, ehrm1 - ehrs1, ehrm1 + ehrs1, color='g', alpha=0.1)
-    #plt.loglog(samplehistk, earm2, 'r-', label=f'Adapt ({alt_model[1]})')
+    plt.loglog(fac*samplehistk, earm2, 'r-', label=f'Adapt ({alt_model[1]})')
     #plt.fill_between(samplehistk, earm2 - ears2, earm2 + ears2, color='r', alpha=0.2)
-    plt.loglog(samplehistk, ehrm2, 'r--', label=f'LHS ({alt_model[1]})')
+    plt.loglog(fac*samplehistk, ehrm2, 'r--', label=f'LHS ({alt_model[1]})')
     #plt.fill_between(samplehistk, ehrm2 - ehrs2, ehrm2 + ehrs2, color='r', alpha=0.1)
 
-    plt.xlabel("Number of samples")
+    if fac > 1.0:
+        plt.xlabel("Number of samples")
+    else:
+        plt.xlabel("Sampling Effort")
     plt.ylabel("NRMSE")
     plt.gca().set_ylim(top=10 ** math.ceil(math.log10(max([ehrm[0], ekrm[0], ehrm1[0],ehrm2[0]]))))
     plt.gca().set_ylim(bottom=10 ** math.floor(math.log10(np.nanmin([ehrm[-1], ekrm[-1], ehrm1[-1],ehrm2[-1]]))))

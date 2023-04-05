@@ -17,6 +17,7 @@ def _mu_sigma_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None):
     
 
     # uniform importance sampled monte carlo integration
+    #NOTE: REMEMBER TO CITE/MENTION THIS
     arrs = np.array_split(tx, dim)
     l1 = 0
     l2 = 0

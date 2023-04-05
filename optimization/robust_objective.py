@@ -2,13 +2,28 @@ import numpy as np
 import copy
 from collections import defaultdict
 from utils.error import stat_comp, _gen_var_lists
+from scipy.special import legendre, hermite, jacobi, roots_legendre, roots_hermite, roots_jacobi
 from smt.sampling_methods import LHS
 
 from smt.utils.options_dictionary import OptionsDictionary
 
+
+# this one better suited for surrogate model
+_poly_types = {
+    "uniform": legendre,
+    "norm": hermite,
+    "beta": jacobi
+}
+
+_poly_root_types = {
+    "uniform": roots_legendre,
+    "norm": roots_hermite,
+    "beta": roots_jacobi
+}
+
 """
 Provides an interface to a consistent set of sampling points for a function with
-design inputs and uncertain inputs, 
+design inputs and uncertain inputs, using LHS
 """
 class RobustSampler():
     def __init__(self, x_d_init, N, **kwargs):
@@ -73,19 +88,6 @@ class RobustSampler():
             desc="keep the same points in the uncertain space as we traverse the design space",
         )
 
-        self.options.declare(
-            "external_only",
-            types=bool,
-            default=False,
-            desc="only use with surrogate. when design is updated, don't add new points at all",
-        )   #TODO: This will likely need tweaking, and allow for both kinds of training data updates
-
-        self.options.declare(
-            "design_noise",
-            types=float,
-            default=0.0,
-            desc="only use with surrogate. when sampling the uncertain space, add random noise to the dvs, scaled by this option",
-        )
 
         self.options.declare(
             "name",
@@ -107,13 +109,14 @@ class RobustSampler():
         xlimits = self.options["xlimits"]
         
 
-        pdf_list, uncert_list, static_list, scales = _gen_var_lists(pdfs, xlimits)
+        pdf_list, uncert_list, static_list, scales, pdf_name_list = _gen_var_lists(pdfs, xlimits)
         
         self.x_u_dim = len(uncert_list)
         self.x_d_dim = len(static_list)
         self.x_u_ind = uncert_list
         self.x_d_ind = static_list
         self.pdf_list = pdf_list
+        self.pdf_name = pdf_name_list
         self.dim = self.x_u_dim + self.x_d_dim
 
         self._initialize()
@@ -125,6 +128,10 @@ class RobustSampler():
     Start of methods to override
     """
     def _initialize(self):
+        
+        
+
+        
         # run sampler for the first time on creation
         xlimits = self.options["xlimits"]
 
@@ -132,7 +139,20 @@ class RobustSampler():
         self.sampling = LHS(xlimits=u_xlimits, criterion='maximin')
 
     def _declare_options(self):
-        pass
+        # add exclusive options
+        self.options.declare(
+            "external_only",
+            types=bool,
+            default=False,
+            desc="only use with surrogate. when design is updated, don't add new points at all",
+        )   #TODO: This will likely need tweaking, and allow for both kinds of training data updates
+
+        self.options.declare(
+            "design_noise",
+            types=float,
+            default=0.0,
+            desc="only use with surrogate. when sampling the uncertain space, add random noise to the dvs, scaled by this option",
+        )
 
     def _new_sample(self, N):
         #TODO: options for this
@@ -390,6 +410,156 @@ class RobustSampler():
 
         pass
 
+
+"""
+Sampler object for stochastic collocation points. N represents total polynomial order, though it may be adapted
+on a per-direction basis
+"""
+class CollocationSampler(RobustSampler):
+    
+
+
+    def _initialize(self):
+        # add exclusive options
+        # self.options.declare(
+        #     "external_only",
+        #     types=bool,
+        #     default=False,
+        #     desc="only use with surrogate. when design is updated, don't add new points at all",
+        # )   #TODO: This will likely need tweaking, and allow for both kinds of training data updates
+        
+        # run sampler for the first time on creation
+        xlimits = self.options["xlimits"]
+
+        
+
+        # given pdfs, generate list of appropriate polynomials
+        #TODO: Only works for uniform/legendre and normal/hermite, beta needs to pass args
+        poly_list = []
+        for i in range(self.x_u_dim):
+            j = self.x_u_ind[i]
+            pname = self.pdf_name[i]
+            if pname == "beta":
+                poly_list.append(lambda n: _poly_root_types["beta"](n, 
+                                                                    alpha=self.pdf_list[j][1],
+                                                                    beta=self.pdf_list[j][2]))
+            else: # don't require additional args
+                poly_list.append(_poly_root_types[pname])
+
+        self.poly_list = poly_list
+        self.weights = None
+
+        # N represents the order of the polynomial basis functions, not the samples directly
+        # If int, that is the order for all directions. If list (of length x_u_dim), apply to each 
+
+
+
+        # u_xlimits = xlimits[self.x_u_ind]
+        # self.sampling = LHS(xlimits=u_xlimits, criterion='maximin')
+
+    def _declare_options(self):
+        pass
+
+    def _new_sample(self, N):
+
+        self.N = N
+        if isinstance(N, int):
+            self.N = self.x_u_dim*[N]
+
+        # use recursion to form full tensor products
+        N_act = self._recurse_total_points(0, self.N, 1)
+
+        # use recursion to get jumps for each dimension
+        jumps = np.zeros(self.x_u_dim, dtype=int)
+
+        # gather list of all abscissae in each direction
+        absc = []
+        weig = []
+        for i in range(self.x_u_dim):
+            x, w = self.poly_list[i](self.N[i])
+            absc.append(x)
+            weig.append(w)
+            jumps[i] = self._recurse_total_points(i, self.N, 1)/self.N[i]
+
+        self.u_tx = np.zeros([N_act, self.x_u_dim])
+        self.weights = np.ones(N_act)
+        
+        si = np.zeros(self.x_u_dim, dtype=int)
+        self._recurse_sc_formation(0, si, jumps, absc, weig, self.N)
+
+        # N_act = len(u_tx)
+        # u_tx = np.array(u_tx)
+
+        tx = np.zeros([N_act, self.dim])
+        tx[:, self.x_u_ind] = self.u_tx
+        tx[:, self.x_d_ind] = self.x_d_cur#[self.x_d_cur[i] for i in self.x_d_ind]
+
+        import pdb; pdb.set_trace()
+        return tx
+
+    def _refine_sample(self, N):
+        N_old = self.N
+
+        if isinstance(N, int):
+            N_add = self.x_u_dim*[N]
+            
+        N_new = np.array(N_old) + np.array(N_add)
+        N_new = N_new.tolist()
+
+        tx = self._new_sample(N)
+
+        return tx
+
+    def _recurse_sc_formation(self, di, si, jumps, absc, weig, N):
+        
+        N_cur = N[di]
+        
+        for i in range(N_cur):
+            super_ind = np.dot(si, jumps)
+            # recurse if more dimensions
+            if di < self.x_u_dim - 1:
+                self._recurse_sc_formation(di+1, si, jumps, absc, weig, N)
+                si[di+1:] = 0
+            
+            self.weights[super_ind] = 1.0
+            for j in range(self.x_u_dim):
+                try:
+                    self.u_tx[super_ind][j] = absc[j][si[j]]
+                    self.weights[super_ind] *= weig[j][si[j]]
+                except:
+                    print("SC Recursion Failure!")
+                    import pdb; pdb.set_trace()
+
+            si[di] += 1
+            
+
+    def _recurse_total_points(self, di, N, tot):
+        
+        tot *= N[di]
+        # recurse if more dimensions
+        if di < self.x_u_dim - 1:
+            tot = self._recurse_total_points(di+1, N, tot)
+
+        return tot
+
+
+
+if __name__ == '__main__':
+
+    N = [5, 3, 2]
+    x_init = 0.
+    xlimits = np.array([[-1., 1.],
+               [-1., 1.],
+               [-1., 1.],
+               [-1., 1.]])
+    pdfs =  [x_init, 'uniform', 'uniform', 'uniform']
+    samp = CollocationSampler(np.array([x_init]), N=N,
+                                xlimits=xlimits, 
+                                probability_functions=pdfs, 
+                                retain_uncertain_points=True)
+    
+    #TODO: Make a test for this
+    #TODO: SCALE, PLANE WORK
 
 # class RobustQuantity():
 #     """

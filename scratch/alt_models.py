@@ -138,6 +138,7 @@ if(dim > 1):
     modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
     modelbase2.options.update({"poly":ssettings["poly"]})
     modelbase2.options.update({"n_start":5})
+    # modelbase2.options.update({"delta_x":1e-4})
     if(dim > 2):
         modelbase2.options.update({"zero_out_y":True})
 else:

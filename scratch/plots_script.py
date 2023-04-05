@@ -18,9 +18,14 @@ from smt.sampling_methods import LHS
 
 # Give directory with desired results as argument
 title = sys.argv[1]
+
+"adding comm line option to double x axis for gradient models"
 title2 = None
+fac = 1.0
 if len(sys.argv) > 2:
-    title2 = sys.argv[2]
+    fac = sys.argv[2]
+if len(sys.argv) > 3:
+    title2 = sys.argv[3]
 
 if not os.path.isdir(title):
     os.mkdir(title)

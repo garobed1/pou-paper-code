@@ -85,14 +85,15 @@ class HessianRefine(ASCriteria):
         if(self.nnew == 0):
             self.nnew = 1
 
-        trx = self.model.X_norma#model.training_points[None][0][0]
-        trf = self.model.y_norma#training_points[None][0][1]
+        #NOTE: Slicing here because GEKPLS appends grad approx
+        trx = self.model.X_norma[0:self.ntr]#model.training_points[None][0][0]
+        trf = self.model.y_norma[0:self.ntr]#training_points[None][0][1]
         trg = np.zeros_like(trx)
-        if(isinstance(self.model, GEKPLS)):
-            for j in range(self.dim):
-                trg[:,j] = self.model.g_norma[:,j].flatten()
-        else:
-            trg = self.grad*(self.model.X_scale/self.model.y_std)
+        # if(isinstance(self.model, GEKPLS)):
+        #     for j in range(self.dim):
+        #         trg[:,j] = self.model.g_norma[:,j].flatten()
+        # else:
+        trg = self.grad*(self.model.X_scale/self.model.y_std)
 
 
         self.trx = trx
@@ -114,7 +115,6 @@ class HessianRefine(ASCriteria):
                 dists, ind = self.tree.query(self.trx[i], nstencil)
                 indn.append(ind)
             hess = []
-
             for i in range(self.ntr):
                 Hh = quadraticSolveHOnly(self.trx[i,:], self.trx[indn[i][1:nstencil],:], \
                                          trf[i], trf[indn[i][1:nstencil]], \
@@ -132,7 +132,10 @@ class HessianRefine(ASCriteria):
     # Assumption is that the quadratic terms are the error
     def evaluate(self, x, bounds, dir=0):
         
-        delta = self.model.options["delta"]
+        try:
+            delta = self.model.options["delta"]
+        except:
+            delta = 1e-10
 
         # exhaustive search for closest sample point, for regularization
         D = cdist(np.array([x]), self.trx)

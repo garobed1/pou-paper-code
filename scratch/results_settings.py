@@ -1,7 +1,7 @@
 
-header = "pou_TESTFAKE3_hess"
+header = "pou_TESTFAKE4_hess_deltax"
 path = None
-skip_LHS = True 
+skip_LHS = False 
 LHS_batch = 7
 runs_per_proc = 1
 
@@ -11,7 +11,7 @@ dim = 2     #problem dimension
 
 
 # Surrogate Settings
-stype = "pouhess"    #surrogate type
+stype = "gekpls" #"pouhess"   #surrogate type
 
 rtype =  "hess"
 opt = 'L-BFGS-B' #'SLSQP'#
@@ -21,8 +21,9 @@ local = False
 # opt = 'SLSQP' #for SFCVT constraint
 # local = True
 
-corr  = "matern32"  #kriging correlation
-poly  = "linear"    #kriging regression 
+corr  = "squar_exp"  #kriging correlation
+poly  = "linear"    #kriging regression
+delta_x = 1e-7 #1e-7
 extra = dim           #gek extra points
 t0 = [1e-0]
 tb = [1e-5, 2e+1]
@@ -31,7 +32,7 @@ rho = 10           #POU parameter
 
 # Adaptive Sampling Settings
 nt0  = dim*10       #initial design size
-ntr = 5      #number of points to add
+ntr = 120      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000*dim       #number of test points to evaluate the error
