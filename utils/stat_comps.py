@@ -1,20 +1,21 @@
 import numpy as np
 from utils.sutils import convert_to_smt_grads
+import copy
 
 
 
 
 
 
-
-def _mu_sigma_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None):
+def _mu_sigma_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None, weights=None):
 
     dim = tx.shape[1]
     
     vals = np.zeros([N,1])
     dens = np.ones([N,1])
-    summand = np.zeros([N,1])
-    
+    summand = np.zeros([N,1])    
+
+    N_act = 1
 
     # uniform importance sampled monte carlo integration
     #NOTE: REMEMBER TO CITE/MENTION THIS
@@ -29,21 +30,27 @@ def _mu_sigma_comp(func_handle, N, tx, xlimits, scales, pdf_list, tf = None):
             vals[l1:l2,:] = func_handle(arrs[k])
         for j in range(dim):
             if not isinstance(pdf_list[j], float):
-                dens[l1:l2,:] = np.multiply(dens[l1:l2,:], pdf_list[j].pdf(arrs[k][:,j]).reshape((l2-l1, 1))) #TODO: loc must be different for certain dists
+                if weights is None:
+                    dens[l1:l2,:] = np.multiply(dens[l1:l2,:], pdf_list[j].pdf(arrs[k][:,j]).reshape((l2-l1, 1))) #TODO: loc must be different for certain dists
+                else:
+                    dens[l1:l2,:] = np.atleast_2d(weights[l1:l2]).T
         summand[l1:l2,:] = dens[l1:l2,:]*vals[l1:l2,:]
         l1 += arrs[k].shape[0]
 
-    area = np.prod(scales) #just a hypercube
-    mean = area*sum(summand)/N
-    #stdev = np.sqrt(((area*sum(summand*vals))/N - (mean)**2))#/N
-    A = sum(dens)/N
-    stdev = np.sqrt(((area*sum(summand*vals))/N - (2-A)*(mean)**2 ))#/N
+    area = 1
+    if weights is None:
+        area = np.prod(scales) #just a hypercube
+        N_act = copy.deepcopy(N)
+    mean = area*sum(summand)/N_act
+    #stdev = np.sqrt(((area*sum(summand*vals))/N_act - (mean)**2))#/N
+    A = sum(dens)/N_act
+    stdev = np.sqrt(((area*sum(summand*vals))/N_act - (2-A)*(mean)**2 ))#/N
 
     return (mean, stdev), vals
 
 
 #TODO: need to not recompute functions if not needed, right now it will rerun analyses already completed
-def _mu_sigma_grad(func_handle, N, tx, xlimits, scales, static_list, pdf_list, tf, tg = None):
+def _mu_sigma_grad(func_handle, N, tx, xlimits, scales, static_list, pdf_list, tf, tg = None, weights=None):
 
     dim = tx.shape[1]
     dim_d = len(static_list)
@@ -54,6 +61,8 @@ def _mu_sigma_grad(func_handle, N, tx, xlimits, scales, static_list, pdf_list, t
     summand = np.zeros([N,1])
     gsummand = np.zeros([N,dim_d])
     
+    N_act = 1
+
     arrs = np.array_split(tx, dim)
     l1 = 0
     l2 = 0
@@ -73,7 +82,11 @@ def _mu_sigma_grad(func_handle, N, tx, xlimits, scales, static_list, pdf_list, t
         for j in range(dim):
             #import pdb; pdb.set_trace()
             if not isinstance(pdf_list[j], float):
-                dens[l1:l2,:] = np.multiply(dens[l1:l2,:], pdf_list[j].pdf(arrs[k][:,j]).reshape((l2-l1, 1))) #TODO: loc must be different for certain dists
+                if weights is None:
+                    dens[l1:l2,:] = np.multiply(dens[l1:l2,:], pdf_list[j].pdf(arrs[k][:,j]).reshape((l2-l1, 1))) #TODO: loc must be different for certain dists
+                else:
+                    dens[l1:l2,:] = np.atleast_2d(weights[l1:l2]).T
+
         summand[l1:l2,:] = dens[l1:l2,:]*vals[l1:l2,:]
         
         for j in range(dim_d):
@@ -81,13 +94,16 @@ def _mu_sigma_grad(func_handle, N, tx, xlimits, scales, static_list, pdf_list, t
         
         l1 += arrs[k].shape[0]
 
-    area = np.prod(scales) #just a hypercube
-    mean = area*sum(summand)/N
+    area = 1
+    if weights is None:
+        area = np.prod(scales) #just a hypercube
+        N_act = copy.deepcopy(N)
+    mean = area*sum(summand)/N_act
     gmean = (area/N)*np.sum(gsummand, axis=0 )
 
     #stdev = np.sqrt(((area*sum(summand*vals))/N - (mean)**2))#/N
-    A = sum(dens)/N
-    stdev = np.sqrt(((area*sum(summand*vals))/N - (2-A)*(mean)**2 ))#/N
+    A = sum(dens)/N_act
+    stdev = np.sqrt(((area*sum(summand*vals))/N_act - (2-A)*(mean)**2 ))#/N
     work = 0.5*(1./stdev)
     work2 = 2.*(2.-A)*mean*gmean
     work3 = np.multiply(2*summand, grads[:,static_list])

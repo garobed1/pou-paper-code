@@ -149,12 +149,16 @@ def stat_comp(model, prob, stat_type="mu_sigma", N=5000, xdata=None, fdata=None,
 
     # generate sample points, with fixed static values
     # TODO: need some kind of all-encompassing sampling function
+    weights=None # for collocation method with weights provided by sampler
     if(xdata is not None):
         if using_sampler:
             tx = xdata.current_samples['x']
             tf = xdata.current_samples['f'] #probably None but this should work
             tg = xdata.current_samples['g']
             N = tx.shape[0]
+
+            if hasattr(xdata, 'weights'):
+                weights = xdata.weights
         else:
             tx = xdata
             tf = None
@@ -182,13 +186,13 @@ def stat_comp(model, prob, stat_type="mu_sigma", N=5000, xdata=None, fdata=None,
 
     if get_grad:
         if tf is None:
-            out_tup, vals = _stat_handle[stat_type](func_handle, N, tx, xlimits, u_scales, pdf_list, tf=tf)
+            out_tup, vals = _stat_handle[stat_type](func_handle, N, tx, xlimits, u_scales, pdf_list, tf=tf, weights=weights)
             if using_sampler:
                 xdata.set_evaluated_func(vals)
 
             tf = vals
 
-        grad_tup, grads = _stat_handle_grad[stat_type](grad_handle, N, tx, xlimits, u_scales, static_list, pdf_list, tf=tf, tg=tg)
+        grad_tup, grads = _stat_handle_grad[stat_type](grad_handle, N, tx, xlimits, u_scales, static_list, pdf_list, tf=tf, tg=tg, weights=weights)
 
         if using_sampler:
             xdata.set_evaluated_grad(grads)

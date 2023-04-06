@@ -118,6 +118,7 @@ class RobustSampler():
         self.pdf_list = pdf_list
         self.pdf_name = pdf_name_list
         self.dim = self.x_u_dim + self.x_d_dim
+        self.scales = scales
 
         self._initialize()
 
@@ -429,7 +430,7 @@ class CollocationSampler(RobustSampler):
         # )   #TODO: This will likely need tweaking, and allow for both kinds of training data updates
         
         # run sampler for the first time on creation
-        xlimits = self.options["xlimits"]
+        self.xlimits = self.options["xlimits"]
 
         
 
@@ -475,8 +476,10 @@ class CollocationSampler(RobustSampler):
         # gather list of all abscissae in each direction
         absc = []
         weig = []
+        #TODO: ONLY WORKS FOR DISTS RANGING -1 to 1, NORMAL DIST IS UNCLEAR
         for i in range(self.x_u_dim):
             x, w = self.poly_list[i](self.N[i])
+            x = x*(self.scales[i]/2) + (0.5*self.scales[i] + xlimits[i,0])
             absc.append(x)
             weig.append(w)
             jumps[i] = self._recurse_total_points(i, self.N, 1)/self.N[i]
@@ -489,12 +492,12 @@ class CollocationSampler(RobustSampler):
 
         # N_act = len(u_tx)
         # u_tx = np.array(u_tx)
-
+        self.weights /= np.power(2, self.x_u_dim)
         tx = np.zeros([N_act, self.dim])
         tx[:, self.x_u_ind] = self.u_tx
         tx[:, self.x_d_ind] = self.x_d_cur#[self.x_d_cur[i] for i in self.x_d_ind]
 
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         return tx
 
     def _refine_sample(self, N):
@@ -546,18 +549,42 @@ class CollocationSampler(RobustSampler):
 
 if __name__ == '__main__':
 
-    N = [5, 3, 2]
     x_init = 0.
-    xlimits = np.array([[-1., 1.],
-               [-1., 1.],
-               [-1., 1.],
-               [-1., 1.]])
-    pdfs =  [x_init, 'uniform', 'uniform', 'uniform']
+    # N = [5, 3, 2]
+    # xlimits = np.array([[-1., 1.],
+    #            [-1., 1.],
+    #            [-1., 1.],
+    #            [-1., 1.]])
+    # pdfs =  [x_init, 'uniform', 'uniform', 'uniform']
+    # samp1 = CollocationSampler(np.array([x_init]), N=N,
+    #                             xlimits=xlimits, 
+    #                             probability_functions=pdfs, 
+    #                             retain_uncertain_points=True)
+    
+    
+    from smt.problems import Rosenbrock
+    from utils.sutils import convert_to_smt_grads
+    N = [5, 3]
+    pdfs = ['uniform', 'uniform']
+    func = Rosenbrock(ndim=2)
+    xlimits = func.xlimits
     samp = CollocationSampler(np.array([x_init]), N=N,
                                 xlimits=xlimits, 
                                 probability_functions=pdfs, 
                                 retain_uncertain_points=True)
     
+
+
+    xt = samp.current_samples['x']
+    ft = func(xt)
+    gt = convert_to_smt_grads(func, xt)
+    samp.set_evaluated_func(ft)
+    samp.set_evaluated_grad(gt)
+
+    from utils.stat_comps import _mu_sigma_comp, _mu_sigma_grad
+    stats, vals = _mu_sigma_comp(func, xt.shape[0], xt, xlimits, samp.scales, pdfs, tf = ft, weights=samp.weights)
+    # gstats, grads = _mu_sigma_grad(func, xt.shape[0], xt, xlimits, samp.scales, pdfs, tf = ft, tg=gt, weights=samp.weights)
+    import pdb; pdb.set_trace()
     #TODO: Make a test for this
     #TODO: SCALE, PLANE WORK
 
