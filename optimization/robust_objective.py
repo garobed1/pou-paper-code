@@ -9,11 +9,7 @@ from smt.utils.options_dictionary import OptionsDictionary
 
 
 # this one better suited for surrogate model
-_poly_types = {
-    "uniform": legendre,
-    "norm": hermite,
-    "beta": jacobi
-}
+
 
 _poly_root_types = {
     "uniform": roots_legendre,
@@ -449,8 +445,13 @@ class CollocationSampler(RobustSampler):
 
         self.poly_list = poly_list
         self.weights = None
+        
+        self.absc_nsc = None
+        self.weig_ind = None
 
-        # N represents the order of the polynomial basis functions, not the samples directly
+        self.N_act = None
+        self.jumps = None
+        # N represents the order of the polynomial basis functions, not the samples directly (N_act)
         # If int, that is the order for all directions. If list (of length x_u_dim), apply to each 
 
 
@@ -464,22 +465,27 @@ class CollocationSampler(RobustSampler):
     def _new_sample(self, N):
 
         self.N = N
+        xlimits = self.options["xlimits"]
         if isinstance(N, int):
             self.N = self.x_u_dim*[N]
 
         # use recursion to form full tensor products
         N_act = self._recurse_total_points(0, self.N, 1)
+        self.N_act = N_act
 
         # use recursion to get jumps for each dimension
         jumps = np.zeros(self.x_u_dim, dtype=int)
 
         # gather list of all abscissae in each direction
         absc = []
+        absc_nsc = [] #no scale
         weig = []
         #TODO: ONLY WORKS FOR DISTS RANGING -1 to 1, NORMAL DIST IS UNCLEAR
         for i in range(self.x_u_dim):
-            x, w = self.poly_list[i](self.N[i])
-            x = x*(self.scales[i]/2) + (0.5*self.scales[i] + xlimits[i,0])
+            x_nsc, w = self.poly_list[i](self.N[i])
+            # x = x*(self.scales[i]/2) + (0.5*self.scales[i] + xlimits[i,0])
+            absc_nsc.append(x_nsc)
+            x = 0.5*(x_nsc + 1.)*self.scales[i] + xlimits[i,0]
             absc.append(x)
             weig.append(w)
             jumps[i] = self._recurse_total_points(i, self.N, 1)/self.N[i]
@@ -492,6 +498,10 @@ class CollocationSampler(RobustSampler):
 
         # N_act = len(u_tx)
         # u_tx = np.array(u_tx)
+        # save abscissae as well
+        self.jumps = jumps
+        self.absc_nsc = absc_nsc
+        self.weig_ind = weig
         self.weights /= np.power(2, self.x_u_dim)
         tx = np.zeros([N_act, self.dim])
         tx[:, self.x_u_ind] = self.u_tx
@@ -586,67 +596,4 @@ if __name__ == '__main__':
     # gstats, grads = _mu_sigma_grad(func, xt.shape[0], xt, xlimits, samp.scales, pdfs, tf = ft, tg=gt, weights=samp.weights)
     import pdb; pdb.set_trace()
     #TODO: Make a test for this
-    #TODO: SCALE, PLANE WORK
 
-# class RobustQuantity():
-#     """
-#     Base class that defines a generic robust quantity of interest. Provides
-#     the function handles that get minimized/evaluated for constraints, along 
-#     with handles for their gradients
-    
-#     Flag as an objective or a constraint
-
-#     Types:
-#         "musigma" (default): Mean + \eta \sqrt{Variance}
-#         "failprob": 
-
-#     Types are implemented as derived classes
-
-#     """
-
-#     def __init__(self, **kwargs):
-#         """
-#         Initialize attributes
-#         """
-#         self.name = ''
-#         self.pathname = None
-#         self.comm = None
-
-
-#         self.options = OptionsDictionary(parent_name=type(self).__name__)
-
-#         self._declare_options()
-#         self.initialize()
-
-#         self.options.update(kwargs)
-
-
-#     def _declare_options(self):
-#         self.options.declare('opt_type', default="obj", values=["obj", "con"],
-#                              desc='objective or constraint')    
-#         self.options.declare('sampler', default=None, 
-#                              desc='sampler object, determines the nature of the samples used to compute the quantity')    
-
-#     def initialize(self):
-#         pass
-
-#     def _func(self, xd):
-#         pass
-
-#     def _grad(self, xd):
-#         pass
-
-
-# class MeanAndVar(RobustQuantity):
-
-#     """
-#     Quantity which is (1-\eta)\mu + \eta\sigma
-
-#     """
-
-#     def _declare_options(self):
-        
-#         super()._declare_options()
-
-#         self.options.declare('eta_val', types=float, default=0.5,
-#                              desc='balance parameter between mean and sigma, likely to be swept for pareto front')
