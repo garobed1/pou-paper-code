@@ -36,6 +36,7 @@ class ASCriteria():
 
         self.supports = supports = {}
         supports["obj_derivatives"] = False
+        supports["uses_constraints"] = False
 
         # set options
         self.options = OptionsDictionary()

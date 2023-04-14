@@ -1,12 +1,14 @@
 import numpy as np
 from numpy.linalg import qr
 from scipy.linalg import lstsq, lu_factor, lu_solve, solve, inv, eig
+from scipy.stats import qmc
 from scipy.spatial.distance import cdist
 from functions.example_problems import Heaviside, MultiDimJump, Quad2D
 from smt.problems import RobotArm
 from smt.sampling_methods import LHS
 from smt.surrogate_models.surrogate_model import SurrogateModel as SMT_SM
 from smt.problems.problem import Problem as SMT_PB
+
 
 def standardization2(X, y, bounds):
 
@@ -666,3 +668,88 @@ def convert_to_smt_grads(smt_func, x_array=None, g_array=None, deriv_predict=Fal
 #     gn[i,:] = i
 
 # quadraticSolve(x, xn, f, fn, g, gn)
+
+"""
+Print generic refinement criteria plots
+
+Parameters:
+    n: problem dim, only does anything for 1 or 2 right now
+    bounds: limits of plot, needed for evaluate
+    name: name of rc to use for plots
+    obj: rc object itself
+    
+    NOTE: NO DIR IMPLEMENTED EITHER FOR NOW
+"""
+def print_rc_plots(n, bounds, name, obj):
+    
+    if(n == 1):
+        import matplotlib.pyplot as plt
+        ndir = 400
+        # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+        # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+        x = np.linspace(0., 1., ndir)
+        F  = np.zeros([ndir]) 
+        for i in range(ndir):
+            xi = np.zeros([1])
+            xi[0] = x[i]
+            F[i]  = -obj.evaluate(xi, bounds)  #TODO: ADD DIR
+        if(obj.ntr == 10):
+            obj.scaler = np.max(F)  
+        F /= np.abs(obj.scaler)
+
+        plt.rcParams['font.size'] = '18'
+        ax = plt.gca()  
+        plt.plot(x, F, label='Criteria')
+        plt.xlim(-0.05, 1.05)
+        plt.ylim(top=1.0)
+        plt.ylim(bottom=-0.015)#np.min(F))
+        trxs = qmc.scale(obj.model.training_points[None][0][0], bounds[:,0], bounds[:,1], reverse=True)
+        #plt.plot(trxs[-1,0], [0], 'ro')
+        plt.plot(trxs[0:,0], np.zeros(trxs[0:,0].shape[0]), 'bo', label='Sample Locations')
+        plt.legend(loc=0)
+        plt.xlabel(r'$x_1$')
+        plt.ylabel(r'$\psi_{\mathrm{CV},%i}(x_1)$' % (obj.ntr-10))
+        wheret = np.full([ndir], True)
+        for i in range(obj.ntr):
+            # ax.fill_betweenx([-1,0], trxs[i]-obj.S, trxs[i]+obj.S, color='r', alpha=0.2, set_edgecolor='face')
+            for j in range(ndir):
+                if(x[j] > trxs[i]-obj.S and x[j] < trxs[i]+obj.S):
+                    wheret[j] = False
+        valid = np.where(wheret)[0]
+        yfill = np.zeros(ndir)
+        ax.fill_between(x,  0., 1., where=wheret, color = 'g', alpha=0.2)
+        plt.axvline(x[valid[np.argmax(F[valid])]], color='k', linestyle='--', linewidth=1.2)
+        plt.savefig(f"{name}_rc_1d_{obj.ntr}.pdf", bbox_inches="tight")  
+        plt.clf()
+        import pdb; pdb.set_trace()
+
+    if(n == 2):
+        import matplotlib.pyplot as plt
+        ndir = 75
+        # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
+        # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
+        x = np.linspace(0., 1., ndir)
+        y = np.linspace(0., 1., ndir)   
+        X, Y = np.meshgrid(x, y)
+        F  = np.zeros([ndir, ndir]) 
+        for i in range(ndir):
+            for j in range(ndir):
+                xi = np.zeros([2])
+                xi[0] = x[i]
+                xi[1] = y[j]
+                F[i,j]  = obj.evaluate(xi, bounds) #TODO: ADD DIR
+        cs = plt.contourf(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
+        plt.colorbar(cs)
+        trxs = qmc.scale(obj.model.training_points[None][0][0], bounds[:,0], bounds[:,1], reverse=True)#obj.trx, 
+        plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
+        plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
+        if hasattr(obj, 'S'):
+            ax = plt.gca()
+            for i in range(trxs.shape[0]):
+                circ = plt.Circle(trxs[i,:], obj.S, color='r', alpha=0.5)#fill=False)
+                ax.add_patch(circ)
+        plt.xlim([0., 1.])
+        plt.ylim([0., 1.])
+        plt.savefig(f"{name}_rc_2d.pdf")    
+        plt.clf()
+        # import pdb; pdb.set_trace()

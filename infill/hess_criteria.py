@@ -12,7 +12,7 @@ from scipy.stats import qmc
 from scipy.spatial import KDTree
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds
-from utils.sutils import innerMatrixProduct, linear, quadratic, quadraticSolve, quadraticSolveHOnly, symMatfromVec, estimate_pou_volume
+from utils.sutils import innerMatrixProduct, quadraticSolveHOnly, symMatfromVec, estimate_pou_volume, print_rc_plots
 
 
 """
@@ -237,79 +237,9 @@ class HessianRefine(ASCriteria):
         # fd = [fd1, fd2]
         # import pdb; pdb.set_trace()
         if(self.options["print_rc_plots"]):
+            print_rc_plots(n, bounds, "POUHESS", self)
 
-            if(n == 1):
-                
-                ndir = 200
-                # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
-                # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
-                x = np.linspace(0., 1., ndir)
-                F  = np.zeros([ndir]) 
-                for i in range(ndir):
-                    xi = np.zeros([1])
-                    xi[0] = x[i]
-                    F[i]  = -self.evaluate(xi, bounds, dir=dir)    
-                if(self.ntr == 10):
-                    self.scaler = np.max(F)  
-                F /= np.abs(self.scaler)
-
-                plt.rcParams['font.size'] = '16'
-                ax = plt.gca()  
-                plt.plot(x, F, label='Criteria')
-                plt.xlim(-0.05, 1.05)
-                plt.ylim(bottom=-0.015)
-                plt.ylim(top=1.0)#np.min(F))
-                trxs = self.trx#qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
-                #plt.plot(trxs[0:-1,0], np.zeros(trxs[0:-1,0].shape[0]), 'bo')
-                #plt.plot(trxs[-1,0], [0], 'ro')
-                plt.plot(trxs[0:,0], np.zeros(trxs[0:,0].shape[0]), 'bo', label='Sample Locations')
-                plt.legend(loc=0)
-                plt.xlabel(r'$x_1$')
-                plt.ylabel(r'$\psi_{\mathrm{Hess},%i}(x_1)$' % (self.ntr-10))
-                plt.axvline(x[np.argmax(F)], color='k', linestyle='--', linewidth=1.2)
-                plt.savefig(f"taylor_rc_1d_{self.ntr}.pdf", bbox_inches="tight")    
-                plt.clf()
-
-                xmod = np.linspace(bounds[0][0], bounds[0][1], ndir)
-                trxmod = self.model.training_points[None][0][0]
-                fmod = self.model.predict_values(xmod)
-                from problem_picker import GetProblem
-                origfunc = GetProblem('fuhgsh', 1)
-                forig = origfunc(xmod)
-                plt.plot(xmod, fmod, 'b', label='Model')
-                plt.plot(xmod, forig, 'k', label='Original')
-                plt.ylim(0,21)
-                trf = self.model.training_points[None][0][1]
-                plt.plot(trxmod, trf, 'bo', label='Sample Locations')
-                plt.legend(loc=2)
-                plt.xlabel(r'$x_1$')
-                plt.ylabel(r'$\hat{f}_{POU,%i}(x_1)$' % (self.ntr-10))
-                plt.axvline(xmod[np.argmax(F)], color='k', linestyle='--', linewidth=1.2)
-                plt.savefig(f"taylor_md_1d_{self.ntr}.pdf", bbox_inches="tight")    
-                plt.clf()
-                import pdb; pdb.set_trace()
-
-            if(n == 2):
-                ndir = 75
-                # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
-                # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
-                x = np.linspace(0., 1., ndir)
-                y = np.linspace(0., 1., ndir)   
-                X, Y = np.meshgrid(x, y)
-                F  = np.zeros([ndir, ndir]) 
-                for i in range(ndir):
-                    for j in range(ndir):
-                        xi = np.zeros([2])
-                        xi[0] = x[i]
-                        xi[1] = y[j]
-                        F[i,j]  = self.evaluate(xi, bounds, dir=dir)    
-                cs = plt.contourf(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
-                plt.colorbar(cs)
-                trxs = self.trx #qmc.scale(self.trx, bounds[:,0], bounds[:,1], reverse=True)
-                plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
-                plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
-                plt.savefig(f"taylor_rc_2d.pdf")    
-                plt.clf()
+     
         # import pdb; pdb.set_trace()
 
 

@@ -1,22 +1,22 @@
 
-header = "testing_sfcvt"
+header = "pou_paper_hess"
 path = None
-skip_LHS = True 
+skip_LHS = False 
 LHS_batch = 7
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "rosenbrock"    #problem
+prob  = "alos"    #problem
 dim = 2     #problem dimension
 
 
 # Surrogate Settings
-stype = "gekpls" #"pouhess"   #surrogate type
+stype = "pouhess" #"pouhess"   #surrogate type
 
-### FOR POU HESS
-# rtype =  "hess"
-# opt = 'L-BFGS-B' #'SLSQP'#
-# local = False
+### FOR POU SFCVT
+rtype =  "hess"
+opt = 'L-BFGS-B' #'SLSQP'#
+local = False
 
 ### FOR POU SFCVT
 # rtype =  "pousfcvt"
@@ -24,23 +24,26 @@ stype = "gekpls" #"pouhess"   #surrogate type
 # local = True
 
 ### FOR REGULAR SFCVT
-rtype =  "sfcvt"
-opt = 'SLSQP' #for SFCVT constraint, 
-local = False
-localswitch = False #fully global optimizer
+# rtype =  "sfcvt"
+# opt = 'SLSQP' #for SFCVT constraint, 
+# local = False
+# localswitch = False #fully global optimizer
 
+#Kriging
 corr  = "squar_exp"  #kriging correlation
 poly  = "linear"    #kriging regression
 delta_x = 1e-4 #1e-7
 extra = dim           #gek extra points
 t0 = [1e-0]
 tb = [1e-5, 2e+1]
+
+#POU
 rscale = 5.5
 rho = 10           #POU parameter
 
 # Adaptive Sampling Settings
-nt0  = 5       #initial design size
-ntr = 70      #number of points to add
+nt0  = dim*10       #initial design size
+ntr = dim*30     #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000*dim       #number of test points to evaluate the error
@@ -57,15 +60,21 @@ if(mstarttype == 2):
 if(pperb == 0):
     pperb = 1
 
-# Other Refinement Settings
-neval = 1+(dim+2) #applies to both criteria and POU model
+# Refinement Settings
+
+#Hess
+neval = 1+(dim+2)
 hess  = "neighborhood"
 interp = "honly"
-criteria = "distance"
+
+#Multi
 perturb = True
+
+#Deprecated
+criteria = "distance"
 bpen = False
 obj = "inv"
 nscale = 10.0 #1.0 for 2D
 nmatch = dim
 
-rc_print = True#False
+rc_print = False#False

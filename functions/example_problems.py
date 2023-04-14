@@ -770,6 +770,62 @@ class FakeShock(Problem):
 
         return y
 
+# Emulated shock problem function, rotated 45 degrees
+class FakeShockRot(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 2, values=[2], types=int)
+        self.options.declare("name", "FakeShockRot", types=str)
+
+    def _setup(self):
+        self.xlimits[0,:] = [23., 27.] #[23., 26.]
+        self.xlimits[1,:] = [0.36, 0.51]
+        self.rot = np.pi/2.
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        y = np.zeros((ne, 1), complex)
+        sc = 0.0004
+        bs = 0.0001
+        root = 24. + 83./500.
+
+        for i in range(ne):
+            X = x[i,:]
+            work = X[0] - 25.5
+            work2 = X[1] - self.xlimits[1,0]
+            if kx is None:
+                if(X[0] > root):
+                    y[i,0] = 0.2*(work**4) + work2
+                else:
+                    y[i,0] = -0.1*work + 0.5 + work2
+
+            elif(kx == 0):
+                if(X[0] > root):
+                    y[i,0] = 0.8*(work**3)
+                else:
+                    y[i,0] = -0.1
+            elif(kx == 1):
+                y[i,0] = 1.0
+        
+        y *= sc
+
+        if kx is None:
+            y += bs
+
+        return y
 
 
 # Ishigami function 
@@ -1042,6 +1098,8 @@ class BetaRobustEx1D(Problem):
             y[:,0] += self.c*dD2*(1.-x[:,0])
 
         return y
+
+
 
 # from matplotlib import pyplot as plt
 

@@ -25,7 +25,7 @@ def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, co
     if(type == "global"):
         if(method == "ga"):
             # gcon = NonlinearConstraint(lambda x: constraints["fun"](x, constraints["args"]), lb=0., ub=np.inf)
-            results = differential_evolution(func, bounds, args, strategy, maxiter=giter, popsize=gpop, tol=gtol, callback=callback, disp=False)
+            results = differential_evolution(func, bounds, args, strategy, maxiter=giter, popsize=gpop, constraints=constraints, tol=gtol, callback=callback, disp=False)
         else:
             return
 

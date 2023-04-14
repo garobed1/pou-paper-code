@@ -11,7 +11,7 @@ from infill.refinecriteria import looCV, HessianFit, TEAD
 from infill.aniso_criteria import AnisotropicRefine
 from infill.taylor_criteria import TaylorRefine, TaylorExploreRefine
 from infill.hess_criteria import HessianRefine, POUSSA
-from infill.loocv_criteria import POUSFCVT, SFCVT
+from infill.loocv_criteria import POUSFCVT
 from infill.aniso_transform import AnisotropicTransform
 from infill.getxnew import getxnew, adaptivesampling
 from optimization.defaults import DefaultOptOptions
@@ -135,7 +135,7 @@ if(prob != 'shock'):
 # Adaptive Sampling Conditions
 options = DefaultOptOptions
 options["local"] = local
-options["localswitch"] = localswitch
+options["localswitch"] = True
 options["errorcheck"] = testdata
 options["multistart"] = mstarttype
 options["lmethod"] = opt
@@ -409,8 +409,6 @@ for n in cases[rank]:
         RC0.append(POUSSA(model0[co], gtrain0[n], xlimits, improve=pperb, multistart=multistart, print_rc_plots=rc_print))
     elif(rtype == "pousfcvt"):
         RC0.append(POUSFCVT(model0[co], gtrain0[n], xlimits, improve=pperb, multistart=multistart, print_rc_plots=rc_print))
-    elif(rtype == "sfcvt"):
-        RC0.append(SFCVT(model0[co], gtrain0[n], xlimits,  print_rc_plots=rc_print)) # improve=pperb, multistart=multistart, not implemented
     else:
         raise ValueError("Given criteria not valid.")
     co += 1
