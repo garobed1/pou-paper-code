@@ -433,7 +433,6 @@ for n in cases[rank]:
     hist.append(hf)
     errhrms.append(ef)
     errhmean.append(ef2)
-    import pdb; pdb.set_trace()
     co += 1
 
 

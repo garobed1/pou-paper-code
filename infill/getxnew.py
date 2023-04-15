@@ -121,55 +121,58 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
     intervals = np.arange(0, count+1)
 
     for i in range(count):
-        t0 = model.training_points[None][0][0]
-        f0 = model.training_points[None][0][1]
-        g0 = rcrit.grad
-        nt, dim = t0.shape
-        #x0 = np.zeros([1, dim])
+        try:
+            t0 = model.training_points[None][0][0]
+            f0 = model.training_points[None][0][1]
+            g0 = rcrit.grad
+            nt, dim = t0.shape
+            #x0 = np.zeros([1, dim])
 
-        # get the new points
-        xnew = np.array(getxnew(rcrit, bounds, rcrit.nnew, options))
-        # import pdb; pdb.set_trace()
-        # add the new points to the model
-        t0 = np.append(t0, xnew, axis=0)
-        f0 = np.append(f0, func(xnew), axis=0)
-        g0 = np.append(g0, convert_to_smt_grads(func, xnew), axis=0)
-        # g0 = np.append(g0, np.zeros([xnew.shape[0], xnew.shape[1]]), axis=0)
-        # for j in range(dim):
-        #     g0[nt:,j] = func(xnew, j)[:,0]
+            # get the new points
+            xnew = np.array(getxnew(rcrit, bounds, rcrit.nnew, options))
+            # import pdb; pdb.set_trace()
+            # add the new points to the model
+            t0 = np.append(t0, xnew, axis=0)
+            f0 = np.append(f0, func(xnew), axis=0)
+            g0 = np.append(g0, convert_to_smt_grads(func, xnew), axis=0)
+            # g0 = np.append(g0, np.zeros([xnew.shape[0], xnew.shape[1]]), axis=0)
+            # for j in range(dim):
+            #     g0[nt:,j] = func(xnew, j)[:,0]
 
-        model.set_training_values(t0, f0)
-        convert_to_smt_grads(model, t0, g0)
-        # if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate) or isinstance(model0, DGEK)):
-        #     for j in range(dim):
-        #         model.set_training_derivatives(t0, g0[:,j], j)
-        model.train()
+            model.set_training_values(t0, f0)
+            convert_to_smt_grads(model, t0, g0)
+            # if(isinstance(model, GEKPLS) or isinstance(model, POUSurrogate) or isinstance(model0, DGEK)):
+            #     for j in range(dim):
+            #         model.set_training_derivatives(t0, g0[:,j], j)
+            model.train()
 
-        # evaluate errors
-        if(options["errorcheck"] is not None):
-            xdata, fdata, intervals = options["errorcheck"]
-            # err = rmse(model, func, xdata=xdata, fdata=fdata)
-            # err2 = meane(model, func, xdata=xdata, fdata=fdata)
-            if(i in intervals.tolist() and i !=0):
-                err = full_error(model, func, xdata=xdata, fdata=fdata)
-                errh.append(err[0])
-                errh2.append(err[1:])
-                #print("yes")
+            # evaluate errors
+            if(options["errorcheck"] is not None):
+                xdata, fdata, intervals = options["errorcheck"]
+                # err = rmse(model, func, xdata=xdata, fdata=fdata)
+                # err2 = meane(model, func, xdata=xdata, fdata=fdata)
+                if(i in intervals.tolist() and i !=0):
+                    err = full_error(model, func, xdata=xdata, fdata=fdata)
+                    errh.append(err[0])
+                    errh2.append(err[1:])
+                    #print("yes")
 
 
-        else:
-            errh = None
-            errh2 = None
-            #hist = None
+            else:
+                errh = None
+                errh2 = None
+                #hist = None
 
-        # save training data at each interval regardless
-        if i in intervals.tolist():
-            hist.append(copy.deepcopy(rcrit.model.training_points[None]))        
+            # save training data at each interval regardless
+            if i in intervals.tolist():
+                hist.append(copy.deepcopy(rcrit.model.training_points[None]))        
 
-        if(rcrit.options["print_iter"] and rank == 0):
-            print("Iteration: ", i)
+            if(rcrit.options["print_iter"] and rank == 0):
+                print("Iteration: ", i)
 
-        # replace criteria
-        rcrit.initialize(model, g0)
+            # replace criteria
+            rcrit.initialize(model, g0)
+        except:
+            print(f"Run on processor {rank} failed, returning what we have")
 
     return model, rcrit, hist, errh, errh2
