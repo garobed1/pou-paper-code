@@ -364,14 +364,18 @@ if(not skip_LHS):
         gtrainK[n][0] = gtrain0[n]
 
         for m in range(len(samplehistK)):
-            modelK.set_training_values(xtrainK[n][m], ftrainK[n][m])
-            convert_to_smt_grads(modelK, xtrainK[n][m], gtrainK[n][m])
-            # if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate) or isinstance(model0[co], DGEK)):
-            #     for i in range(dim):
-            #         modelK.set_training_derivatives(xtrainK[n][m], gtrainK[n][m][:,i:i+1], i)
-            modelK.train()
-            errkrms[co].append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-            errkmean[co].append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+            try:
+                modelK.set_training_values(xtrainK[n][m], ftrainK[n][m])
+                convert_to_smt_grads(modelK, xtrainK[n][m], gtrainK[n][m])
+                # if(isinstance(modelbase, GEKPLS) or isinstance(modelbase, POUSurrogate) or isinstance(model0[co], DGEK)):
+                #     for i in range(dim):
+                #         modelK.set_training_derivatives(xtrainK[n][m], gtrainK[n][m][:,i:i+1], i)
+                modelK.train()
+                errkrms[co].append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+                errkmean[co].append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+            except:
+                print("LHS runs started failing on this processor!")
+                continue
         co += 1
 
     errkrms = comm.gather(errkrms, root=0)

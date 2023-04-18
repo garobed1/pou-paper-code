@@ -175,5 +175,6 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
             rcrit.initialize(model, g0)
         except:
             print(f"Run on processor {rank} failed, returning what we have")
-
+            continue
+        
     return model, rcrit, hist, errh, errh2
