@@ -1,13 +1,13 @@
 
-header = "testing_sfcvt"
+header = "testing_gek1d"
 path = None
 skip_LHS = True 
 LHS_batch = 7
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "rosenbrock"    #problem
-dim = 2     #problem dimension
+prob  = "arctan"    #problem
+dim = 1     #problem dimension
 
 
 # Surrogate Settings

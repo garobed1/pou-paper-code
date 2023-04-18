@@ -20,6 +20,7 @@ from utils.error import rmse, meane
 from functions.problem_picker import GetProblem
 
 from smt.surrogate_models import KPLS, GEKPLS, KRG
+from surrogate.gek_1d import GEK1D
 from surrogate.direct_gek import DGEK
 #from smt.surrogate_models.rbf import RBF
 from surrogate.pougrad import POUSurrogate, POUHessian
@@ -259,24 +260,31 @@ if rank == 0:
 # Initial Design Surrogate
 if fresh:
     if(stype == "gekpls"):
-        modelbase = GEKPLS(xlimits=xlimits)
-        # modelbase.options.update({"hyper_opt":'TNC'})
-        # modelbase.options.update({"theta0":t0g})
-        # modelbase.options.update({"theta_bounds":tbg})
-        modelbase.options.update({"n_comp":dim})
-        modelbase.options.update({"extra_points":extra})
+        if(dim > 1):
+            modelbase = GEKPLS(xlimits=xlimits)
+            # modelbase.options.update({"hyper_opt":'TNC'})
+            modelbase.options.update({"n_comp":dim})
+            modelbase.options.update({"extra_points":extra})
+            modelbase.options.update({"delta_x":delta_x})
+            if(dim > 2):
+                modelbase.options.update({"zero_out_y":True})
+        else: # to get gek runs to work in 1D
+            modelbase = GEK1D(xlimits=xlimits)
+            #modelgek.options.update({"hyper_opt":"TNC"})
+        modelbase.options.update({"theta0":t0})
+        modelbase.options.update({"theta_bounds":tb})
         modelbase.options.update({"corr":corr})
         modelbase.options.update({"poly":poly})
-        modelbase.options.update({"delta_x":delta_x})
         modelbase.options.update({"n_start":5})
+
     elif(stype == "dgek"):
         modelbase = DGEK(xlimits=xlimits)
         # modelbase.options.update({"hyper_opt":'TNC'})
+        modelbase.options.update({"theta0":t0})
+        modelbase.options.update({"theta_bounds":tb})
         modelbase.options.update({"corr":corr})
         modelbase.options.update({"poly":poly})
         modelbase.options.update({"n_start":5})
-        modelbase.options.update({"theta0":t0})
-        modelbase.options.update({"theta_bounds":tb})
     elif(stype == "pou"):
         modelbase = POUSurrogate()
         modelbase.options.update({"rho":rho})

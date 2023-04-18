@@ -694,7 +694,8 @@ def print_rc_plots(n, bounds, name, obj):
             xi[0] = x[i]
             F[i]  = -obj.evaluate(xi, bounds)  #TODO: ADD DIR
         if(obj.ntr == 10):
-            obj.scaler = np.max(F)  
+            obj.scaler = np.max(F)
+        obj.scaler = 1.0
         F /= np.abs(obj.scaler)
 
         plt.rcParams['font.size'] = '18'

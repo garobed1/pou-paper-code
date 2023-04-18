@@ -110,6 +110,7 @@ def getxnew(rcrit, bounds, nnew, options=None):
     return xnew
 
 
+
 def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
 
     count = int(ntr/rcrit.nnew)
