@@ -222,8 +222,8 @@ for s in range(size):
 # ftrain0 = comm.bcast(ftrain0, root=0)
 # gtrain0 = comm.bcast(gtrain0, root=0)
 
-
 idx = np.round(np.linspace(0, len(intervals)-1, LHS_batch+1)).astype(int)
+
 
 intervalsk = intervals[idx]
 samplehistK = intervalsk + nt0*np.ones(len(intervalsk), dtype=int)

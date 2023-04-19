@@ -13,7 +13,6 @@ from scipy.stats import qmc
 from utils.sutils import estimate_pou_volume, innerMatrixProduct, quadraticSolveHOnly, symMatfromVec
 from utils.sutils import standardization2
 
-
 _poly_types = {
     "uniform": legendre,
     "norm": hermite,
@@ -176,7 +175,7 @@ class PCEStrictSurrogate(SurrogateModel):
         #finally
 
         y = np.matmul(self.Ls, ft)
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         return y
 
     def _recurse_sc_interp(self, di, si, jumps, acc, N):
@@ -217,10 +216,16 @@ if __name__ == '__main__':
     
     
     from smt.problems import Rosenbrock
+    from functions.example_problems import MultiDimJump, Peaks2D
+    from functions.example_problems_2 import ALOSDim
+    from utils.error import rmse
     from utils.sutils import convert_to_smt_grads
-    N = [5, 3]
+    N = [13, 13]
     pdfs = ['uniform', 'uniform']
-    func = Rosenbrock(ndim=2)
+    # func = Rosenbrock(ndim=2)
+    # func = MultiDimJump(ndim=2, alpha=8.)
+    # func = Peaks2D(ndim=2)
+    func = ALOSDim(ndim=2)
     xlimits = func.xlimits
     samp = CollocationSampler(np.array([x_init]), N=N,
                                 xlimits=xlimits, 
@@ -243,6 +248,8 @@ if __name__ == '__main__':
     # x = np.array([[2.0,2.0]])
 
     y = surr.predict_values(x)
+
+    stuff = rmse(surr, func, N=5000*2)
 
        # gstats, grads = _mu_sigma_grad(func, xt.shape[0], xt, xlimits, samp.scales, pdfs, tf = ft, tg=gt, weights=samp.weights)
     import pdb; pdb.set_trace()
