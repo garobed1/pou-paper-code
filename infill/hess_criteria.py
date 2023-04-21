@@ -25,6 +25,7 @@ class HessianRefine(ASCriteria):
 
         self.grad = grad
         self.bounds = bounds
+        self.Mc = None
 
         super().__init__(model, **kwargs)
         self.scaler = 0
@@ -60,6 +61,19 @@ class HessianRefine(ASCriteria):
             3, 
             types=int,
             desc="number of closest points to evaluate hessian estimate"
+        )
+
+        declare(
+            "scale_by_cond", 
+            False, 
+            types=bool,
+            desc="scale criteria in a cell by the condition number of the hess approx matrix"
+        )
+        declare(
+            "out_of_bounds", 
+            0, 
+            types=(int, float),
+            desc="allow optimizer to go out of bounds, then snap inside if it goes there"
         )
 
 
@@ -107,7 +121,7 @@ class HessianRefine(ASCriteria):
         # Check if the trained surrogate model has hessian data
         try:
             self.H = model.h
-
+            self.Mc = model.Mc
         except:
             indn = []
             nstencil = self.options["neval"]
@@ -115,18 +129,20 @@ class HessianRefine(ASCriteria):
                 dists, ind = self.tree.query(self.trx[i], nstencil)
                 indn.append(ind)
             hess = []
+            mcs = np.zeros(self.ntr)
             for i in range(self.ntr):
-                Hh = quadraticSolveHOnly(self.trx[i,:], self.trx[indn[i][1:nstencil],:], \
+                Hh, mc = quadraticSolveHOnly(self.trx[i,:], self.trx[indn[i][1:nstencil],:], \
                                          trf[i], trf[indn[i][1:nstencil]], \
-                                         trg[i,:], trg[indn[i][1:nstencil],:])
+                                         trg[i,:], trg[indn[i][1:nstencil],:], return_cond=True)
 
                 hess.append(np.zeros([self.dim, self.dim]))
+                mcs[i] = mc
                 for j in range(self.dim):
                     for k in range(self.dim):
                         hess[i][j,k] = Hh[symMatfromVec(j,k,self.dim)]
 
             self.H = hess
-
+            self.Mc = mcs#/np.max(mcs)
         
 
     # Assumption is that the quadratic terms are the error
@@ -136,6 +152,10 @@ class HessianRefine(ASCriteria):
             delta = self.model.options["delta"]
         except:
             delta = 1e-10
+
+        Mc = np.ones(self.ntr)
+        if self.options["scale_by_cond"]:
+            Mc = self.Mc
 
         # exhaustive search for closest sample point, for regularization
         D = cdist(np.array([x]), self.trx)
@@ -147,7 +167,7 @@ class HessianRefine(ASCriteria):
         for i in range(self.ntr):
             work = x - self.trx[i]
             dist = D[0][i] + delta#np.sqrt(D[0][i] + delta)
-            local = 0.5*innerMatrixProduct(self.H[i], work)*self.dV[i]
+            local = 0.5*innerMatrixProduct(self.H[i], work)*self.dV[i]*Mc[i] # NEWNEWNEW
             expfac = np.exp(-self.rho*(dist-mindist))
             numer += local*expfac
             denom += expfac
@@ -169,6 +189,10 @@ class HessianRefine(ASCriteria):
         
         delta = self.model.options["delta"]
 
+        Mc = np.ones(self.ntr)
+        if self.options["scale_by_cond"]:
+            Mc = self.Mc
+
         # exhaustive search for closest sample point, for regularization
         D = cdist(np.array([x]), self.trx)
         mindist = min(D[0])
@@ -183,8 +207,8 @@ class HessianRefine(ASCriteria):
             work = x - self.trx[i]
             dist = D[0][i] + delta#np.sqrt(D[0][i] + delta)
             ddist = work/D[0][i]
-            local = 0.5*innerMatrixProduct(self.H[i], work)*self.dV[i]
-            dlocal = np.dot(self.H[i], work)*self.dV[i]
+            local = 0.5*innerMatrixProduct(self.H[i], work)*self.dV[i]*Mc[i]
+            dlocal = np.dot(self.H[i], work)*self.dV[i]*self.Mc[i]
             expfac = np.exp(-self.rho*(dist-mindist))
             dexpfac = -self.rho*expfac*ddist
             numer += local*expfac
@@ -223,6 +247,8 @@ class HessianRefine(ASCriteria):
         fakebounds[:,1] = 1.
         self.dV = estimate_pou_volume(self.trx, fakebounds)
 
+        # new idea: factor in hessian regression matrix condition number!
+
 
         # ### FD CHECK
         # h = 1e-6
@@ -259,11 +285,23 @@ class HessianRefine(ASCriteria):
         # For batches, set a numerator based on the scale of the error
         self.numer = abs(np.mean(errs))/100.
 
+        if(self.options["out_of_bounds"]):
+            for i in range(self.dim):
+                bounds[i][0] = -self.options["out_of_bounds"]
+                bounds[i][1] = 1. + self.options["out_of_bounds"]
+
         return xc, bounds# + 0.001*self.dminmax+randvec, bounds
 
 
 
     def post_asopt(self, x, bounds, dir=0):
+
+        #snap to edge if needed 
+        for i in range(self.dim):
+            if(x[i] > 1.0):
+                x[i] = 1.0
+            if(x[i] < 0.0):
+                x[i] = 0.0
 
         self.trx = np.append(self.trx, np.array([x]), axis=0)
 

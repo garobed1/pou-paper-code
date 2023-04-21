@@ -140,6 +140,10 @@ options["localswitch"] = localswitch
 options["errorcheck"] = testdata
 options["multistart"] = mstarttype
 options["lmethod"] = opt
+try:
+    options["method"] = gopt
+except:
+    pass
 
 # Print Conditions
 if rank == 0:
@@ -253,7 +257,6 @@ if(not skip_LHS):
     xtrainK = comm.bcast(xtrainK, root=0)
     ftrainK = comm.bcast(ftrainK, root=0)
     gtrainK = comm.bcast(gtrainK, root=0)
-
 if rank == 0:
     print("Training Initial Surrogate ...")
 
@@ -396,7 +399,7 @@ if(not skip_LHS):
 
     with open(f'{path}/{title}/errkmean.pickle', 'wb') as f:
         pickle.dump(errkmean, f)
-        
+
 
 if rank == 0:
     print("Initial Refinement Criteria ...")
@@ -504,3 +507,5 @@ if rank == 0:
     if(dim > 3):
         with open(f'{path}/{title}/intervals{affix}.pickle', 'wb') as f:
             pickle.dump(intervals, f)
+
+import pdb; pdb.set_trace()

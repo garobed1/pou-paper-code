@@ -340,6 +340,7 @@ class POUHessian(POUSurrogate):
             types=int,
             desc="number of closest points to evaluate hessian estimate")
 
+        self.Mc = None
         self.supports["training_derivatives"] = True
         self.supports["derivatives"] = True
 
@@ -374,19 +375,21 @@ class POUHessian(POUSurrogate):
             dists, ind = self.tree.query(self.X_norma[i], nstencil)
             indn.append(ind)
         hess = np.zeros([self.ntr, self.dim, self.dim])
-
+        mcs = np.zeros(self.ntr)
         for i in range(self.ntr):
-            Hh = quadraticSolveHOnly(self.X_norma[i,:], self.X_norma[indn[i][1:nstencil],:], \
+            Hh, mc = quadraticSolveHOnly(self.X_norma[i,:], self.X_norma[indn[i][1:nstencil],:], \
                                      self.y_norma[i], self.y_norma[indn[i][1:nstencil]], \
-                                     self.g_norma[i,:], self.g_norma[indn[i][1:nstencil],:])
+                                     self.g_norma[i,:], self.g_norma[indn[i][1:nstencil],:], return_cond=True)
 
             # hess.append(np.zeros([self.dim, self.dim]))
             # hess[i] = np.zeros([self.dim, self.dim])
+            mcs[i] = mc
             for j in range(self.dim):
                 for k in range(self.dim):
                     hess[i,j,k] = Hh[symMatfromVec(j,k,self.dim)]
 
         self.h = hess
+        self.Mc = mcs
 
         # self.dV = estimate_pou_volume(self.training_points[None][0][0], self.options["bounds"])
 
@@ -933,7 +936,7 @@ class POUErrorVol(POUError):
 
 
 class POUCV(SurrogateModel): 
-    name = "POU"
+    name = "POUCV"
     """
     Computes cross-validation error of POU model
 

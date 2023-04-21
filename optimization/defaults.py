@@ -26,7 +26,7 @@ DefaultOptOptions = {
     "lmethod":'SLSQP', 
     "lstrategy":None,
     "giter":10, 
-    "gpop":15, 
+    "gpop":25, 
     "gtol":0.01,
     "liter":100,
     "ltol":1e-6,

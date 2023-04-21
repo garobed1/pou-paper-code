@@ -1,4 +1,4 @@
-from scipy.optimize import minimize, differential_evolution, NonlinearConstraint
+from scipy.optimize import minimize, differential_evolution, NonlinearConstraint, brute, OptimizeResult
 # from pyoptsparse import Optimization
 from optimization.defaults import DefaultOptOptions
 import numpy as np
@@ -26,6 +26,11 @@ def optimize(func, args, bounds, type="global", x0=None, jac=None, hess=None, co
         if(method == "ga"):
             # gcon = NonlinearConstraint(lambda x: constraints["fun"](x, constraints["args"]), lb=0., ub=np.inf)
             results = differential_evolution(func, bounds, args, strategy, maxiter=giter, popsize=gpop, constraints=constraints, tol=gtol, callback=callback, disp=False)
+        elif(method == "brute"):
+            xs, fval, grid, Jout = brute(func, bounds, args, Ns=liter, finish=None, full_output=True)
+            results = OptimizeResult(x=xs,
+                    fun=fval,
+                    success=True)
         else:
             return
 

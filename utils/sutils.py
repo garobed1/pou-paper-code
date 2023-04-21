@@ -206,7 +206,7 @@ def quadraticSolve(x, xn, f, fn, g, gn):
     return fh, gh, Hh
 
 
-def quadraticSolveHOnly(x, xn, f, fn, g, gn):
+def quadraticSolveHOnly(x, xn, f, fn, g, gn, return_cond=False):
 
     """
     Construct a quadratic interpolation over a limited neighborhood of points 
@@ -281,6 +281,9 @@ def quadraticSolveHOnly(x, xn, f, fn, g, gn):
     Hh = sol[0]
 
     #import pdb; pdb.set_trace()
+    if return_cond:
+        return Hh, np.linalg.cond(mat)
+    
     return Hh
 
 
@@ -726,6 +729,8 @@ def print_rc_plots(n, bounds, name, obj):
 
     if(n == 2):
         import matplotlib.pyplot as plt
+        from functions.example_problems_2 import ALOSDim
+        trueFunc = ALOSDim(ndim=2)
         ndir = 75
         # x = np.linspace(bounds[0][0], bounds[0][1], ndir)
         # y = np.linspace(bounds[1][0], bounds[1][1], ndir)
@@ -733,17 +738,25 @@ def print_rc_plots(n, bounds, name, obj):
         y = np.linspace(0., 1., ndir)   
         X, Y = np.meshgrid(x, y)
         F  = np.zeros([ndir, ndir]) 
+        FM = np.zeros([ndir, ndir]) 
+        FT = np.zeros([ndir, ndir]) 
         for i in range(ndir):
             for j in range(ndir):
                 xi = np.zeros([2])
                 xi[0] = x[i]
                 xi[1] = y[j]
+                FM[i,j] = obj.model.predict_values(np.atleast_2d(xi))
+                FT[i,j] = trueFunc(np.atleast_2d(xi))
                 F[i,j]  = obj.evaluate(xi, bounds) #TODO: ADD DIR
         cs = plt.contourf(Y, X, F, levels = np.linspace(np.min(F), 0., 25))
         plt.colorbar(cs)
+        trx = obj.model.training_points[None][0][0]
         trxs = qmc.scale(obj.model.training_points[None][0][0], bounds[:,0], bounds[:,1], reverse=True)#obj.trx, 
         plt.plot(trxs[0:-1,0], trxs[0:-1,1], 'bo')
         plt.plot(trxs[-1,0], trxs[-1,1], 'ro')
+        target = np.unravel_index(np.argmin(F, axis=None), F.shape)
+        # import pdb; pdb.set_trace()
+        plt.plot(y[target[0]], x[target[1]], 'go')
         if hasattr(obj, 'S'):
             ax = plt.gca()
             for i in range(trxs.shape[0]):
@@ -752,5 +765,17 @@ def print_rc_plots(n, bounds, name, obj):
         plt.xlim([0., 1.])
         plt.ylim([0., 1.])
         plt.savefig(f"{name}_rc_2d.pdf")    
+        plt.clf()
+
+        Z = -abs(FM-FT)
+        cs = plt.contourf(Y, X, Z, levels = 40)
+        plt.colorbar(cs, aspect=20, label = r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
+        plt.xlabel(r"$x_1$")
+        plt.ylabel(r"$x_2$")
+        #plt.legend(loc=1)
+        plt.plot(trx[0:-1,0], trx[0:-1,1], 'bo')
+        plt.plot(trx[-1,0], trx[-1,1], 'ro')
+        plt.plot(y[target[0]], x[target[1]], 'go')
+        plt.savefig(f"{name}_err_2d.pdf", bbox_inches="tight")
         plt.clf()
         # import pdb; pdb.set_trace()
