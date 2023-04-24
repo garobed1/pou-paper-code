@@ -40,7 +40,26 @@ fresh = True
 
 
 # If folder and integer arg are given, start from there
-if len(sys.argv) > 1:
+if len(sys.argv) == 2: #assume we're given the name of a python file and import it
+    # All variables not initialized come from this import
+    ssplit = sys.argv[1].split(sep='/')
+    suse = '.'.join(ssplit)
+    set = importlib.import_module(suse)
+    # from results_settings import * 
+    # Generate results folder and list of inputs
+    title = f"{set.header}_{set.prob}_{set.dim}D"
+    if(set.path == None):
+        path = "."
+    else:
+        path = set.path
+    if rank == 0:
+        if not os.path.isdir(f"{path}/{title}"):
+            os.mkdir(f"{path}/{title}")
+        shutil.copy(f"./{sys.argv[1]}.py", f"{path}/{title}/settings.py")
+
+
+
+elif len(sys.argv) > 2:
     fresh = False
     
     args = sys.argv[1:]
@@ -52,11 +71,13 @@ if len(sys.argv) > 1:
         path = '/'.join(tsplit[:-1])
     title = tsplit[-1]
     
-    if rank == 0:
-        shutil.copy(f"{path}/{title}/settings.py", "./results_settings.py")
+    # if rank == 0:
+    #     shutil.copy(f"{path}/{title}/settings.py", "./results_settings.py")
     #sys.path.append(title)
 
-    from results_settings import *
+    # from results_settings import *
+    # import results_settings as set
+    set = importlib.import_module(f"{path}.{title}.settings")
     if(path == None):
         path = "."
     
@@ -75,17 +96,19 @@ if len(sys.argv) > 1:
 
 else:
     # All variables not initialized come from this import
-    from results_settings import * 
+    import results_settings as set
     # Generate results folder and list of inputs
-    title = f"{header}_{prob}_{dim}D"
-    if(path == None):
+    title = f"{set.header}_{set.prob}_{set.dim}D"
+    if(set.path == None):
         path = "."
+    else:
+        path = set.path
     if rank == 0:
         if not os.path.isdir(f"{path}/{title}"):
             os.mkdir(f"{path}/{title}")
         shutil.copy("./results_settings.py", f"{path}/{title}/settings.py")
 
-Nruns = size*runs_per_proc
+Nruns = size*set.runs_per_proc
 # Fan out parallel cases
 cases = divide_cases(Nruns, size)
 
@@ -99,17 +122,19 @@ if(not fresh):
     for s in range(size):
         for n in range(len(cases[s])):
             model0[cases[s][n]] = model0lists[s][n]
+else:
+    ntr = set.ntr
+    nt0 = set.nt0
 
 # Problem Settings
-ud = False
-ud = perturb
-trueFunc = GetProblem(prob, dim, use_design=ud)
+ud = set.perturb
+trueFunc = GetProblem(set.prob, set.dim, use_design=ud)
 xlimits = trueFunc.xlimits
 sampling = LHS(xlimits=xlimits, criterion='m')
-if(rtype == 'anisotransform'):
+if(set.rtype == 'anisotransform'):
     sequencer = []
     for n in range(Nruns):
-        sequencer.append(qmc.Halton(d=dim))
+        sequencer.append(qmc.Halton(d=set.dim))
 
 
 
@@ -117,15 +142,15 @@ if(rtype == 'anisotransform'):
 xtest = None 
 ftest = None
 testdata = None
-if(dim > 3):
-    intervals = np.arange(0, ntr, dim)
+if(set.dim > 3):
+    intervals = np.arange(0, ntr, set.dim)
     intervals = np.append(intervals, ntr-1)
 else:
     intervals = np.arange(0, ntr)
 
-if(prob != 'shock'):
+if(set.prob != 'shock'):
     if rank == 0:
-        xtest = sampling(Nerr)
+        xtest = sampling(set.Nerr)
         ftest = trueFunc(xtest)
 
         testdata = [xtest, ftest, intervals]
@@ -135,13 +160,13 @@ if(prob != 'shock'):
     testdata = comm.bcast(testdata, root=0)
 # Adaptive Sampling Conditions
 options = DefaultOptOptions
-options["local"] = local
-options["localswitch"] = localswitch
+options["local"] = set.local
+options["localswitch"] = set.localswitch
 options["errorcheck"] = testdata
-options["multistart"] = mstarttype
-options["lmethod"] = opt
+options["multistart"] = set.mstarttype
+options["lmethod"] = set.opt
 try:
-    options["method"] = gopt
+    options["method"] = set.gopt
 except:
     pass
 
@@ -149,19 +174,19 @@ except:
 if rank == 0:
     print("\n")
     print("\n")
-    print("Surrogate Type       : ", stype)
-    print("Refinement Type      : ", rtype)
-    print("Refinement Multistart: ", multistart)
-    print("Correlation Function : ", corr)
-    print("Regression Function  : ", poly)
-    print("GEK Extra Points     : ", extra)
-    print("Problem              : ", prob)
-    print("Problem Dimension    : ", dim)
+    print("Surrogate Type       : ", set.stype)
+    print("Refinement Type      : ", set.rtype)
+    print("Refinement Multistart: ", set.multistart)
+    print("Correlation Function : ", set.corr)
+    print("Regression Function  : ", set.poly)
+    print("GEK Extra Points     : ", set.extra)
+    print("Problem              : ", set.prob)
+    print("Problem Dimension    : ", set.dim)
     print("Initial Sample Size  : ", nt0)
     print("Refined Points Size  : ", ntr)
     print("Total Points         : ", nt0+ntr)
-    print("Points Per Iteration : ", batch)
-    print("RMSE Size            : ", Nerr)
+    print("Points Per Iteration : ", set.batch)
+    print("RMSE Size            : ", set.Nerr)
     print("\n")
 
 
@@ -226,7 +251,7 @@ for s in range(size):
 # ftrain0 = comm.bcast(ftrain0, root=0)
 # gtrain0 = comm.bcast(gtrain0, root=0)
 
-idx = np.round(np.linspace(0, len(intervals)-1, LHS_batch+1)).astype(int)
+idx = np.round(np.linspace(0, len(intervals)-1, set.LHS_batch+1)).astype(int)
 
 
 intervalsk = intervals[idx]
@@ -236,7 +261,7 @@ samplehistK[-1] += 1
 if rank == 0:
     print("Computing Non-Adaptive Designs ...")
 
-if(not skip_LHS):
+if(not set.skip_LHS):
         # Final Design(s)
     xtrainK = []
     ftrainK = []
@@ -262,51 +287,51 @@ if rank == 0:
 
 # Initial Design Surrogate
 if fresh:
-    if(stype == "gekpls"):
-        if(dim > 1):
+    if(set.stype == "gekpls"):
+        if(set.dim > 1):
             modelbase = GEKPLS(xlimits=xlimits)
             # modelbase.options.update({"hyper_opt":'TNC'})
-            modelbase.options.update({"n_comp":dim})
-            modelbase.options.update({"extra_points":extra})
-            modelbase.options.update({"delta_x":delta_x})
-            if(dim > 2):
+            modelbase.options.update({"n_comp":set.dim})
+            modelbase.options.update({"extra_points":set.extra})
+            modelbase.options.update({"delta_x":set.delta_x})
+            if(set.dim > 2):
                 modelbase.options.update({"zero_out_y":True})
         else: # to get gek runs to work in 1D
             modelbase = GEK1D(xlimits=xlimits)
             #modelgek.options.update({"hyper_opt":"TNC"})
-        modelbase.options.update({"theta0":t0})
-        modelbase.options.update({"theta_bounds":tb})
-        modelbase.options.update({"corr":corr})
-        modelbase.options.update({"poly":poly})
+        modelbase.options.update({"theta0":set.t0})
+        modelbase.options.update({"theta_bounds":set.tb})
+        modelbase.options.update({"corr":set.corr})
+        modelbase.options.update({"poly":set.poly})
         modelbase.options.update({"n_start":5})
 
-    elif(stype == "dgek"):
+    elif(set.stype == "dgek"):
         modelbase = DGEK(xlimits=xlimits)
         # modelbase.options.update({"hyper_opt":'TNC'})
-        modelbase.options.update({"theta0":t0})
-        modelbase.options.update({"theta_bounds":tb})
-        modelbase.options.update({"corr":corr})
-        modelbase.options.update({"poly":poly})
+        modelbase.options.update({"theta0":set.t0})
+        modelbase.options.update({"theta_bounds":set.tb})
+        modelbase.options.update({"corr":set.corr})
+        modelbase.options.update({"poly":set.poly})
         modelbase.options.update({"n_start":5})
-    elif(stype == "pou"):
+    elif(set.stype == "pou"):
         modelbase = POUSurrogate()
-        modelbase.options.update({"rho":rho})
-    elif(stype == "pouhess"):
-        modelbase = POUHessian(bounds=xlimits, rscale=rscale)
-        modelbase.options.update({"rho":rho})
-        modelbase.options.update({"neval":neval})
-    elif(stype == "kpls"):
+        modelbase.options.update({"rho":set.rho})
+    elif(set.stype == "pouhess"):
+        modelbase = POUHessian(bounds=xlimits, rscale=set.rscale)
+        modelbase.options.update({"rho":set.rho})
+        modelbase.options.update({"neval":set.neval})
+    elif(set.stype == "kpls"):
         modelbase = KPLS()
         # modelbase.options.update({"hyper_opt":'TNC'})
-        modelbase.options.update({"n_comp":dim})
-        modelbase.options.update({"corr":corr})
-        modelbase.options.update({"poly":poly})
+        modelbase.options.update({"n_comp":set.dim})
+        modelbase.options.update({"corr":set.corr})
+        modelbase.options.update({"poly":set.poly})
         modelbase.options.update({"n_start":5})
     else:
         modelbase = KRG()
         # modelbase.options.update({"hyper_opt":'TNC'})
-        modelbase.options.update({"corr":corr})
-        modelbase.options.update({"poly":poly})
+        modelbase.options.update({"corr":set.corr})
+        modelbase.options.update({"poly":set.poly})
         modelbase.options.update({"n_start":5})
     modelbase.options.update({"print_global":False})
 
@@ -339,21 +364,21 @@ for n in cases[rank]: #range(Nruns):
 # Initial Model Error
 err0rms = []
 err0mean = []
-if(prob != 'shock'):
+if(set.prob != 'shock'):
     if rank == 0:
         print("Computing Initial Surrogate Error ...")
 
     co = 0
     for n in cases[rank]:
-        err0rms.append(rmse(model0[co], trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-        err0mean.append(meane(model0[co], trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+        err0rms.append(rmse(model0[co], trueFunc, N=set.Nerr, xdata=xtest, fdata=ftest))
+        err0mean.append(meane(model0[co], trueFunc, N=set.Nerr, xdata=xtest, fdata=ftest))
         co += 1
 
 
 if rank == 0:
     print("Computing Final Non-Adaptive Surrogate Error ...")
 
-if(not skip_LHS):
+if(not set.skip_LHS):
     # Non-Adaptive Model Error
     errkrms = []
     errkmean = []
@@ -374,8 +399,8 @@ if(not skip_LHS):
                 #     for i in range(dim):
                 #         modelK.set_training_derivatives(xtrainK[n][m], gtrainK[n][m][:,i:i+1], i)
                 modelK.train()
-                errkrms[co].append(rmse(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
-                errkmean[co].append(meane(modelK, trueFunc, N=Nerr, xdata=xtest, fdata=ftest))
+                errkrms[co].append(rmse(modelK, trueFunc, N=set.Nerr, xdata=xtest, fdata=ftest))
+                errkmean[co].append(meane(modelK, trueFunc, N=set.Nerr, xdata=xtest, fdata=ftest))
             except:
                 print("LHS runs started failing on this processor!")
                 continue
@@ -408,24 +433,24 @@ if rank == 0:
 RC0 = []
 co = 0
 for n in cases[rank]:
-    if(rtype == "aniso"):
-        RC0.append(AnisotropicRefine(model0[co], gtrain0[n], xlimits, rscale=rscale, nscale=nscale, improve=pperb, neval=neval, hessian=hess, interp=interp, bpen=bpen, objective=obj, multistart=multistart) )
-    elif(rtype == "anisotransform"):
-        RC0.append(AnisotropicTransform(model0[co], sequencer[n], gtrain0[n], improve=pperb, nmatch=nmatch, neval=neval, hessian=hess, interp=interp))
-    elif(rtype == "tead"):
+    if(set.rtype == "aniso"):
+        RC0.append(AnisotropicRefine(model0[co], gtrain0[n], xlimits, rscale=set.rscale, nscale=set.nscale, improve=set.pperb, neval=set.neval, hessian=set.hess, interp=set.interp, bpen=set.bpen, objective=set.obj, multistart=set.multistart) )
+    elif(set.rtype == "anisotransform"):
+        RC0.append(AnisotropicTransform(model0[co], sequencer[n], gtrain0[n], improve=set.pperb, nmatch=set.nmatch, neval=set.neval, hessian=set.hess, interp=set.interp))
+    elif(set.rtype == "tead"):
         RC0.append(TEAD(model0[co], gtrain0[n], xlimits, gradexact=True))
-    elif(rtype == "taylor"):
-        RC0.append(TaylorRefine(model0[co], gtrain0[n], xlimits, volume_weight=perturb, rscale=rscale, improve=pperb, multistart=multistart) )
-    elif(rtype == "taylorexp"):
-        RC0.append(TaylorExploreRefine(model0[co], gtrain0[n], xlimits, rscale=rscale, improve=pperb, objective=obj, multistart=multistart) ) 
-    elif(rtype == "hess"):
-        RC0.append(HessianRefine(model0[co], gtrain0[n], xlimits, neval=neval, rscale=rscale, improve=pperb, multistart=multistart, print_rc_plots=rc_print) )
-    elif(rtype == "poussa"):
-        RC0.append(POUSSA(model0[co], gtrain0[n], xlimits, improve=pperb, multistart=multistart, print_rc_plots=rc_print))
-    elif(rtype == "pousfcvt"):
-        RC0.append(POUSFCVT(model0[co], gtrain0[n], xlimits, improve=pperb, multistart=multistart, print_rc_plots=rc_print))
-    elif(rtype == "sfcvt"):
-        RC0.append(SFCVT(model0[co], gtrain0[n], xlimits,  print_rc_plots=rc_print)) # improve=pperb, multistart=multistart, not implemented
+    elif(set.rtype == "taylor"):
+        RC0.append(TaylorRefine(model0[co], gtrain0[n], xlimits, volume_weight=set.perturb, rscale=set.rscale, improve=set.pperb, multistart=set.multistart) )
+    elif(set.rtype == "taylorexp"):
+        RC0.append(TaylorExploreRefine(model0[co], gtrain0[n], xlimits, rscale=set.rscale, improve=set.pperb, objective=set.obj, multistart=set.multistart) ) 
+    elif(set.rtype == "hess"):
+        RC0.append(HessianRefine(model0[co], gtrain0[n], xlimits, neval=set.neval, rscale=set.rscale, improve=set.pperb, multistart=set.multistart, print_rc_plots=set.rc_print) )
+    elif(set.rtype == "poussa"):
+        RC0.append(POUSSA(model0[co], gtrain0[n], xlimits, improve=set.pperb, multistart=set.multistart, print_rc_plots=set.rc_print))
+    elif(set.rtype == "pousfcvt"):
+        RC0.append(POUSFCVT(model0[co], gtrain0[n], xlimits, improve=set.pperb, multistart=set.multistart, print_rc_plots=set.rc_print))
+    elif(set.rtype == "sfcvt"):
+        RC0.append(SFCVT(model0[co], gtrain0[n], xlimits,  print_rc_plots=set.rc_print)) # improve=pperb, multistart=multistart, not implemented
     else:
         raise ValueError("Given criteria not valid.")
     co += 1
@@ -504,7 +529,7 @@ if rank == 0:
     with open(f'{path}/{title}/errhmean{affix}.pickle', 'wb') as f:
         pickle.dump(errhmean, f)
 
-    if(dim > 3):
+    if(set.dim > 3):
         with open(f'{path}/{title}/intervals{affix}.pickle', 'wb') as f:
             pickle.dump(intervals, f)
 

@@ -350,6 +350,7 @@ class POUHessian(POUSurrogate):
         terms = np.atleast_2d(g*dx).sum(axis = 1)
         for j in range(dx.shape[0]):
             terms[j] += 0.5*innerMatrixProduct(h[j], dx[j])
+            # import pdb; pdb.set_trace()
         return terms
 
     def higher_terms_deriv(self, dx, g, h, kx):
