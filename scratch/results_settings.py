@@ -1,7 +1,7 @@
 
 header = "testing_alos_gek_lhs"
 path = None
-skip_LHS = False 
+skip_LHS = True 
 LHS_batch = 7
 runs_per_proc = 1
 
@@ -11,7 +11,7 @@ dim = 2     #problem dimension
 
 
 # Surrogate Settings
-stype = "gekpls" #"pouhess"   #surrogate type
+stype = "pouhess" #"pouhess"   #surrogate type
 
 ### FOR POU HESS
 # rtype =  "hess"
@@ -21,16 +21,16 @@ stype = "gekpls" #"pouhess"   #surrogate type
 # localswitch = True
 
 ### FOR POU SFCVT
-# rtype =  "pousfcvt"
-# opt = 'SLSQP' #for SFCVT constraint
-# local = True
-# localswitch = True
+rtype =  "pousfcvt"
+opt = 'SLSQP' #for SFCVT constraint
+local = True
+localswitch = True
 
 ### FOR REGULAR SFCVT
-rtype =  "sfcvt"
-opt = 'SLSQP' #for SFCVT constraint, 
-local = False
-localswitch = False #fully global optimizer
+# rtype =  "sfcvt"
+# opt = 'SLSQP' #for SFCVT constraint, 
+# local = False
+# localswitch = False #fully global optimizer
 
 corr  = "squar_exp"  #kriging correlation
 poly  = "linear"    #kriging regression

@@ -122,7 +122,8 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
     intervals = np.arange(0, count+1)
 
     for i in range(count):
-        try:
+        # try:
+        if 1:
             t0 = model.training_points[None][0][0]
             f0 = model.training_points[None][0][1]
             g0 = rcrit.grad
@@ -173,8 +174,8 @@ def adaptivesampling(func, model0, rcrit, bounds, ntr, options=None):
 
             # replace criteria
             rcrit.initialize(model, g0)
-        except:
-            print(f"Run on processor {rank} failed, returning what we have")
-            continue
+        # except:
+        #     print(f"Run on processor {rank} failed, returning what we have")
+        #     continue
         
     return model, rcrit, hist, errh, errh2

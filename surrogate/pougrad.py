@@ -347,7 +347,7 @@ class POUHessian(POUSurrogate):
     def higher_terms(self, dx, g, h):
         # terms = np.dot(g, dx)
         # terms += 0.5*innerMatrixProduct(h, dx)
-        terms = (g*dx).sum(axis = 1)
+        terms = np.atleast_2d(g*dx).sum(axis = 1)
         for j in range(dx.shape[0]):
             terms[j] += 0.5*innerMatrixProduct(h[j], dx[j])
         return terms
