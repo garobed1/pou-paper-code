@@ -74,7 +74,8 @@ class PCEStrictSurrogate(SurrogateModel):
 
     
     def _train(self) -> None:
-        self.set_collocation_sampler(self.options["sampler"])
+        # self.set_collocation_sampler(self.options["sampler"])
+        self.set_collocation_sampler(self.sampler)
 
 
 
@@ -92,8 +93,9 @@ class PCEStrictSurrogate(SurrogateModel):
         xlimits = self.options['bounds']
         self.dim = sampler.x_u_dim
 
-        self.xt = sampler.current_samples["x"][sampler.x_u_ind]
+        self.xt = sampler.current_samples["x"][:,sampler.x_u_ind]
         self.ft = sampler.current_samples["f"]
+        # import pdb; pdb.set_trace()
         # self.we = sampler.weights
         # self.po = sampler.
 
@@ -127,7 +129,7 @@ class PCEStrictSurrogate(SurrogateModel):
         # self.po = poly_list
 
 
-
+        self.options['sampler'] = sampler
         self.sampler = sampler
 
     def _predict_values(self, x: np.ndarray) -> np.ndarray:
@@ -173,7 +175,6 @@ class PCEStrictSurrogate(SurrogateModel):
         self._recurse_sc_interp(0, si, sampler.jumps, acc, N)
         
         #finally
-
         y = np.matmul(self.Ls, ft)
         # import pdb; pdb.set_trace()
         return y
