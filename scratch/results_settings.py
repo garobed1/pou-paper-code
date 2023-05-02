@@ -1,30 +1,30 @@
 
-header = "testing_alos_gek_lhs"
+header = "testing_what_wrong_with_hess"
 path = None
 skip_LHS = True 
 LHS_batch = 7
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "mixedsine"    #problem
-dim = 2     #problem dimension
+prob  = "arctan"    #problem
+dim = 1     #problem dimension
 
 
 # Surrogate Settings
 stype = "pouhess" #"pouhess"   #surrogate type
 
 ### FOR POU HESS
-# rtype =  "hess"
-# opt = 'L-BFGS-B' #'SLSQP'#
-# local = False
-# gopt = 'ga' #'brute'
-# localswitch = True
+rtype =  "hess"
+opt = 'L-BFGS-B' #'SLSQP'#
+local = False
+gopt = 'ga' #'brute'
+localswitch = True
 
 ### FOR POU SFCVT
-rtype =  "pousfcvt"
-opt = 'SLSQP' #for SFCVT constraint
-local = True
-localswitch = True
+# rtype =  "pousfcvt"
+# opt = 'SLSQP' #for SFCVT constraint
+# local = True
+# localswitch = True
 
 ### FOR REGULAR SFCVT
 # rtype =  "sfcvt"

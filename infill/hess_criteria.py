@@ -297,12 +297,11 @@ class HessianRefine(ASCriteria):
     def post_asopt(self, x, bounds, dir=0):
 
         #snap to edge if needed 
-        for i in range(self.dim):
-            if(x[i] > 1.0):
-                x[i] = 1.0
-            if(x[i] < 0.0):
-                x[i] = 0.0
-
+        # for i in range(self.dim):
+        #     if(x[i] > 1.0):
+        #         x[i] = 1.0
+        #     if(x[i] < 0.0):
+        #         x[i] = 0.0
         self.trx = np.append(self.trx, np.array([x]), axis=0)
 
         return x

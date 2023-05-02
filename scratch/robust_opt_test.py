@@ -104,13 +104,10 @@ plt.ylabel(r"$\mu_f(x_d)$")
 plt.savefig(f"./robust_opt_plots/convrobust1_true.pdf", bbox_inches="tight")
 plt.clf()
 
-cs = plt.plot(xds, objs, linestyle='-', marker='s', label='convergence')
+cs = plt.plot(xds, objs, 'b-', marker='s', label='convergence')
 
-plt.xlabel(r"$x_d$")
-plt.ylabel(r"$\mu_f(x_d)$")
-
-plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
-plt.axvline(results1.x, color='r', linestyle='--', linewidth=1.2)
+plt.legend()
+plt.savefig(f"./robust_opt_plots/objrobustwconv1_true.pdf", bbox_inches="tight")
 
 ndir = 150
 x = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
@@ -118,7 +115,14 @@ y = np.zeros([ndir])
 for j in range(ndir):
     y[j] = objRobust(x[j], func, eta_use)
 # Plot original function
-plt.plot(x, y, label='objective')
+plt.plot(x, y, '-k', label='objective')
+
+plt.xlabel(r"$x_d$")
+plt.ylabel(r"$\mu_f(x_d)$")
+
+plt.axvline(x_init, color='k', linestyle='--', linewidth=1.2)
+plt.axvline(results1.x, color='r', linestyle='--', linewidth=1.2)
+
 
 plt.legend()
 plt.savefig(f"./robust_opt_plots/objrobust1_true.pdf", bbox_inches="tight")
@@ -131,7 +135,6 @@ plt.clf()
 
 
 
-import pdb; pdb.set_trace()
 # plot beta dist
 x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
 y = np.zeros([ndir])
@@ -139,8 +142,8 @@ beta_handle = beta(pdfs[0][1],pdfs[0][2])
 for j in range(ndir):
     y[j] = beta_handle.pdf(x[j])
 cs = plt.plot(x, y)
-plt.xlabel(r"$x_d$")
-plt.ylabel(r"$\mu_f(x_d)$")
+plt.xlabel(r"$x_u$")
+plt.ylabel(r"$P(x_u;3,1)$")
 plt.axvline(0.75, color='r', linestyle='--', linewidth=1.2)
 #plt.legend(loc=1)
 plt.savefig(f"./robust_opt_plots/betadist1_true.pdf", bbox_inches="tight")
@@ -148,6 +151,7 @@ plt.clf()
 
 
 
+import pdb; pdb.set_trace()
 
 
 

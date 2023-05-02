@@ -92,7 +92,7 @@ class RobustSampler():
             desc="keep the same points in the uncertain space as we traverse the design space",
         )
 
-
+        self._declare_options()
         self.options.update(kwargs)
 
         self.N = N

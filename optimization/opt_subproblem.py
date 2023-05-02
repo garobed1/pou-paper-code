@@ -379,14 +379,13 @@ class SequentialFullSolve(OptSubproblem):
             """
             if(self.options["gradient_proximity_ref"]):
                 grel = gerr-gtol
-                gclose = 1. - grel/grange
+                gclose = 1. - abs(grel/grange)
                 rmin = self.options["flat_refinement"] #minimum improvement
                 rcap = self.prob_truth.model.stat.get_fidelity()
 
                 fac = gclose - reflevel/rcap
 
                 refjump = rmin + max(0, int(fac*rcap))
-                # import pdb; pdb.set_trace()
 
             # grab sample data from the truth model if we are using a surrogate
             if self.prob_model.model.stat.surrogate and self.options["use_truth_to_train"]:

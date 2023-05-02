@@ -150,4 +150,3 @@ with open(f'{path}/{title}/errhrms.pickle', 'wb') as f:
 with open(f'{path}/{title}/errhmean.pickle', 'wb') as f:
     pickle.dump(errhmean, f)
         
-import pdb; pdb.set_trace()

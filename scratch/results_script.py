@@ -475,7 +475,7 @@ for n in cases[rank]:
     errhmean.append(ef2)
     co += 1
 
-
+# import pdb; pdb.set_trace()
 # #try:
 # if("comp_hist" in ssettings):
 #     iters = len(ef)

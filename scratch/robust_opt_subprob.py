@@ -24,22 +24,22 @@ from optimization.defaults import DefaultOptOptions
 
 plt.rcParams['font.size'] = '16'
 
-name = 'betaex_trust_demo'
+name = 'betaex_trust_demo_2'
 
 if not os.path.isdir(f"{name}"):
     os.mkdir(f"{name}")
 
 # surrogate
-grad_prox_ref = False
+grad_prox_ref = True
 use_truth_to_train = True #NEW, ONLY IF USING SURR
 
-use_surrogate = True
+use_surrogate = False
 full_surrogate = True
 
 use_design_noise = False #NEW, ONLY IF USING SURR
 design_noise = 0.0
 
-trust_region_bound = True #NEW
+trust_region_bound = False #NEW
 initial_trust_radius = 1.0
 
 print_plots = True
@@ -47,7 +47,7 @@ print_plots = True
 # set up robust objective UQ comp parameters
 u_dim = 1
 eta_use = 1.0
-N_t = 5000*u_dim
+N_t = 500*u_dim
 # N_t = 500*u_dim
 N_m = 10
 jump = 10
@@ -100,7 +100,7 @@ if use_surrogate:
 
 pdfs = [['beta', 3., 1.], 0.] # replace 2nd arg with the current design var
 
-max_outer = 3
+max_outer = 20
 opt_settings = {}
 opt_settings['ACC'] = 1e-6
 
@@ -242,18 +242,19 @@ for i in range(outer+1):
         ind0 = sum(jumps[:i])
     ind1 = sum(jumps[:i+1])
 
-    plt.plot(list(np.asarray(func_calls[ind0:ind1])+bigsum), objs[ind0:ind1], linestyle='-', marker='s', color='b', label='convergence')
+    plt.plot(list(np.asarray(func_calls[ind0:ind1+1])+bigsum), objs[ind0:ind1+1], linestyle='-', marker='s', color='b', label='model')
     plt.plot([func_calls[ind1]+bigsum,func_calls_t[i]+func_calls[ind1]], 
-             [objs[ind1], objs_t[i]], linestyle='-', marker='s', color='orange')
+             [objs[ind1], objs_t[i]], linestyle='-', marker='s', color='orange', label='validation')
     bigsum = func_calls_t[i]
 
 # plt.xscale("log")
 plt.xlabel(r"Function Calls")
 plt.ylabel(r"$\mu_f(x_d)$")
+plt.legend()
 
 plt.savefig(f"./{name}/convrobust1_true.pdf", bbox_inches="tight")
 
-
+import pdb; pdb.set_trace()
 
 plt.clf()
 
@@ -264,7 +265,7 @@ for i in range(outer+1):
         ind0 = sum(jumps[:i])
     ind1 = sum(jumps[:i+1])
 
-    plt.plot(xds[ind0:ind1], objs[ind0:ind1], linestyle='-', marker='s',color='b')
+    plt.plot(xds[ind0:ind1+1], objs[ind0:ind1+1], linestyle='-', marker='s',color='b')
     plt.plot(xds_t[i], objs_t[i], linestyle='-', marker='s', color='orange')
 
 
