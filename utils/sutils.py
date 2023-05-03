@@ -713,16 +713,16 @@ def print_rc_plots(n, bounds, name, obj):
         plt.legend(loc=0)
         plt.xlabel(r'$x_1$')
         plt.ylabel(r'$\psi_{\mathrm{CV},%i}(x_1)$' % (obj.ntr-10))
-        wheret = np.full([ndir], True)
-        for i in range(obj.ntr):
-            # ax.fill_betweenx([-1,0], trxs[i]-obj.S, trxs[i]+obj.S, color='r', alpha=0.2, set_edgecolor='face')
-            for j in range(ndir):
-                if(x[j] > trxs[i]-obj.S and x[j] < trxs[i]+obj.S):
-                    wheret[j] = False
-        valid = np.where(wheret)[0]
-        yfill = np.zeros(ndir)
-        ax.fill_between(x,  0., 1., where=wheret, color = 'g', alpha=0.2)
-        plt.axvline(x[valid[np.argmax(F[valid])]], color='k', linestyle='--', linewidth=1.2)
+        # wheret = np.full([ndir], True)
+        # for i in range(obj.ntr):
+        #     # ax.fill_betweenx([-1,0], trxs[i]-obj.S, trxs[i]+obj.S, color='r', alpha=0.2, set_edgecolor='face')
+        #     for j in range(ndir):
+        #         if(x[j] > trxs[i]-obj.S and x[j] < trxs[i]+obj.S):
+        #             wheret[j] = False
+        # valid = np.where(wheret)[0]
+        # yfill = np.zeros(ndir)
+        # ax.fill_between(x,  0., 1., where=wheret, color = 'g', alpha=0.2)
+        # plt.axvline(x[valid[np.argmax(F[valid])]], color='k', linestyle='--', linewidth=1.2)
         plt.savefig(f"{name}_rc_1d_{obj.ntr}.pdf", bbox_inches="tight")  
         plt.clf()
         import pdb; pdb.set_trace()

@@ -135,6 +135,41 @@ class MixedSine(Problem):
         else:
             y[:,0] = -1./(x[:,0]*x[:,1]*x[:,kx])*np.cos(1./(x[:,0]*x[:,1]))
         return y
+    
+class SimpleConvex(Problem):
+    def _initialize(self):
+        self.options.declare("ndim", 1, values=[1], types=int)
+        self.options.declare("order", 4, types=int)
+        self.options.declare("name", "MixedSine", types=str)
+
+    def _setup(self):
+        self.xlimits[:, 0] = 0.0
+        self.xlimits[:, 1] = 1.0
+
+    def _evaluate(self, x, kx):
+        """
+        Arguments
+        ---------
+        x : ndarray[ne, nx]
+            Evaluation points.
+        kx : int or None
+            Index of derivative (0-based) to return values with respect to.
+            None means return function value rather than derivative.
+
+        Returns
+        -------
+        ndarray[ne, 1]
+            Functions values if kx=None or derivative values if kx is an int.
+        """
+        ne, nx = x.shape
+        ord = self.options["order"]
+
+        y = np.zeros((ne, 1), complex)
+        if kx is None:
+            y[:,0] = x[:,0]**ord
+        else:
+            y[:,0] = ord*x[:,0]**(ord-1)
+        return y
 
 
 if __name__ == '__main__':

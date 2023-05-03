@@ -5,14 +5,14 @@ from matplotlib import pyplot as plt
 from smt.utils.options_dictionary import OptionsDictionary
 from smt.sampling_methods import LHS
 from smt.surrogate_models import GEKPLS, KPLS, KRG
-from surrogate.pougrad import POUCV, POUError, POUErrorVol, POUMetric, POUSurrogate
+from surrogate.pougrad import POUCV, POUError, POUErrorVol, POUMetric, POUSurrogate, POUHessian
 from infill.refinecriteria import ASCriteria
 from scipy.linalg import lstsq, eig
 from scipy.stats import qmc
 from scipy.spatial import KDTree
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.optimize import Bounds
-from utils.sutils import innerMatrixProduct, quadraticSolveHOnly, symMatfromVec, estimate_pou_volume, print_rc_plots
+from utils.sutils import innerMatrixProduct, quadraticSolveHOnly, symMatfromVec, estimate_pou_volume, print_rc_plots, standardization2
 
 
 """
@@ -100,14 +100,29 @@ class HessianRefine(ASCriteria):
             self.nnew = 1
 
         #NOTE: Slicing here because GEKPLS appends grad approx
-        trx = self.model.X_norma[0:self.ntr]#model.training_points[None][0][0]
-        trf = self.model.y_norma[0:self.ntr]#training_points[None][0][1]
-        trg = np.zeros_like(trx)
-        # if(isinstance(self.model, GEKPLS)):
-        #     for j in range(self.dim):
-        #         trg[:,j] = self.model.g_norma[:,j].flatten()
-        # else:
-        trg = self.grad*(self.model.X_scale/self.model.y_std)
+        if not isinstance(self.model, POUHessian):
+            trxs = self.model.training_points[None][0][0]
+            trfs = self.model.training_points[None][0][1]
+            trg = np.zeros_like(trxs)
+            (
+                trx,
+                trf,
+                X_offset,
+                y_mean,
+                X_scale,
+                y_std,
+            ) = standardization2(trxs, trfs, self.bounds)
+
+            trg = self.grad*(X_scale/y_std)
+        else:
+            trx = self.model.X_norma[0:self.ntr]#model.training_points[None][0][0]
+            trf = self.model.y_norma[0:self.ntr]#training_points[None][0][1]
+            trg = np.zeros_like(trx)
+            # if(isinstance(self.model, GEKPLS)):
+            #     for j in range(self.dim):
+            #         trg[:,j] = self.model.g_norma[:,j].flatten()
+            # else:
+            trg = self.grad*(self.model.X_scale/self.model.y_std)
 
 
         self.trx = trx

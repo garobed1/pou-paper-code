@@ -99,8 +99,8 @@ for i in range(nprocs):
     xk = xk + xtrainK[i][:]
     fk = fk + ftrainK[i][:]
     gk = gk + gtrainK[i][:]
-    ekr = ekr + errkrms[i][:]
-    ekm = ekm + errkmean[i][:]
+    # ekr = ekr + errkrms[i][:]
+    # ekm = ekm + errkmean[i][:]
     mf = mf + modelf[i][:]
     e0r = e0r + err0rms[i]
     e0m = e0m + err0mean[i]
@@ -141,21 +141,21 @@ if(dim > 3):
 else:
     intervals = np.arange(iters)
 
-itersk = len(ekr[0])
+# itersk = len(ekr[0])
 if(title2):
     iterst = len(ehrt[0])
     if(iterst < iters):
         iters = iterst
 
 samplehist = np.zeros(iters, dtype=int)
-samplehistk = np.zeros(itersk, dtype=int)
+# samplehistk = np.zeros(itersk, dtype=int)
 
 samplehist[0] = hi[0][0][0][0].shape[0] #training_points 
 for i in range(1, iters-1):
     samplehist[i] = samplehist[i-1] + (intervals[1] - intervals[0])
 samplehist[iters-1] = mf[0].training_points[None][0][0].shape[0]
-for i in range(itersk):
-    samplehistk[i] = len(xk[i])
+# for i in range(itersk):
+#     samplehistk[i] = len(xk[i])
 
 if(title2):
     xt = np.linspace(0, samplehist[-1]-samplehist[0], iters, dtype=int)
@@ -167,9 +167,9 @@ if(title2):
 ehrm = np.zeros(iters)
 ehmm = np.zeros(iters)
 ehsm = np.zeros(iters) 
-ekrm = np.zeros(itersk)
-ekmm = np.zeros(itersk)
-eksm = np.zeros(itersk)
+# ekrm = np.zeros(itersk)
+# ekmm = np.zeros(itersk)
+# eksm = np.zeros(itersk)
 if(title2):
     ehrmt = np.zeros(iters)
     ehmmt = np.zeros(iters)
@@ -179,9 +179,9 @@ for i in range(nruns):
     ehrm += np.array(ehr[i]).T[0]/nruns
     ehmm += np.array(ehm[i]).T[0][0]/nruns
     ehsm += np.array(ehm[i]).T[0][1]/nruns
-    ekrm += np.array(ekr[i]).T[0]/nruns
-    ekmm += np.array(ekm[i]).T[0][0]/nruns
-    eksm += np.array(ekm[i]).T[0][1]/nruns
+    # ekrm += np.array(ekr[i]).T[0]/nruns
+    # ekmm += np.array(ekm[i]).T[0][0]/nruns
+    # eksm += np.array(ekm[i]).T[0][1]/nruns
     if(title2):
         ehrmt += np.array(ehrt[i]).T[0]/nruns
         ehmmt += np.array(ehmt[i]).T[0][0]/nruns
@@ -194,7 +194,7 @@ for i in range(nruns):
 #NRMSE
 ax = plt.gca()
 plt.loglog(samplehist, ehrm, "b-", label=f'Adaptive')
-plt.loglog(samplehistk, ekrm, 'k-', label='LHS')
+# plt.loglog(samplehistk, ekrm, 'k-', label='LHS')
 if(title2):
     plt.loglog(samplehist, ehrmt, "r-", label=f'TEAD NRMSE')
 plt.xlabel("Number of samples")
@@ -211,7 +211,7 @@ plt.clf()
 
 ax = plt.gca()
 plt.loglog(samplehist, ehmm, "b-", label='Adaptive' )
-plt.loglog(samplehistk, ekmm, 'k-', label='LHS')
+# plt.loglog(samplehistk, ekmm, 'k-', label='LHS')
 plt.xlabel("Number of samples")
 plt.ylabel("Mean Error")
 plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehmm[0])))
@@ -227,7 +227,7 @@ plt.clf()
 
 ax = plt.gca()
 plt.loglog(samplehist, ehsm, "b-", label='Adaptive' )
-plt.loglog(samplehistk, eksm, 'k-', label='LHS')
+# plt.loglog(samplehistk, eksm, 'k-', label='LHS')
 plt.xlabel("Number of samples")
 plt.ylabel(r"$\sigma$ Error")
 plt.gca().set_ylim(top=10 ** math.ceil(math.log10(ehsm[0])))

@@ -1,5 +1,5 @@
 
-header = "testing_what_wrong_with_hess"
+header = "testing_what_wrong_with_hess_gek"
 path = None
 skip_LHS = True 
 LHS_batch = 7
@@ -7,11 +7,11 @@ runs_per_proc = 1
 
 # Problem Conditions
 prob  = "arctan"    #problem
-dim = 1     #problem dimension
+dim = 2     #problem dimension
 
 
 # Surrogate Settings
-stype = "pouhess" #"pouhess"   #surrogate type
+stype = "gekpls" #"pouhess"   #surrogate type
 
 ### FOR POU HESS
 rtype =  "hess"
@@ -37,7 +37,7 @@ poly  = "linear"    #kriging regression
 delta_x = 1e-4 #1e-7
 extra = dim           #gek extra points
 t0 = [1e-0]
-tb = [1e-5, 2e+1]
+tb = [1e-6, 2e+1]
 rscale = 5.5
 rho = 10           #POU parameter
 
@@ -71,4 +71,4 @@ obj = "inv"
 nscale = 10.0 #1.0 for 2D
 nmatch = dim
 
-rc_print = False#False
+rc_print = False
