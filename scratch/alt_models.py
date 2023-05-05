@@ -47,8 +47,10 @@ if not os.path.isdir(title):
 prob = title.split("_")[-2]
 plt.rcParams['font.size'] = '18'
 plt.rc('legend',fontsize=14)
+# import pdb; pdb.set_trace()
 
 # Adaptive Data
+sys.path.append('../surrogate')
 with open(f'{title}/modelf.pickle', 'rb') as f:
     modelf = pickle.load(f)
 with open(f'{title}/err0rms.pickle', 'rb') as f:
@@ -297,6 +299,9 @@ slima1 = slim*10
 slima2 = slim*10
 slimh1 = slim*10
 slimh2 = slim*10
+
+
+
 
 for k in range(nperr):
     ind = k + rank*nperr
