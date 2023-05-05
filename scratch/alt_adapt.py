@@ -31,6 +31,7 @@ Adaptive sampling-based surrogate error
 """
 
 # Give directory with desired results as argument
+delta_x = 1e-7
 title = sys.argv[1]
 alt_model = ['POU','KRG','GEK']#sys.argv[2]
 #impath = title.rsplit('.')
@@ -92,17 +93,18 @@ if(dim > 1):
     modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
     modelbase2.options.update({"poly":ssettings["poly"]})
     modelbase2.options.update({"n_start":5})
+    modelbase2.options.update({"delta_x":delta_x})
     if(dim > 2):
         modelbase2.options.update({"zero_out_y":True})
-else:
-    modelbase2 = KRG()
-    #modelgek.options.update({"hyper_opt":"TNC"})
-    modelbase2.options.update({"theta0":ssettings["t0"]})
-    modelbase2.options.update({"theta_bounds":ssettings["tb"]})
-    modelbase2.options.update({"corr":"squar_exp"})#})
-    modelbase2.options.update({"poly":ssettings["poly"]})
-    modelbase2.options.update({"n_start":5})
-    modelbase2.options.update({"print_prediction":False})
+# else:
+#     modelbase2 = KRG()
+#     #modelgek.options.update({"hyper_opt":"TNC"})
+#     modelbase2.options.update({"theta0":ssettings["t0"]})
+#     modelbase2.options.update({"theta_bounds":ssettings["tb"]})
+#     modelbase2.options.update({"corr":"squar_exp"})#})
+#     modelbase2.options.update({"poly":ssettings["poly"]})
+#     modelbase2.options.update({"n_start":5})
+#     modelbase2.options.update({"print_prediction":False})
 
 
 modelbase1 = KRG()
@@ -161,7 +163,7 @@ for m in range(iters):
                 models[j].set_training_derivatives(xtrain, gtrain[:,i:i+1], i)
         models[j].train()
 
-        if(ftrain.shape[0] > 0):
+        if(ftrain.shape[0] > 1000):
             ndir = 150
             xlimits = trueFunc.xlimits
             x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
@@ -188,7 +190,7 @@ for m in range(iters):
             plt.plot(xtrain[nt0:,0], xtrain[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
             plt.savefig(f"{title}/2d_errcon_a.pdf", bbox_inches="tight")
             plt.clf()
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
 
 
         errors[j].append(rmse(models[j], trueFunc, N=Nerr, xdata=xref, fdata=fref))

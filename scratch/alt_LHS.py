@@ -28,6 +28,7 @@ LHS based surrogate error
 """
 
 # Give directory with desired results as argument
+delta_x = 1e-7
 title = sys.argv[1]
 alt_model = ['POU','KRG','GEK']#sys.argv[2]
 #impath = title.rsplit('.')
@@ -92,17 +93,19 @@ if(dim > 1):
     modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
     modelbase2.options.update({"poly":ssettings["poly"]})
     modelbase2.options.update({"n_start":5})
+    modelbase2.options.update({"delta_x":delta_x})
     if(dim > 2):
         modelbase2.options.update({"zero_out_y":True})
-else:
-    modelbase2 = KRG()
-    #modelgek.options.update({"hyper_opt":"TNC"})
-    modelbase2.options.update({"theta0":ssettings["t0"]})
-    modelbase2.options.update({"theta_bounds":ssettings["tb"]})
-    modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
-    modelbase2.options.update({"poly":ssettings["poly"]})
-    modelbase2.options.update({"n_start":5})
-    modelbase2.options.update({"print_prediction":False})
+    
+# else:
+#     modelbase2 = KRG()
+#     #modelgek.options.update({"hyper_opt":"TNC"})
+#     modelbase2.options.update({"theta0":ssettings["t0"]})
+#     modelbase2.options.update({"theta_bounds":ssettings["tb"]})
+#     modelbase2.options.update({"corr":"squar_exp"})#ssettings["corr"]})
+#     modelbase2.options.update({"poly":ssettings["poly"]})
+#     modelbase2.options.update({"n_start":5})
+#     modelbase2.options.update({"print_prediction":False})
 
 
 modelbase1 = KRG()
