@@ -563,6 +563,15 @@ if rank == 0:
 
 
 
+    with open(f'{title}/errhrmsgek.pickle', 'wb') as f:
+        pickle.dump(ear2, f)
+    with open(f'{title}/errhrmskrg.pickle', 'wb') as f:
+        pickle.dump(ear1, f)
+    with open(f'{title}/errkrmsgek.pickle', 'wb') as f:
+        pickle.dump(ehr2, f)
+    with open(f'{title}/errkrmskrg.pickle', 'wb') as f:
+        pickle.dump(ehr1, f)
+
     with open(f'{title}/meanspou.pickle', 'wb') as f:
         pickle.dump(meanspou, f)
     with open(f'{title}/meanskrg.pickle', 'wb') as f:
