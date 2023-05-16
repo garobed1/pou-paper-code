@@ -266,4 +266,37 @@ if __name__ == '__main__':
     plt.savefig(f"./2dES.pdf", bbox_inches="tight")
     plt.clf()
 
+
+    #contour
+    plt.rcParams['font.size'] = '16'
+    ndir = 150
+    func = MixedSine(ndim=2)
+    xlimits = func.xlimits
+    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+    y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
+
+    X, Y = np.meshgrid(x, y)
+    Za = np.zeros([ndir, ndir])
+    Zk = np.zeros([ndir, ndir])
+    F  = np.zeros([ndir, ndir])
+    FK  = np.zeros([ndir, ndir])
+    TF = np.zeros([ndir, ndir])
+
+    for i in range(ndir):
+        for j in range(ndir):
+            xi = np.zeros([1,2])
+            xi[0,0] = x[i]
+            xi[0,1] = y[j]
+            TF[j,i] = func(xi)
+
+    # Plot original function
+    cs = plt.contourf(X, Y, TF, levels = 40)
+    plt.colorbar(cs, aspect=20)
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    #plt.legend(loc=1)
+    plt.savefig(f"mixedsine_true.pdf", bbox_inches="tight")
+
+    plt.clf()
+
     import pdb; pdb.set_trace()

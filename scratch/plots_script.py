@@ -63,17 +63,24 @@ with open(f'{title}/errhmean.pickle', 'rb') as f:
     errhmean = pickle.load(f)
 # import pdb; pdb.set_trace()
 # LHS Data
-with open(f'{title}/xk.pickle', 'rb') as f:
-    xtrainK = pickle.load(f)
-with open(f'{title}/fk.pickle', 'rb') as f:
-    ftrainK = pickle.load(f)
-with open(f'{title}/gk.pickle', 'rb') as f:
-    gtrainK = pickle.load(f)
-with open(f'{title}/errkrms.pickle', 'rb') as f:
-    errkrms = pickle.load(f)
-with open(f'{title}/errkmean.pickle', 'rb') as f:
-    errkmean = pickle.load(f)
-
+try:
+    with open(f'{title}/xk.pickle', 'rb') as f:
+        xtrainK = pickle.load(f)
+    with open(f'{title}/fk.pickle', 'rb') as f:
+        ftrainK = pickle.load(f)
+    with open(f'{title}/gk.pickle', 'rb') as f:
+        gtrainK = pickle.load(f)
+    with open(f'{title}/errkrms.pickle', 'rb') as f:
+        errkrms = pickle.load(f)
+    with open(f'{title}/errkmean.pickle', 'rb') as f:
+        errkmean = pickle.load(f)
+except:
+    xtrainK = None
+    ftrainK = None
+    gtrainK = None
+    errkrms = None
+    errkmean = None
+    print("no lhs")
 
 # Concatenate lists
 xk = []
@@ -96,9 +103,12 @@ if(title2):
     ehmt = []
 nprocs = len(modelf)
 for i in range(nprocs):
-    xk = xk + xtrainK[i][:]
-    fk = fk + ftrainK[i][:]
-    gk = gk + gtrainK[i][:]
+    try:
+        xk = xk + xtrainK[i][:]
+        fk = fk + ftrainK[i][:]
+        gk = gk + gtrainK[i][:]
+    except:
+        print("no")
     # ekr = ekr + errkrms[i][:]
     # ekm = ekm + errkmean[i][:]
     mf = mf + modelf[i][:]
@@ -116,7 +126,7 @@ for i in range(nprocs):
         ehmt = ehmt + errhmeant[i][:]
 
 nruns = len(mf)
-dim = xk[0].shape[1]
+dim = mf[0].training_points[None][0][0].shape[1]
 
 
 # Problem Settings
@@ -188,7 +198,175 @@ for i in range(nruns):
         ehsmt += np.array(ehmt[i]).T[0][1]/nruns
 
 
+if(dim == 1):
+    # plt.clf()
+    # nt0 = samplehist[0]
+    # # Plot Training Points
+    # plt.plot(trx[0:nt0,0], np.zeros(trx[0:nt0,0].shape[0]), "bo", label='Initial Samples')
+    # plt.plot(trx[nt0:,0], np.zeros(trx[nt0:,0].shape[0]), "ro", label='Adaptive Samples')
+    # plt.xlabel(r"$x$")
+    # plt.ylabel(r"$f$")
+    # #plt.legend(loc=1)
+    # plt.savefig(f"{title}/1d_adaptive_pts.pdf", bbox_inches="tight")#"tight")
+    # plt.clf()
 
+    ndir = 75
+    xlimits = trueFunc.xlimits
+    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+
+    Z = np.zeros([ndir])
+    Zh = np.zeros([ndir])
+    F = np.zeros([ndir])
+    Fh = np.zeros([ndir])
+    TF = np.zeros([ndir])
+    pmod = mf[0]
+    for i in range(ndir):
+        xi = np.zeros([1,1])
+        xi[0] = x[i]
+        TF[i] = trueFunc(xi)
+        F[i] = pmod.predict_values(xi)
+        # Fh[i] = mk.predict_values(xi)
+        Z[i] = abs(F[i] - TF[i])
+        # Zh[i] = abs(Fh[i] - TF[i])
+
+    # Plot Non-Adaptive Error
+    tk = pmod.training_points[None][0][0]
+    tkf = pmod.training_points[None][0][1]
+    plt.plot(x, TF, "-k", label=f'True')
+    plt.plot(x, F, "-b", label=f'POU')
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$f(\mathbf{x})$")
+    #plt.legend(loc=1)
+    plt.plot(tk[:10,0], tkf[:10,0], "bo", label='LHS Points')
+    plt.plot(tk[10:,0], tkf[10:,0], "ro", label='Adaptive Points')
+    plt.legend(fontsize='13')
+    plt.savefig(f"{title}/1d_models_adapt_{prob}.pdf", bbox_inches="tight")
+    plt.clf()
+
+    # # Plot the target function
+    # plt.plot(x, TF, "-k", label=f'True')
+    # plt.xlabel(r"$x$")
+    # plt.ylabel(r"$f$")
+    # #plt.legend(loc=1)
+    # plt.savefig(f"{title}/1dtrue.pdf", bbox_inches="tight")
+    # plt.clf()
+
+    # # Plot Non-Adaptive Error
+    # plt.plot(x, TF, "-k", label=f'True')
+    # # plt.plot(x, Fgek, "-m", label=f'IGEK')
+    # plt.plot(x, F, "-b", label=f'AS')
+    # plt.xlabel(r"$x$")
+    # plt.ylabel(r"$f$")
+    # #plt.legend(loc=1)
+    # plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", label='Initial Samples')
+    # plt.plot(trx[nt0:,0], trf[nt0:,0], "ro", label='Adaptive Samples')
+    # plt.savefig(f"{title}/1dplot.pdf", bbox_inches="tight")
+    # plt.clf()
+
+    # # Plot Non-Adaptive Error
+    # # plt.plot(x, Zgek, "-m", label=f'IGEK')
+    # plt.plot(x, Z, "-k", label=f'Adaptive (POU)')
+    # plt.plot(x, Zh, "--k", label=f'LHS (POU)')
+    # plt.xlabel(r"$x$")
+    # plt.ylabel(r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
+    # plt.plot(trx[0:nt0,0], np.zeros_like(trf[0:nt0,0]), "bo", label='Initial Samples')
+    # plt.plot(trx[nt0:,0], np.zeros_like(trf[nt0:,0]), "ro", label='Added Samples')
+    # plt.plot(trxk, max(np.max(Z), np.max(Zh))*np.ones_like(trxk), "ko", label='LHS Samples')
+    # plt.legend(fontsize='13')
+    # plt.savefig(f"{title}/1derr.pdf", bbox_inches="tight")
+
+    plt.clf()
+
+if(dim == 2):
+
+    # plt.clf()
+    # nt0 = samplehist[0]
+    # # Plot Training Points
+    # plt.plot(trx[0:nt0,0], trx[0:nt0,1], "bo", label='Initial Samples')
+    # plt.plot(trx[nt0:,0], trx[nt0:,1], "ro", label='Adaptive Samples')
+    # plt.xlabel(r"$x_1$")
+    # plt.ylabel(r"$x_2$")
+    # #plt.legend(loc=1)
+    # plt.savefig(f"{title}/2d_adaptive_pts.pdf", bbox_inches="tight")#"tight")
+    # plt.clf()
+    
+    # plt.clf()
+    # # Plot Training Points
+    # plt.plot(trxk[:,0], trxk[:,1], "bo", label='LHS Points')
+    # plt.xlabel(r"$x_1$")
+    # plt.ylabel(r"$x_2$")
+    # #plt.legend(loc=1)
+    # plt.savefig(f"{title}/2d_lhs_pts.pdf", bbox_inches="tight")#"tight")
+    # plt.clf()
+
+    # Plot Error contour
+    #contour
+    ndir = 150
+    xlimits = trueFunc.xlimits
+    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
+    y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
+
+    X, Y = np.meshgrid(x, y)
+    Za = np.zeros([ndir, ndir])
+    Zk = np.zeros([ndir, ndir])
+    F  = np.zeros([ndir, ndir])
+    FK  = np.zeros([ndir, ndir])
+    TF = np.zeros([ndir, ndir])
+    pmod = mf[0]
+    for i in range(ndir):
+        for j in range(ndir):
+            xi = np.zeros([1,2])
+            xi[0,0] = x[i]
+            xi[0,1] = y[j]
+            F[j,i]  = pmod.predict_values(xi)
+            # FK[j,i] = mk.predict_values(xi)
+            TF[j,i] = trueFunc(xi)
+            Za[j,i] = abs(F[j,i] - TF[j,i])
+            # Zk[j,i] = abs(FK[j,i] - TF[j,i])
+
+    # # Plot original function
+    # cs = plt.contourf(X, Y, TF, levels = 40)
+    # plt.colorbar(cs, aspect=20)
+    # plt.xlabel(r"$x_1$")
+    # plt.ylabel(r"$x_2$")
+    # #plt.legend(loc=1)
+    # plt.savefig(f"{title}/2d_true.pdf", bbox_inches="tight")
+
+    # plt.clf()
+
+    tk = pmod.training_points[None][0][0]
+    cs = plt.contourf(X, Y, F, levels=np.linspace(-2.0, 2.0, 30))
+    cbar = plt.colorbar(cs)
+    cbar.set_label(r"$\hat{f}(\mathbf{x})$")
+    plt.xlabel(r"$x_1$")
+    plt.ylabel(r"$x_2$")
+    plt.plot(tk[:20,0], tk[:20,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='LHS Points')
+    plt.plot(tk[20:,0], tk[20:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Points')
+    plt.legend(fontsize=13)
+    plt.savefig(f"{title}/2d_models_adapt_{prob}.pdf", bbox_inches="tight")
+    plt.clf()
+
+    # cs = plt.contourf(X, Y, Za, levels = 40)
+    # plt.colorbar(cs, aspect=20, label = r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
+    # plt.xlabel(r"$x_1$")
+    # plt.ylabel(r"$x_2$")
+    # #plt.legend(loc=1)
+    # plt.plot(trx[0:nt0,0], trx[0:nt0,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
+    # plt.plot(trx[nt0:,0], trx[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
+    # plt.savefig(f"{title}/2d_errcon_a.pdf", bbox_inches="tight")
+
+    # plt.clf()
+
+    # # Plot Non-Adaptive Error
+    # tk = mk.training_points[None][0][0]
+    # plt.contourf(X, Y, Zk, levels = cs.levels, label = r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
+    # plt.colorbar(cs, )
+    # plt.xlabel(r"$x_1$")
+    # plt.ylabel(r"$x_2$")
+    # plt.plot(tk[:,0], tk[:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='LHS Samples')
+    # plt.savefig(f"{title}/2d_errcon_k.pdf", bbox_inches="tight")
+
+    plt.clf()
 
 
 #NRMSE
@@ -288,150 +466,9 @@ if(snapshot):
 
 # # Plot points
 
-if(dim == 1):
-    plt.clf()
-    nt0 = samplehist[0]
-    # Plot Training Points
-    plt.plot(trx[0:nt0,0], np.zeros(trx[0:nt0,0].shape[0]), "bo", label='Initial Samples')
-    plt.plot(trx[nt0:,0], np.zeros(trx[nt0:,0].shape[0]), "ro", label='Adaptive Samples')
-    plt.xlabel(r"$x$")
-    plt.ylabel(r"$f$")
-    #plt.legend(loc=1)
-    plt.savefig(f"{title}/1d_adaptive_pts.pdf", bbox_inches="tight")#"tight")
-    plt.clf()
-
-    ndir = 75
-    xlimits = trueFunc.xlimits
-    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
-
-    Z = np.zeros([ndir])
-    Zh = np.zeros([ndir])
-    F = np.zeros([ndir])
-    Fh = np.zeros([ndir])
-    TF = np.zeros([ndir])
-
-    for i in range(ndir):
-        xi = np.zeros([1,1])
-        xi[0] = x[i]
-        TF[i] = trueFunc(xi)
-        F[i] = pmod.predict_values(xi)
-        Fh[i] = mk.predict_values(xi)
-        Z[i] = abs(F[i] - TF[i])
-        Zh[i] = abs(Fh[i] - TF[i])
-
-    # Plot the target function
-    plt.plot(x, TF, "-k", label=f'True')
-    plt.xlabel(r"$x$")
-    plt.ylabel(r"$f$")
-    #plt.legend(loc=1)
-    plt.savefig(f"{title}/1dtrue.pdf", bbox_inches="tight")
-    plt.clf()
-
-    # Plot Non-Adaptive Error
-    plt.plot(x, TF, "-k", label=f'True')
-    # plt.plot(x, Fgek, "-m", label=f'IGEK')
-    plt.plot(x, F, "-b", label=f'AS')
-    plt.xlabel(r"$x$")
-    plt.ylabel(r"$f$")
-    #plt.legend(loc=1)
-    plt.plot(trx[0:nt0,0], trf[0:nt0,0], "bo", label='Initial Samples')
-    plt.plot(trx[nt0:,0], trf[nt0:,0], "ro", label='Adaptive Samples')
-    plt.savefig(f"{title}/1dplot.pdf", bbox_inches="tight")
-    plt.clf()
-
-    # Plot Non-Adaptive Error
-    # plt.plot(x, Zgek, "-m", label=f'IGEK')
-    plt.plot(x, Z, "-k", label=f'Adaptive (POU)')
-    plt.plot(x, Zh, "--k", label=f'LHS (POU)')
-    plt.xlabel(r"$x$")
-    plt.ylabel(r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
-    plt.plot(trx[0:nt0,0], np.zeros_like(trf[0:nt0,0]), "bo", label='Initial Samples')
-    plt.plot(trx[nt0:,0], np.zeros_like(trf[nt0:,0]), "ro", label='Added Samples')
-    plt.plot(trxk, max(np.max(Z), np.max(Zh))*np.ones_like(trxk), "ko", label='LHS Samples')
-    plt.legend(fontsize='13')
-    plt.savefig(f"{title}/1derr.pdf", bbox_inches="tight")
-
-    plt.clf()
 
 
-if(dim == 2):
 
-    plt.clf()
-    nt0 = samplehist[0]
-    # Plot Training Points
-    plt.plot(trx[0:nt0,0], trx[0:nt0,1], "bo", label='Initial Samples')
-    plt.plot(trx[nt0:,0], trx[nt0:,1], "ro", label='Adaptive Samples')
-    plt.xlabel(r"$x_1$")
-    plt.ylabel(r"$x_2$")
-    #plt.legend(loc=1)
-    plt.savefig(f"{title}/2d_adaptive_pts.pdf", bbox_inches="tight")#"tight")
-    plt.clf()
-    
-    plt.clf()
-    # Plot Training Points
-    plt.plot(trxk[:,0], trxk[:,1], "bo", label='LHS Points')
-    plt.xlabel(r"$x_1$")
-    plt.ylabel(r"$x_2$")
-    #plt.legend(loc=1)
-    plt.savefig(f"{title}/2d_lhs_pts.pdf", bbox_inches="tight")#"tight")
-    plt.clf()
-
-    # Plot Error contour
-    #contour
-    ndir = 150
-    xlimits = trueFunc.xlimits
-    x = np.linspace(xlimits[0][0], xlimits[0][1], ndir)
-    y = np.linspace(xlimits[1][0], xlimits[1][1], ndir)
-
-    X, Y = np.meshgrid(x, y)
-    Za = np.zeros([ndir, ndir])
-    Zk = np.zeros([ndir, ndir])
-    F  = np.zeros([ndir, ndir])
-    FK  = np.zeros([ndir, ndir])
-    TF = np.zeros([ndir, ndir])
-
-    for i in range(ndir):
-        for j in range(ndir):
-            xi = np.zeros([1,2])
-            xi[0,0] = x[i]
-            xi[0,1] = y[j]
-            F[j,i]  = pmod.predict_values(xi)
-            FK[j,i] = mk.predict_values(xi)
-            TF[j,i] = trueFunc(xi)
-            Za[j,i] = abs(F[j,i] - TF[j,i])
-            Zk[j,i] = abs(FK[j,i] - TF[j,i])
-
-    # Plot original function
-    cs = plt.contourf(X, Y, TF, levels = 40)
-    plt.colorbar(cs, aspect=20)
-    plt.xlabel(r"$x_1$")
-    plt.ylabel(r"$x_2$")
-    #plt.legend(loc=1)
-    plt.savefig(f"{title}/2d_true.pdf", bbox_inches="tight")
-
-    plt.clf()
-
-    cs = plt.contourf(X, Y, Za, levels = 40)
-    plt.colorbar(cs, aspect=20, label = r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
-    plt.xlabel(r"$x_1$")
-    plt.ylabel(r"$x_2$")
-    #plt.legend(loc=1)
-    plt.plot(trx[0:nt0,0], trx[0:nt0,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='Initial Samples')
-    plt.plot(trx[nt0:,0], trx[nt0:,1], "o", fillstyle='full', markerfacecolor='r', markeredgecolor='r', label='Adaptive Samples')
-    plt.savefig(f"{title}/2d_errcon_a.pdf", bbox_inches="tight")
-
-    plt.clf()
-
-    # Plot Non-Adaptive Error
-    tk = mk.training_points[None][0][0]
-    plt.contourf(X, Y, Zk, levels = cs.levels, label = r"$|\hat{f}(\mathbf{x}) - f(\mathbf{x})|$")
-    plt.colorbar(cs, )
-    plt.xlabel(r"$x_1$")
-    plt.ylabel(r"$x_2$")
-    plt.plot(tk[:,0], tk[:,1], "o", fillstyle='full', markerfacecolor='b', markeredgecolor='b', label='LHS Samples')
-    plt.savefig(f"{title}/2d_errcon_k.pdf", bbox_inches="tight")
-
-    plt.clf()
 
 
 

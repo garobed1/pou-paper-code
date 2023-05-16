@@ -1,17 +1,17 @@
 
-header = "testing_what_wrong_with_hess_gek"
+header = "getting_adapt_plots"
 path = None
 skip_LHS = True 
 LHS_batch = 7
 runs_per_proc = 1
 
 # Problem Conditions
-prob  = "arctan"    #problem
-dim = 2     #problem dimension
+prob  = "fuhgp3"    #problem
+dim = 1     #problem dimension
 
 
 # Surrogate Settings
-stype = "gekpls" #"pouhess"   #surrogate type
+stype = "pouhess"   #surrogate type
 
 ### FOR POU HESS
 rtype =  "hess"
@@ -42,8 +42,8 @@ rscale = 5.5
 rho = 10           #POU parameter
 
 # Adaptive Sampling Settings
-nt0  = 20       #initial design size
-ntr = 20      #number of points to add
+nt0  = 10       #initial design size
+ntr = 10      #number of points to add
 ntot = nt0 + ntr    #total number of points
 batch = 1#dim*2        #batch size for refinement, as a percentage of ntr
 Nerr = 5000*dim       #number of test points to evaluate the error
