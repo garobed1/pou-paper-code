@@ -139,7 +139,7 @@ class POUSurrogate(SurrogateModel):
             # for i in range(numsample):
 
             work = x - xc
-            dist = D[k,neighbors] + delta#np.sqrt(D[0][i] + delta)
+            dist = np.sqrt(D[k,neighbors]**2 + delta)
             expfac = np.exp(-rho*(dist-mindist[k]))
             # local = np.zeros(numsample)
 
@@ -227,8 +227,8 @@ class POUSurrogate(SurrogateModel):
             # evaluate the surrogate, requiring the distance from every point
             # for i in range(numsample):
             work = x - xc
-            dist = D[k,:] + delta#np.sqrt(D[0][i] + delta)
-            ddist = work[:,kx]/D[k,:]
+            dist = np.sqrt(D[k,:]**2 + delta)
+            ddist = (work[:,kx]/D[k,:])*(D[k,:]/dist)
 
             expfac = np.exp(-rho*(dist-mindist[k]))
             dexpfac = -rho*expfac*ddist
@@ -252,7 +252,7 @@ class POUSurrogate(SurrogateModel):
             dy_dx_[k] = (denom*dnumer - numer*ddenom)/(denom**2)
 
         y = (self.y_mean + self.y_std * y_).ravel()
-        dy_dx = (self.y_std * dy_dx_).ravel()/4 # need to find why this is needed
+        dy_dx = (self.y_std * dy_dx_).ravel()/self.X_scale[kx] 
         # print("mindist  = ", exec1)
         # print("evaluate = ", exec2)
         # import pdb; pdb.set_trace()
